@@ -1,0 +1,123 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [{"expr": "sum(rate(http_server_requests_seconds_count[1m]))", "refId": "A"}],
+      "title": "HTTP RPS",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "targets": [{"expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri=\"/events\",method=\"POST\"}[1m])) by (le))", "refId": "A"}],
+      "title": "HTTP p99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "targets": [{"expr": "sum by (script) (rate(redis_lua_duration_ms_milliseconds_sum[1m])) / sum by (script) (rate(redis_lua_duration_ms_milliseconds_count[1m]))", "refId": "A"}],
+      "title": "Redis Lua Avg Duration (ms)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "targets": [
+        {"expr": "increase(idempotency_hit_total[5m])", "legendFormat": "hit", "refId": "A"},
+        {"expr": "increase(idempotency_miss_total[5m])", "legendFormat": "miss", "refId": "B"},
+        {"expr": "increase(idempotency_conflict_total[5m])", "legendFormat": "conflict", "refId": "C"}
+      ],
+      "title": "Idempotency Counters (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "targets": [{"expr": "sum by (apiKeyId) (increase(rate_limit_block_total[5m]))", "refId": "A"}],
+      "title": "Rate Limit Blocks (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "id": 6,
+      "targets": [
+        {"expr": "circuit_breaker_failure_rate", "legendFormat": "failure_rate", "refId": "A"},
+        {"expr": "circuit_breaker_state{state='open'}", "legendFormat": "open", "refId": "B"},
+        {"expr": "circuit_breaker_state{state='half_open'}", "legendFormat": "half_open", "refId": "C"},
+        {"expr": "circuit_breaker_state{state='closed'}", "legendFormat": "closed", "refId": "D"}
+      ],
+      "title": "Circuit Breaker",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "id": 7,
+      "targets": [
+        {"expr": "snapshot_lag_seconds", "legendFormat": "lag", "refId": "A"},
+        {"expr": "sum(rate(snapshot_duration_seconds_sum[5m])) / sum(rate(snapshot_duration_seconds_count[5m]))", "legendFormat": "avg_duration", "refId": "B"}
+      ],
+      "title": "Snapshot Lag / Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "id": 8,
+      "targets": [
+        {"expr": "increase(snapshot_failure_total[5m])", "legendFormat": "failure", "refId": "A"},
+        {"expr": "increase(snapshot_skip_total[5m])", "legendFormat": "skip", "refId": "B"},
+        {"expr": "increase(cold_start_recovery_total[30m])", "legendFormat": "cold_start_recovery", "refId": "C"}
+      ],
+      "title": "Snapshot Counters",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+      "id": 9,
+      "targets": [
+        {"expr": "stream_pending_entries", "legendFormat": "pending", "refId": "A"},
+        {"expr": "stream_consumer_lag", "legendFormat": "lag", "refId": "B"}
+      ],
+      "title": "Streams",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["realtime", "portfolio"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "RealtimeAPI Overview",
+  "uid": "realtime-overview",
+  "version": 1,
+  "weekStart": ""
+}

@@ -1,0 +1,8 @@
+users
+projects
+leaderboards
+api_keys
+snapshot_batches
+usage_stats
+snapshot_entries
+flyway_schema_history

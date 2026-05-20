@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<database name="realtime_ranking" schema="public" type="PostgreSQL - 15.17 (Debian 15.17-1.pgdg13+1)">
+   <tables>
+      <table name="api_keys" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="true" defaultValue="null" digits="0" id="0" name="id" nullable="false" remarks="" size="19" type="int8" typeCode="-5">
+            <child column="api_key_id" foreignKey="usage_stats_api_key_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="usage_stats"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="project_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="api_keys_project_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="projects"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="key_hash" nullable="false" remarks="" size="128" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="key_prefix" nullable="false" remarks="" size="16" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="'ACTIVE'::character varying" digits="0" id="4" name="status" nullable="false" remarks="" size="16" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="100" digits="0" id="5" name="rate_limit_per_sec" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="1000000" digits="0" id="6" name="daily_quota" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="8" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="9" name="revoked_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="10" name="expires_at" nullable="true" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="api_keys_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="api_keys_key_hash_key" unique="true">
+            <column ascending="true" name="key_hash"/>
+         </index>
+         <index name="idx_api_keys_project_id" unique="false">
+            <column ascending="true" name="project_id"/>
+         </index>
+         <index name="idx_api_keys_status" unique="false">
+            <column ascending="true" name="status"/>
+         </index>
+         <checkConstraint constraint="((daily_quota &gt; 0))" name="api_keys_daily_quota_check"/>
+         <checkConstraint constraint="((rate_limit_per_sec &gt; 0))" name="api_keys_rate_limit_per_sec_check"/>
+         <checkConstraint constraint="(((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'REVOKED'::character varying, 'EXPIRED'::character varying])::text[])))" name="api_keys_status_check"/>
+      </table>
+      <table name="flyway_schema_history" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="false" defaultValue="null" digits="0" id="0" name="installed_rank" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="version" nullable="true" remarks="" size="50" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="description" nullable="false" remarks="" size="200" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="type" nullable="false" remarks="" size="20" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="script" nullable="false" remarks="" size="1000" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="5" name="checksum" nullable="true" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="6" name="installed_by" nullable="false" remarks="" size="100" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="7" name="installed_on" nullable="false" remarks="" size="29" type="timestamp" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="8" name="execution_time" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="9" name="success" nullable="false" remarks="" size="1" type="bool" typeCode="-7"/>
+         <primaryKey column="installed_rank" sequenceNumberInPK="1"/>
+         <index name="flyway_schema_history_pk" unique="true">
+            <column ascending="true" name="installed_rank"/>
+         </index>
+         <index name="flyway_schema_history_s_idx" unique="false">
+            <column ascending="true" name="success"/>
+         </index>
+      </table>
+      <table name="leaderboards" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <child column="leaderboard_id" foreignKey="snapshot_batches_leaderboard_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="snapshot_batches"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="project_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="leaderboards_project_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="projects"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="name" nullable="false" remarks="" size="2147483647" type="text" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="leaderboards_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_leaderboards_project_id" unique="false">
+            <column ascending="true" name="project_id"/>
+         </index>
+         <index name="leaderboards_project_id_name_key" unique="true">
+            <column ascending="true" name="project_id"/>
+            <column ascending="true" name="name"/>
+         </index>
+      </table>
+      <table name="projects" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="false" defaultValue="gen_random_uuid()" digits="0" id="0" name="id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <child column="project_id" foreignKey="api_keys_project_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="api_keys"/>
+            <child column="project_id" foreignKey="leaderboards_project_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="leaderboards"/>
+         </column>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="1" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="admin_id" nullable="true" remarks="" size="19" type="int8" typeCode="-5">
+            <parent column="id" foreignKey="projects_admin_id_fkey" implied="false" onDeleteCascade="false" schema="public" table="users"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="name" nullable="false" remarks="" size="100" type="varchar" typeCode="12"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="projects_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_projects_admin_id" unique="false">
+            <column ascending="true" name="admin_id"/>
+         </index>
+         <index name="uk_projects_name" unique="true">
+            <column ascending="true" name="name"/>
+         </index>
+      </table>
+      <table name="snapshot_batches" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="true" defaultValue="null" digits="0" id="0" name="id" nullable="false" remarks="" size="19" type="int8" typeCode="-5">
+            <child column="snapshot_id" foreignKey="snapshot_entries_snapshot_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="snapshot_entries"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="leaderboard_id" nullable="false" remarks="" size="2147483647" type="uuid" typeCode="1111">
+            <parent column="id" foreignKey="snapshot_batches_leaderboard_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="leaderboards"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="2" name="snapshot_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="1000" digits="0" id="3" name="top_n" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="4" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="snapshot_batches_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_snapshot_batches_lookup" unique="false">
+            <column ascending="true" name="leaderboard_id"/>
+            <column ascending="false" name="snapshot_at"/>
+         </index>
+         <index name="snapshot_batches_leaderboard_id_snapshot_at_key" unique="true">
+            <column ascending="true" name="leaderboard_id"/>
+            <column ascending="true" name="snapshot_at"/>
+         </index>
+         <checkConstraint constraint="((top_n &gt; 0))" name="snapshot_batches_top_n_check"/>
+      </table>
+      <table name="snapshot_entries" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="true" defaultValue="null" digits="0" id="0" name="id" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="snapshot_id" nullable="false" remarks="" size="19" type="int8" typeCode="-5">
+            <parent column="id" foreignKey="snapshot_entries_snapshot_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="snapshot_batches"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="rank" nullable="false" remarks="" size="10" type="int4" typeCode="4"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="3" name="user_id" nullable="false" remarks="" size="19" type="int8" typeCode="-5">
+            <parent column="id" foreignKey="snapshot_entries_user_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="users"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="4" name="score" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="5" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="snapshot_entries_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_snapshot_entries_snapshot_rank_user" unique="false">
+            <column ascending="true" name="snapshot_id"/>
+            <column ascending="true" name="rank"/>
+            <column ascending="true" name="user_id"/>
+         </index>
+         <index name="snapshot_entries_snapshot_id_user_id_key" unique="true">
+            <column ascending="true" name="snapshot_id"/>
+            <column ascending="true" name="user_id"/>
+         </index>
+         <checkConstraint constraint="((rank &gt; 0))" name="snapshot_entries_rank_check"/>
+      </table>
+      <table name="usage_stats" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="true" defaultValue="null" digits="0" id="0" name="id" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="api_key_id" nullable="false" remarks="" size="19" type="int8" typeCode="-5">
+            <parent column="id" foreignKey="usage_stats_api_key_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="api_keys"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="2" name="bucket_type" nullable="false" remarks="" size="8" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="null" digits="6" id="3" name="bucket_start" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="4" name="request_count" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="5" name="allowed_count" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="6" name="blocked_count" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="7" name="idempotency_hit_count" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="8" name="idempotency_miss_count" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="0" digits="0" id="9" name="idempotency_conflict_count" nullable="false" remarks="" size="19" type="int8" typeCode="-5"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="10" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="11" name="updated_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="usage_stats_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="idx_usage_stats_api_key_bucket" unique="false">
+            <column ascending="true" name="api_key_id"/>
+            <column ascending="true" name="bucket_type"/>
+            <column ascending="false" name="bucket_start"/>
+         </index>
+         <index name="idx_usage_stats_bucket_lookup" unique="false">
+            <column ascending="true" name="bucket_type"/>
+            <column ascending="false" name="bucket_start"/>
+         </index>
+         <index name="usage_stats_api_key_id_bucket_type_bucket_start_key" unique="true">
+            <column ascending="true" name="api_key_id"/>
+            <column ascending="true" name="bucket_type"/>
+            <column ascending="true" name="bucket_start"/>
+         </index>
+         <checkConstraint constraint="((allowed_count &gt;= 0))" name="usage_stats_allowed_count_check"/>
+         <checkConstraint constraint="((blocked_count &gt;= 0))" name="usage_stats_blocked_count_check"/>
+         <checkConstraint constraint="(((bucket_type)::text = ANY ((ARRAY['HOUR'::character varying, 'DAY'::character varying])::text[])))" name="usage_stats_bucket_type_check"/>
+         <checkConstraint constraint="((idempotency_conflict_count &gt;= 0))" name="usage_stats_idempotency_conflict_count_check"/>
+         <checkConstraint constraint="((idempotency_hit_count &gt;= 0))" name="usage_stats_idempotency_hit_count_check"/>
+         <checkConstraint constraint="((idempotency_miss_count &gt;= 0))" name="usage_stats_idempotency_miss_count_check"/>
+         <checkConstraint constraint="((request_count &gt;= 0))" name="usage_stats_request_count_check"/>
+      </table>
+      <table name="users" remarks="" schema="public" type="TABLE">
+         <column autoUpdated="true" defaultValue="null" digits="0" id="0" name="id" nullable="false" remarks="" size="19" type="int8" typeCode="-5">
+            <child column="admin_id" foreignKey="projects_admin_id_fkey" implied="false" onDeleteCascade="false" schema="public" table="projects"/>
+            <child column="user_id" foreignKey="snapshot_entries_user_id_fkey" implied="false" onDeleteCascade="true" schema="public" table="snapshot_entries"/>
+         </column>
+         <column autoUpdated="false" defaultValue="null" digits="0" id="1" name="external_id" nullable="false" remarks="" size="30" type="varchar" typeCode="12"/>
+         <column autoUpdated="false" defaultValue="now()" digits="6" id="2" name="created_at" nullable="false" remarks="" size="35" type="timestamptz" typeCode="93"/>
+         <primaryKey column="id" sequenceNumberInPK="1"/>
+         <index name="users_pkey" unique="true">
+            <column ascending="true" name="id"/>
+         </index>
+         <index name="users_external_id_key" unique="true">
+            <column ascending="true" name="external_id"/>
+         </index>
+      </table>
+   </tables>
+</database>

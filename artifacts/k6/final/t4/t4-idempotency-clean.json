@@ -1,0 +1,1809 @@
+{
+    "root_group": {
+        "groups": {
+            "setup": {
+                "checks": {
+                    "create admin user status 201": {
+                        "name": "create admin user status 201",
+                        "path": "::setup::create admin user status 201",
+                        "id": "58cf2a9794a4a0c506a216cbfd3929a5",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "admin login status 200": {
+                        "name": "admin login status 200",
+                        "path": "::setup::admin login status 200",
+                        "id": "ac8d066c50f904636ba7d72cab39de6b",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create project status 201": {
+                        "name": "create project status 201",
+                        "path": "::setup::create project status 201",
+                        "id": "0969966b6626aff8821828d12dbfcda3",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create benchmark api key status 201": {
+                        "id": "cf71f548ff649343f21b1004cc89270f",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create benchmark api key status 201",
+                        "path": "::setup::create benchmark api key status 201"
+                    },
+                    "create leaderboard status 201": {
+                        "path": "::setup::create leaderboard status 201",
+                        "id": "d5f7d8177462f2cc7bac6c96f6f7541f",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create leaderboard status 201"
+                    },
+                    "create event user 0 status 201": {
+                        "name": "create event user 0 status 201",
+                        "path": "::setup::create event user 0 status 201",
+                        "id": "4aea0531482879a8a41c910c771f3f9d",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 1 status 201": {
+                        "id": "460714f0d08677deb87cde1741c77d5f",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 1 status 201",
+                        "path": "::setup::create event user 1 status 201"
+                    },
+                    "create event user 2 status 201": {
+                        "fails": 0,
+                        "name": "create event user 2 status 201",
+                        "path": "::setup::create event user 2 status 201",
+                        "id": "31e909387486082eb9a83da8a940225c",
+                        "passes": 1
+                    },
+                    "create event user 3 status 201": {
+                        "fails": 0,
+                        "name": "create event user 3 status 201",
+                        "path": "::setup::create event user 3 status 201",
+                        "id": "6662bff910d63b10b7f3c62e74b5fb41",
+                        "passes": 1
+                    },
+                    "create event user 4 status 201": {
+                        "fails": 0,
+                        "name": "create event user 4 status 201",
+                        "path": "::setup::create event user 4 status 201",
+                        "id": "75b77a27f5274a7a98f6f7cfcfa846b2",
+                        "passes": 1
+                    },
+                    "create event user 5 status 201": {
+                        "name": "create event user 5 status 201",
+                        "path": "::setup::create event user 5 status 201",
+                        "id": "33402c3f25443dd9c71e9438e33e2b7a",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 6 status 201": {
+                        "name": "create event user 6 status 201",
+                        "path": "::setup::create event user 6 status 201",
+                        "id": "d3fc7f42f480e8316ab0c3dbba0916ed",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 7 status 201": {
+                        "name": "create event user 7 status 201",
+                        "path": "::setup::create event user 7 status 201",
+                        "id": "bb47d936762d62d6e86ef782f34951f9",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 8 status 201": {
+                        "name": "create event user 8 status 201",
+                        "path": "::setup::create event user 8 status 201",
+                        "id": "ce8bde84ac84901f2d9e2a4557138a6d",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 9 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 9 status 201",
+                        "path": "::setup::create event user 9 status 201",
+                        "id": "5008d2f8ee15a52d510c21db03f57eff"
+                    },
+                    "create event user 10 status 201": {
+                        "path": "::setup::create event user 10 status 201",
+                        "id": "b6b9f507e0cfea854b08e3a49bd6350a",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 10 status 201"
+                    },
+                    "create event user 11 status 201": {
+                        "name": "create event user 11 status 201",
+                        "path": "::setup::create event user 11 status 201",
+                        "id": "dcd308700d73e7fe0ee662b14303fc7a",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 12 status 201": {
+                        "name": "create event user 12 status 201",
+                        "path": "::setup::create event user 12 status 201",
+                        "id": "3da20bbe2ba50c99549889d4e9b41cc9",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 13 status 201": {
+                        "name": "create event user 13 status 201",
+                        "path": "::setup::create event user 13 status 201",
+                        "id": "e4fe415181d7a29f242298baf1147cf6",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 14 status 201": {
+                        "path": "::setup::create event user 14 status 201",
+                        "id": "a3860e989a285468867b9c50ff34f46e",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 14 status 201"
+                    },
+                    "create event user 15 status 201": {
+                        "fails": 0,
+                        "name": "create event user 15 status 201",
+                        "path": "::setup::create event user 15 status 201",
+                        "id": "2953012de569405970fcde35ae4542b6",
+                        "passes": 1
+                    },
+                    "create event user 16 status 201": {
+                        "name": "create event user 16 status 201",
+                        "path": "::setup::create event user 16 status 201",
+                        "id": "e9966db61f57eca300e6a8ebd2806587",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 17 status 201": {
+                        "name": "create event user 17 status 201",
+                        "path": "::setup::create event user 17 status 201",
+                        "id": "cc2af97e8d0845247e2b562e533a4bdc",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 18 status 201": {
+                        "name": "create event user 18 status 201",
+                        "path": "::setup::create event user 18 status 201",
+                        "id": "977a0fb831871140f5bdc43321c9543c",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 19 status 201": {
+                        "name": "create event user 19 status 201",
+                        "path": "::setup::create event user 19 status 201",
+                        "id": "42c28350196ed3f75ab050cb856688af",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 20 status 201": {
+                        "name": "create event user 20 status 201",
+                        "path": "::setup::create event user 20 status 201",
+                        "id": "1952fa2cf80202d016cb2d74d621bbf4",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 21 status 201": {
+                        "name": "create event user 21 status 201",
+                        "path": "::setup::create event user 21 status 201",
+                        "id": "5e25a5c2a21c6154c96da9d6a3ce527d",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 22 status 201": {
+                        "fails": 0,
+                        "name": "create event user 22 status 201",
+                        "path": "::setup::create event user 22 status 201",
+                        "id": "c0a303c6ae0e8033524d71f4bc405d95",
+                        "passes": 1
+                    },
+                    "create event user 23 status 201": {
+                        "name": "create event user 23 status 201",
+                        "path": "::setup::create event user 23 status 201",
+                        "id": "6e44dbf17cc8532818dbd9efccc201af",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 24 status 201": {
+                        "name": "create event user 24 status 201",
+                        "path": "::setup::create event user 24 status 201",
+                        "id": "8e76b802e39597e6ccdf5d29cf19cc68",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 25 status 201": {
+                        "name": "create event user 25 status 201",
+                        "path": "::setup::create event user 25 status 201",
+                        "id": "487d1893b0498efc0ec9f6a861e64320",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 26 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 26 status 201",
+                        "path": "::setup::create event user 26 status 201",
+                        "id": "35e80e87807b2870177f84117c780009"
+                    },
+                    "create event user 27 status 201": {
+                        "name": "create event user 27 status 201",
+                        "path": "::setup::create event user 27 status 201",
+                        "id": "95fc6207128e2f7053a8a88e9d368d01",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 28 status 201": {
+                        "name": "create event user 28 status 201",
+                        "path": "::setup::create event user 28 status 201",
+                        "id": "1dc308abf596450dceb7d3f2b62c136f",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 29 status 201": {
+                        "name": "create event user 29 status 201",
+                        "path": "::setup::create event user 29 status 201",
+                        "id": "5d083b2f0e8519e4e8e068980a8ca2ba",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 30 status 201": {
+                        "name": "create event user 30 status 201",
+                        "path": "::setup::create event user 30 status 201",
+                        "id": "63819656a6c46f7869edfc2547febb87",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 31 status 201": {
+                        "name": "create event user 31 status 201",
+                        "path": "::setup::create event user 31 status 201",
+                        "id": "d8b1fbd554aa744915995b57ec029b43",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 32 status 201": {
+                        "name": "create event user 32 status 201",
+                        "path": "::setup::create event user 32 status 201",
+                        "id": "34e513190c27441034c6b38a81ecfe13",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 33 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 33 status 201",
+                        "path": "::setup::create event user 33 status 201",
+                        "id": "f92455a0112588ebede899310db00275"
+                    },
+                    "create event user 34 status 201": {
+                        "fails": 0,
+                        "name": "create event user 34 status 201",
+                        "path": "::setup::create event user 34 status 201",
+                        "id": "6cdb3b9cdb6383a9d8533ccece0dc3d6",
+                        "passes": 1
+                    },
+                    "create event user 35 status 201": {
+                        "name": "create event user 35 status 201",
+                        "path": "::setup::create event user 35 status 201",
+                        "id": "c8c8de4117fab6f06260deeb0d6b9ee2",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 36 status 201": {
+                        "name": "create event user 36 status 201",
+                        "path": "::setup::create event user 36 status 201",
+                        "id": "b31aa223326b0051e12279d41d94379d",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 37 status 201": {
+                        "name": "create event user 37 status 201",
+                        "path": "::setup::create event user 37 status 201",
+                        "id": "e9ba17996cd771a4c77d92a20ed829c0",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 38 status 201": {
+                        "name": "create event user 38 status 201",
+                        "path": "::setup::create event user 38 status 201",
+                        "id": "23a93db0ed8efa9f7a66d003f441a0c4",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 39 status 201": {
+                        "path": "::setup::create event user 39 status 201",
+                        "id": "c593c8d3f3ed9c2b34c5c3d202177d60",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 39 status 201"
+                    },
+                    "create event user 40 status 201": {
+                        "name": "create event user 40 status 201",
+                        "path": "::setup::create event user 40 status 201",
+                        "id": "8e12bebcb343e25efda26cf529c4d08f",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 41 status 201": {
+                        "fails": 0,
+                        "name": "create event user 41 status 201",
+                        "path": "::setup::create event user 41 status 201",
+                        "id": "a151d336036b0ee00cf623dfcf3de455",
+                        "passes": 1
+                    },
+                    "create event user 42 status 201": {
+                        "name": "create event user 42 status 201",
+                        "path": "::setup::create event user 42 status 201",
+                        "id": "c9804e51db3e5177ec128d10c8e7c072",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 43 status 201": {
+                        "name": "create event user 43 status 201",
+                        "path": "::setup::create event user 43 status 201",
+                        "id": "853324ee400b214a2e8105ea112c93ce",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 44 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 44 status 201",
+                        "path": "::setup::create event user 44 status 201",
+                        "id": "442bce9f4adab3f2f2807f98c3b0bdbf"
+                    },
+                    "create event user 45 status 201": {
+                        "fails": 0,
+                        "name": "create event user 45 status 201",
+                        "path": "::setup::create event user 45 status 201",
+                        "id": "51eaa32f4720ab879242cb0e9f30e7c7",
+                        "passes": 1
+                    },
+                    "create event user 46 status 201": {
+                        "id": "24388ab22f16313387f2ef9f3969bd9b",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 46 status 201",
+                        "path": "::setup::create event user 46 status 201"
+                    },
+                    "create event user 47 status 201": {
+                        "id": "1bdbb53ae219067a560b9a24e7543300",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 47 status 201",
+                        "path": "::setup::create event user 47 status 201"
+                    },
+                    "create event user 48 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 48 status 201",
+                        "path": "::setup::create event user 48 status 201",
+                        "id": "6d43b5e5fe1e3a4eae1e5adb5d91dca5"
+                    },
+                    "create event user 49 status 201": {
+                        "id": "8e144980818e93bfb0a024bd81316c4c",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 49 status 201",
+                        "path": "::setup::create event user 49 status 201"
+                    },
+                    "create event user 50 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 50 status 201",
+                        "path": "::setup::create event user 50 status 201",
+                        "id": "2b3a6bf81adf52cd2db2f36dd9b99ac0"
+                    },
+                    "create event user 51 status 201": {
+                        "fails": 0,
+                        "name": "create event user 51 status 201",
+                        "path": "::setup::create event user 51 status 201",
+                        "id": "9fee20553a45dfbabbf1fa57bc9e7e43",
+                        "passes": 1
+                    },
+                    "create event user 52 status 201": {
+                        "id": "f5a8aa5393ce3381ce9f7e4a04eabe5d",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 52 status 201",
+                        "path": "::setup::create event user 52 status 201"
+                    },
+                    "create event user 53 status 201": {
+                        "path": "::setup::create event user 53 status 201",
+                        "id": "1e60978dde83911c6422e741f5e35bdf",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 53 status 201"
+                    },
+                    "create event user 54 status 201": {
+                        "path": "::setup::create event user 54 status 201",
+                        "id": "7400acd63dee62bba71418a6c015ebef",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 54 status 201"
+                    },
+                    "create event user 55 status 201": {
+                        "fails": 0,
+                        "name": "create event user 55 status 201",
+                        "path": "::setup::create event user 55 status 201",
+                        "id": "2a4488d53e51735b9edf38b847baa5a4",
+                        "passes": 1
+                    },
+                    "create event user 56 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 56 status 201",
+                        "path": "::setup::create event user 56 status 201",
+                        "id": "70c87696a65536bb444e23b3c0258cc9"
+                    },
+                    "create event user 57 status 201": {
+                        "fails": 0,
+                        "name": "create event user 57 status 201",
+                        "path": "::setup::create event user 57 status 201",
+                        "id": "b4b83a70d29bf8afc32a174f56ced737",
+                        "passes": 1
+                    },
+                    "create event user 58 status 201": {
+                        "name": "create event user 58 status 201",
+                        "path": "::setup::create event user 58 status 201",
+                        "id": "1978882a49c78545d8a695820588eb7a",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 59 status 201": {
+                        "fails": 0,
+                        "name": "create event user 59 status 201",
+                        "path": "::setup::create event user 59 status 201",
+                        "id": "c880758d399909a54f4a0c4ba51fffea",
+                        "passes": 1
+                    },
+                    "create event user 60 status 201": {
+                        "name": "create event user 60 status 201",
+                        "path": "::setup::create event user 60 status 201",
+                        "id": "13f440f2b8c2e2f8c3545f7081fcf473",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 61 status 201": {
+                        "name": "create event user 61 status 201",
+                        "path": "::setup::create event user 61 status 201",
+                        "id": "0549bee6942425992a3802a3ce1e2cc8",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 62 status 201": {
+                        "id": "0a541f0812142b93184f8ae56bb8ae31",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 62 status 201",
+                        "path": "::setup::create event user 62 status 201"
+                    },
+                    "create event user 63 status 201": {
+                        "fails": 0,
+                        "name": "create event user 63 status 201",
+                        "path": "::setup::create event user 63 status 201",
+                        "id": "dff9bc4f915273ea649c2d2e62caa583",
+                        "passes": 1
+                    },
+                    "create event user 64 status 201": {
+                        "name": "create event user 64 status 201",
+                        "path": "::setup::create event user 64 status 201",
+                        "id": "7a1b031456c17c84f2942afea88a695b",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 65 status 201": {
+                        "name": "create event user 65 status 201",
+                        "path": "::setup::create event user 65 status 201",
+                        "id": "36e773877549d6e46cc6e908fb6a3930",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 66 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 66 status 201",
+                        "path": "::setup::create event user 66 status 201",
+                        "id": "2443c8fc20c3ee31864ce9f6dfc8b71b"
+                    },
+                    "create event user 67 status 201": {
+                        "fails": 0,
+                        "name": "create event user 67 status 201",
+                        "path": "::setup::create event user 67 status 201",
+                        "id": "cc237dc9e4121348d4513e7b5f5e97cd",
+                        "passes": 1
+                    },
+                    "create event user 68 status 201": {
+                        "name": "create event user 68 status 201",
+                        "path": "::setup::create event user 68 status 201",
+                        "id": "3ce9c60388246f3c58054d85a6574315",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 69 status 201": {
+                        "name": "create event user 69 status 201",
+                        "path": "::setup::create event user 69 status 201",
+                        "id": "aeec4c35ae5befe1eb946db8670a44de",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 70 status 201": {
+                        "name": "create event user 70 status 201",
+                        "path": "::setup::create event user 70 status 201",
+                        "id": "8264ab68290a225779f65111ce0c2fff",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 71 status 201": {
+                        "name": "create event user 71 status 201",
+                        "path": "::setup::create event user 71 status 201",
+                        "id": "aba1da311b57b4f490e463bbed2ec0fd",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 72 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 72 status 201",
+                        "path": "::setup::create event user 72 status 201",
+                        "id": "04d7654275b1ecdfacbf0f057134b1fb"
+                    },
+                    "create event user 73 status 201": {
+                        "name": "create event user 73 status 201",
+                        "path": "::setup::create event user 73 status 201",
+                        "id": "967819c44c393c02685fa77d00629232",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 74 status 201": {
+                        "name": "create event user 74 status 201",
+                        "path": "::setup::create event user 74 status 201",
+                        "id": "43c9e29c1738d6b117540d6497df9266",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 75 status 201": {
+                        "name": "create event user 75 status 201",
+                        "path": "::setup::create event user 75 status 201",
+                        "id": "93546edf8f473d2aa7bf182d89d9fe48",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 76 status 201": {
+                        "path": "::setup::create event user 76 status 201",
+                        "id": "711b27a0063e0cddfc45379908d88209",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 76 status 201"
+                    },
+                    "create event user 77 status 201": {
+                        "fails": 0,
+                        "name": "create event user 77 status 201",
+                        "path": "::setup::create event user 77 status 201",
+                        "id": "8fe2752e5666926537af9c32fe2dd14c",
+                        "passes": 1
+                    },
+                    "create event user 78 status 201": {
+                        "name": "create event user 78 status 201",
+                        "path": "::setup::create event user 78 status 201",
+                        "id": "84a1c364aaec4495092e22b7eefb14f2",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 79 status 201": {
+                        "id": "e325d383d919b2811c34663688d22960",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 79 status 201",
+                        "path": "::setup::create event user 79 status 201"
+                    },
+                    "create event user 80 status 201": {
+                        "fails": 0,
+                        "name": "create event user 80 status 201",
+                        "path": "::setup::create event user 80 status 201",
+                        "id": "c1101025c6b8b8c1b3b5913b09a12bba",
+                        "passes": 1
+                    },
+                    "create event user 81 status 201": {
+                        "fails": 0,
+                        "name": "create event user 81 status 201",
+                        "path": "::setup::create event user 81 status 201",
+                        "id": "26b6109c84f2a90f9431283cd95f297e",
+                        "passes": 1
+                    },
+                    "create event user 82 status 201": {
+                        "fails": 0,
+                        "name": "create event user 82 status 201",
+                        "path": "::setup::create event user 82 status 201",
+                        "id": "7bac457c789b02c4ef696e4ec6a311c5",
+                        "passes": 1
+                    },
+                    "create event user 83 status 201": {
+                        "id": "401f248303576d4ed4860ecc7df51731",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 83 status 201",
+                        "path": "::setup::create event user 83 status 201"
+                    },
+                    "create event user 84 status 201": {
+                        "id": "5b9df43d779caad10a76cf4d83196a32",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 84 status 201",
+                        "path": "::setup::create event user 84 status 201"
+                    },
+                    "create event user 85 status 201": {
+                        "id": "0eac6bed7f9d3086c6e0a77e53401adf",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 85 status 201",
+                        "path": "::setup::create event user 85 status 201"
+                    },
+                    "create event user 86 status 201": {
+                        "name": "create event user 86 status 201",
+                        "path": "::setup::create event user 86 status 201",
+                        "id": "83b8f1d9656018318aedaf19fc8b79e5",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 87 status 201": {
+                        "fails": 0,
+                        "name": "create event user 87 status 201",
+                        "path": "::setup::create event user 87 status 201",
+                        "id": "c84975d425568f89a22d1c62f673a6d2",
+                        "passes": 1
+                    },
+                    "create event user 88 status 201": {
+                        "name": "create event user 88 status 201",
+                        "path": "::setup::create event user 88 status 201",
+                        "id": "21438177d89d6768c26bfe70c2eca960",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 89 status 201": {
+                        "name": "create event user 89 status 201",
+                        "path": "::setup::create event user 89 status 201",
+                        "id": "3378f0802f158e43d027ce4e18a19ca3",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 90 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 90 status 201",
+                        "path": "::setup::create event user 90 status 201",
+                        "id": "8e8aa37df6f35786f38bc9ed39d128ca"
+                    },
+                    "create event user 91 status 201": {
+                        "name": "create event user 91 status 201",
+                        "path": "::setup::create event user 91 status 201",
+                        "id": "21714b1528e9e951fcdc728e5591ac2c",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 92 status 201": {
+                        "name": "create event user 92 status 201",
+                        "path": "::setup::create event user 92 status 201",
+                        "id": "8ca44a69a1296731bfd7053ae7b80c07",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 93 status 201": {
+                        "fails": 0,
+                        "name": "create event user 93 status 201",
+                        "path": "::setup::create event user 93 status 201",
+                        "id": "71684f4f7c3b9cca459ab95f6c8cbaa0",
+                        "passes": 1
+                    },
+                    "create event user 94 status 201": {
+                        "name": "create event user 94 status 201",
+                        "path": "::setup::create event user 94 status 201",
+                        "id": "726e5ebc3ca801c8ddbec2bb3e459e68",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 95 status 201": {
+                        "name": "create event user 95 status 201",
+                        "path": "::setup::create event user 95 status 201",
+                        "id": "c967668758011b76a525858e9c8d8af3",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 96 status 201": {
+                        "name": "create event user 96 status 201",
+                        "path": "::setup::create event user 96 status 201",
+                        "id": "1f6d80caeb6b70ae2f07285d9e6361f6",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 97 status 201": {
+                        "name": "create event user 97 status 201",
+                        "path": "::setup::create event user 97 status 201",
+                        "id": "a4da3a691e376ffe31957b6da5eec0da",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 98 status 201": {
+                        "id": "0842444ae9d5606164bdb30aff527094",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 98 status 201",
+                        "path": "::setup::create event user 98 status 201"
+                    },
+                    "create event user 99 status 201": {
+                        "fails": 0,
+                        "name": "create event user 99 status 201",
+                        "path": "::setup::create event user 99 status 201",
+                        "id": "58b120f6c0bab1e6e0f12beb5bd1b1cd",
+                        "passes": 1
+                    },
+                    "create event user 100 status 201": {
+                        "fails": 0,
+                        "name": "create event user 100 status 201",
+                        "path": "::setup::create event user 100 status 201",
+                        "id": "f695d42c5d229eb6a0da915d0ad8a383",
+                        "passes": 1
+                    },
+                    "create event user 101 status 201": {
+                        "id": "e50ebbef5f6567b5bbf4d64c108d4a80",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 101 status 201",
+                        "path": "::setup::create event user 101 status 201"
+                    },
+                    "create event user 102 status 201": {
+                        "name": "create event user 102 status 201",
+                        "path": "::setup::create event user 102 status 201",
+                        "id": "b3bf26f29d6e97fc9ee1d612f698ebcf",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 103 status 201": {
+                        "name": "create event user 103 status 201",
+                        "path": "::setup::create event user 103 status 201",
+                        "id": "c776cdaf861dfe77670c6cc948d285c9",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 104 status 201": {
+                        "name": "create event user 104 status 201",
+                        "path": "::setup::create event user 104 status 201",
+                        "id": "2435b1bf34ca57d9a997831344155b96",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 105 status 201": {
+                        "fails": 0,
+                        "name": "create event user 105 status 201",
+                        "path": "::setup::create event user 105 status 201",
+                        "id": "019a630e0373422373462df41fce75d2",
+                        "passes": 1
+                    },
+                    "create event user 106 status 201": {
+                        "fails": 0,
+                        "name": "create event user 106 status 201",
+                        "path": "::setup::create event user 106 status 201",
+                        "id": "39fa1d5a11e5c453bee73cb6bdc2a437",
+                        "passes": 1
+                    },
+                    "create event user 107 status 201": {
+                        "name": "create event user 107 status 201",
+                        "path": "::setup::create event user 107 status 201",
+                        "id": "e0f0e0847453a6e63a50f90472cddedf",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 108 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 108 status 201",
+                        "path": "::setup::create event user 108 status 201",
+                        "id": "f1fb00aaeec5fc2d9cfbbda5f1bb97d4"
+                    },
+                    "create event user 109 status 201": {
+                        "name": "create event user 109 status 201",
+                        "path": "::setup::create event user 109 status 201",
+                        "id": "1f16d1fcb324a6b487ef39ad575df24a",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 110 status 201": {
+                        "name": "create event user 110 status 201",
+                        "path": "::setup::create event user 110 status 201",
+                        "id": "a2aa2d7d4e48330bfef18d4db83cf581",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 111 status 201": {
+                        "fails": 0,
+                        "name": "create event user 111 status 201",
+                        "path": "::setup::create event user 111 status 201",
+                        "id": "1b2b7ff983758d18109a11910a0fcdf9",
+                        "passes": 1
+                    },
+                    "create event user 112 status 201": {
+                        "fails": 0,
+                        "name": "create event user 112 status 201",
+                        "path": "::setup::create event user 112 status 201",
+                        "id": "04e09cdc3939a766e7a423dd31e8a342",
+                        "passes": 1
+                    },
+                    "create event user 113 status 201": {
+                        "name": "create event user 113 status 201",
+                        "path": "::setup::create event user 113 status 201",
+                        "id": "69d54e429df3cb613afdb39aa79ee672",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 114 status 201": {
+                        "name": "create event user 114 status 201",
+                        "path": "::setup::create event user 114 status 201",
+                        "id": "24d04d424a0104e7114eb095b9ca7d77",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 115 status 201": {
+                        "name": "create event user 115 status 201",
+                        "path": "::setup::create event user 115 status 201",
+                        "id": "4ba94604d077c1888728079f5b15c429",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 116 status 201": {
+                        "name": "create event user 116 status 201",
+                        "path": "::setup::create event user 116 status 201",
+                        "id": "5c1a3a259a24bd734eca86737cccf4dd",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 117 status 201": {
+                        "name": "create event user 117 status 201",
+                        "path": "::setup::create event user 117 status 201",
+                        "id": "f6d4d98754218772d3bc4308fe9a7d0c",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 118 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 118 status 201",
+                        "path": "::setup::create event user 118 status 201",
+                        "id": "348cb98ed386532c82e6a49577d6381b"
+                    },
+                    "create event user 119 status 201": {
+                        "name": "create event user 119 status 201",
+                        "path": "::setup::create event user 119 status 201",
+                        "id": "a81e3fd3208034cbbb94f398dd3007b1",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 120 status 201": {
+                        "name": "create event user 120 status 201",
+                        "path": "::setup::create event user 120 status 201",
+                        "id": "c29b13ada7ac31bdef98fe1d509020c1",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 121 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 121 status 201",
+                        "path": "::setup::create event user 121 status 201",
+                        "id": "e60890ffb919916bddef3aad781c2a80"
+                    },
+                    "create event user 122 status 201": {
+                        "name": "create event user 122 status 201",
+                        "path": "::setup::create event user 122 status 201",
+                        "id": "ebbab7eacc9558f4389380ecc4bd2ea5",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 123 status 201": {
+                        "name": "create event user 123 status 201",
+                        "path": "::setup::create event user 123 status 201",
+                        "id": "024ba37eae9712a47ba54adf63c148da",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 124 status 201": {
+                        "fails": 0,
+                        "name": "create event user 124 status 201",
+                        "path": "::setup::create event user 124 status 201",
+                        "id": "28ede2bb5def698baa6be130dc8f5c04",
+                        "passes": 1
+                    },
+                    "create event user 125 status 201": {
+                        "id": "f8a5ed63fc332e60f15d17686a83e5a3",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 125 status 201",
+                        "path": "::setup::create event user 125 status 201"
+                    },
+                    "create event user 126 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 126 status 201",
+                        "path": "::setup::create event user 126 status 201",
+                        "id": "55d76b165515f00020db8b5c94de1574"
+                    },
+                    "create event user 127 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 127 status 201",
+                        "path": "::setup::create event user 127 status 201",
+                        "id": "62d6d628e46d7f764e823f23a288f3b0"
+                    },
+                    "create event user 128 status 201": {
+                        "name": "create event user 128 status 201",
+                        "path": "::setup::create event user 128 status 201",
+                        "id": "828d31bf849a497d6f445dfce248171f",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 129 status 201": {
+                        "name": "create event user 129 status 201",
+                        "path": "::setup::create event user 129 status 201",
+                        "id": "bd18e8968b3140b73481600e5789df49",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 130 status 201": {
+                        "id": "77116fb659fba47d9e8d5c893ae5697e",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 130 status 201",
+                        "path": "::setup::create event user 130 status 201"
+                    },
+                    "create event user 131 status 201": {
+                        "name": "create event user 131 status 201",
+                        "path": "::setup::create event user 131 status 201",
+                        "id": "fe7e717c40af5933adbd1256dbfd1021",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 132 status 201": {
+                        "id": "cbe3fa43b03c74efabd04653f27b11a0",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 132 status 201",
+                        "path": "::setup::create event user 132 status 201"
+                    },
+                    "create event user 133 status 201": {
+                        "path": "::setup::create event user 133 status 201",
+                        "id": "888376263b32efd645b19febb7d441b3",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 133 status 201"
+                    },
+                    "create event user 134 status 201": {
+                        "name": "create event user 134 status 201",
+                        "path": "::setup::create event user 134 status 201",
+                        "id": "c24ebc593c42a4c859c398e2a06ff182",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 135 status 201": {
+                        "name": "create event user 135 status 201",
+                        "path": "::setup::create event user 135 status 201",
+                        "id": "94128dfa080461460bf24e2c1509b519",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 136 status 201": {
+                        "fails": 0,
+                        "name": "create event user 136 status 201",
+                        "path": "::setup::create event user 136 status 201",
+                        "id": "36363394206c4477908d9f2a65afcd2d",
+                        "passes": 1
+                    },
+                    "create event user 137 status 201": {
+                        "fails": 0,
+                        "name": "create event user 137 status 201",
+                        "path": "::setup::create event user 137 status 201",
+                        "id": "7536d1820bee9877556026eca35e6ab1",
+                        "passes": 1
+                    },
+                    "create event user 138 status 201": {
+                        "name": "create event user 138 status 201",
+                        "path": "::setup::create event user 138 status 201",
+                        "id": "d4720f909629928229cf34c7817fab55",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 139 status 201": {
+                        "path": "::setup::create event user 139 status 201",
+                        "id": "d724c3cbd9a2d2f6dbbc873092523793",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 139 status 201"
+                    },
+                    "create event user 140 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 140 status 201",
+                        "path": "::setup::create event user 140 status 201",
+                        "id": "75db5c204610e26896a5235197341976"
+                    },
+                    "create event user 141 status 201": {
+                        "name": "create event user 141 status 201",
+                        "path": "::setup::create event user 141 status 201",
+                        "id": "582ce09c146b5c4297e201654cf9c642",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 142 status 201": {
+                        "path": "::setup::create event user 142 status 201",
+                        "id": "a2440d0b1d82864102bcbc2168ee59f6",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 142 status 201"
+                    },
+                    "create event user 143 status 201": {
+                        "name": "create event user 143 status 201",
+                        "path": "::setup::create event user 143 status 201",
+                        "id": "16fca22baddeba26388a05ef7c957857",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 144 status 201": {
+                        "name": "create event user 144 status 201",
+                        "path": "::setup::create event user 144 status 201",
+                        "id": "5f996f8c9c6c282b0bb1e5a0bce67447",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 145 status 201": {
+                        "name": "create event user 145 status 201",
+                        "path": "::setup::create event user 145 status 201",
+                        "id": "d00c367cd9b21fcff5686ea628cdc8ec",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 146 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 146 status 201",
+                        "path": "::setup::create event user 146 status 201",
+                        "id": "15ef404f2c88c28c87de1e444e9b64e3"
+                    },
+                    "create event user 147 status 201": {
+                        "name": "create event user 147 status 201",
+                        "path": "::setup::create event user 147 status 201",
+                        "id": "bedb8919095762cf671b497d99b7e63f",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 148 status 201": {
+                        "fails": 0,
+                        "name": "create event user 148 status 201",
+                        "path": "::setup::create event user 148 status 201",
+                        "id": "f4e6cc4ea9afbe374aa742fa4eccb049",
+                        "passes": 1
+                    },
+                    "create event user 149 status 201": {
+                        "name": "create event user 149 status 201",
+                        "path": "::setup::create event user 149 status 201",
+                        "id": "eb6154c0bf026e0e05819b26985d4d20",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 150 status 201": {
+                        "name": "create event user 150 status 201",
+                        "path": "::setup::create event user 150 status 201",
+                        "id": "3bf8ab5609055c182c8b64ab09081a31",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 151 status 201": {
+                        "fails": 0,
+                        "name": "create event user 151 status 201",
+                        "path": "::setup::create event user 151 status 201",
+                        "id": "af370128353a2f7f8b1ab97c81d32460",
+                        "passes": 1
+                    },
+                    "create event user 152 status 201": {
+                        "fails": 0,
+                        "name": "create event user 152 status 201",
+                        "path": "::setup::create event user 152 status 201",
+                        "id": "f7fc9954ad584930adb11bc0ca6cc9ed",
+                        "passes": 1
+                    },
+                    "create event user 153 status 201": {
+                        "name": "create event user 153 status 201",
+                        "path": "::setup::create event user 153 status 201",
+                        "id": "5b6b48dd98573aaada59f359d68a39cf",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 154 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 154 status 201",
+                        "path": "::setup::create event user 154 status 201",
+                        "id": "fe796ffa6b42841323ff73f1b942d7c4"
+                    },
+                    "create event user 155 status 201": {
+                        "fails": 0,
+                        "name": "create event user 155 status 201",
+                        "path": "::setup::create event user 155 status 201",
+                        "id": "b2d4ab1192208c8593bc501bf98df9e0",
+                        "passes": 1
+                    },
+                    "create event user 156 status 201": {
+                        "id": "8f6a18992a372bc1fa8c875a9fc0deb0",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 156 status 201",
+                        "path": "::setup::create event user 156 status 201"
+                    },
+                    "create event user 157 status 201": {
+                        "name": "create event user 157 status 201",
+                        "path": "::setup::create event user 157 status 201",
+                        "id": "98533dee2613c80b29935889858ffa5e",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 158 status 201": {
+                        "id": "6c55ccac3a64a9d4b134c8240bd045df",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 158 status 201",
+                        "path": "::setup::create event user 158 status 201"
+                    },
+                    "create event user 159 status 201": {
+                        "id": "1f542419721dc87460f2a08980388cb1",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 159 status 201",
+                        "path": "::setup::create event user 159 status 201"
+                    },
+                    "create event user 160 status 201": {
+                        "name": "create event user 160 status 201",
+                        "path": "::setup::create event user 160 status 201",
+                        "id": "c36b0e6a116c26648aede2589c1cdbd2",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 161 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 161 status 201",
+                        "path": "::setup::create event user 161 status 201",
+                        "id": "61bd5b970e3bd1118e77619aed3c51fa"
+                    },
+                    "create event user 162 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 162 status 201",
+                        "path": "::setup::create event user 162 status 201",
+                        "id": "f1d4bb13cdc18dfd053120ba1322e7ab"
+                    },
+                    "create event user 163 status 201": {
+                        "name": "create event user 163 status 201",
+                        "path": "::setup::create event user 163 status 201",
+                        "id": "623cf76ac26be0106df2adddd8ec6e28",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 164 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 164 status 201",
+                        "path": "::setup::create event user 164 status 201",
+                        "id": "1aa2603536a2e70e44d3a8e649127c1c"
+                    },
+                    "create event user 165 status 201": {
+                        "name": "create event user 165 status 201",
+                        "path": "::setup::create event user 165 status 201",
+                        "id": "0090a12cda4d3887aac04c6593d68c00",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 166 status 201": {
+                        "fails": 0,
+                        "name": "create event user 166 status 201",
+                        "path": "::setup::create event user 166 status 201",
+                        "id": "9d956780de041638cdfc7ef24abd9770",
+                        "passes": 1
+                    },
+                    "create event user 167 status 201": {
+                        "name": "create event user 167 status 201",
+                        "path": "::setup::create event user 167 status 201",
+                        "id": "258f370f3ad2972052c5f8d320191189",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 168 status 201": {
+                        "name": "create event user 168 status 201",
+                        "path": "::setup::create event user 168 status 201",
+                        "id": "991ff03f8b19ecd158e2a6c8b7c83ad9",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 169 status 201": {
+                        "fails": 0,
+                        "name": "create event user 169 status 201",
+                        "path": "::setup::create event user 169 status 201",
+                        "id": "173f84bf1f36e1e16988117d0efada84",
+                        "passes": 1
+                    },
+                    "create event user 170 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 170 status 201",
+                        "path": "::setup::create event user 170 status 201",
+                        "id": "6ffe8a534d8cf6926121b6eb2f3fcc2d"
+                    },
+                    "create event user 171 status 201": {
+                        "fails": 0,
+                        "name": "create event user 171 status 201",
+                        "path": "::setup::create event user 171 status 201",
+                        "id": "31beea8697508c3a689d2319f509e288",
+                        "passes": 1
+                    },
+                    "create event user 172 status 201": {
+                        "path": "::setup::create event user 172 status 201",
+                        "id": "ab4d8183e0fc23654084b9ec1c9a3525",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 172 status 201"
+                    },
+                    "create event user 173 status 201": {
+                        "path": "::setup::create event user 173 status 201",
+                        "id": "cc4fe4c21f02cc271fa50ca16512d206",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 173 status 201"
+                    },
+                    "create event user 174 status 201": {
+                        "name": "create event user 174 status 201",
+                        "path": "::setup::create event user 174 status 201",
+                        "id": "ac2e01cca3564d0270ec55d54a845394",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 175 status 201": {
+                        "name": "create event user 175 status 201",
+                        "path": "::setup::create event user 175 status 201",
+                        "id": "663d2e186ac6fa9d83cfd75e6c48b270",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 176 status 201": {
+                        "path": "::setup::create event user 176 status 201",
+                        "id": "6725292bb8fffacd99fba8bf1c50ed20",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 176 status 201"
+                    },
+                    "create event user 177 status 201": {
+                        "name": "create event user 177 status 201",
+                        "path": "::setup::create event user 177 status 201",
+                        "id": "e75c1d2ea4bd58e0b5a41ba0f12e7783",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 178 status 201": {
+                        "name": "create event user 178 status 201",
+                        "path": "::setup::create event user 178 status 201",
+                        "id": "a347e3cbb084578be40b1f92ab5a1535",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 179 status 201": {
+                        "name": "create event user 179 status 201",
+                        "path": "::setup::create event user 179 status 201",
+                        "id": "d8a1c69c71148c97f5f508b9b5b5e795",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 180 status 201": {
+                        "fails": 0,
+                        "name": "create event user 180 status 201",
+                        "path": "::setup::create event user 180 status 201",
+                        "id": "fe9bcce49ec3389a49ce7ac0b3f48a67",
+                        "passes": 1
+                    },
+                    "create event user 181 status 201": {
+                        "name": "create event user 181 status 201",
+                        "path": "::setup::create event user 181 status 201",
+                        "id": "26e02a37360082df929b718bc3547e31",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 182 status 201": {
+                        "id": "ed57127b18889ecc5ffec6cd0cdfe173",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 182 status 201",
+                        "path": "::setup::create event user 182 status 201"
+                    },
+                    "create event user 183 status 201": {
+                        "name": "create event user 183 status 201",
+                        "path": "::setup::create event user 183 status 201",
+                        "id": "f1f54de26cb5b54dd82cfbc50262669d",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 184 status 201": {
+                        "fails": 0,
+                        "name": "create event user 184 status 201",
+                        "path": "::setup::create event user 184 status 201",
+                        "id": "b386cf2db02c0abb53ea882a224e6650",
+                        "passes": 1
+                    },
+                    "create event user 185 status 201": {
+                        "name": "create event user 185 status 201",
+                        "path": "::setup::create event user 185 status 201",
+                        "id": "9caea31a49ae1f0dd56a08abab30771f",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 186 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 186 status 201",
+                        "path": "::setup::create event user 186 status 201",
+                        "id": "237479617020402a9d2e2fda49aa0055"
+                    },
+                    "create event user 187 status 201": {
+                        "name": "create event user 187 status 201",
+                        "path": "::setup::create event user 187 status 201",
+                        "id": "63da754c5a9fa976345ae41e9be119e8",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 188 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 188 status 201",
+                        "path": "::setup::create event user 188 status 201",
+                        "id": "e2ce788a27969b0c3be2a137609432ed"
+                    },
+                    "create event user 189 status 201": {
+                        "name": "create event user 189 status 201",
+                        "path": "::setup::create event user 189 status 201",
+                        "id": "07b86d37564c9536e743dc3c92d2ee35",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 190 status 201": {
+                        "fails": 0,
+                        "name": "create event user 190 status 201",
+                        "path": "::setup::create event user 190 status 201",
+                        "id": "b23518b17ff4eea39745c249c5d89cac",
+                        "passes": 1
+                    },
+                    "create event user 191 status 201": {
+                        "name": "create event user 191 status 201",
+                        "path": "::setup::create event user 191 status 201",
+                        "id": "5d856d62b25d546435e5d5740326785d",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 192 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 192 status 201",
+                        "path": "::setup::create event user 192 status 201",
+                        "id": "409d310fbfba132dd68f09099341c1dd"
+                    },
+                    "create event user 193 status 201": {
+                        "name": "create event user 193 status 201",
+                        "path": "::setup::create event user 193 status 201",
+                        "id": "1a7086c18166b5a1ab5301736fdcfb50",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 194 status 201": {
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 194 status 201",
+                        "path": "::setup::create event user 194 status 201",
+                        "id": "c9170adc2c0a64cdb1ff222a4fcc58a5"
+                    },
+                    "create event user 195 status 201": {
+                        "path": "::setup::create event user 195 status 201",
+                        "id": "76ad85dd368842cb1b389e60299a895a",
+                        "passes": 1,
+                        "fails": 0,
+                        "name": "create event user 195 status 201"
+                    },
+                    "create event user 196 status 201": {
+                        "name": "create event user 196 status 201",
+                        "path": "::setup::create event user 196 status 201",
+                        "id": "8ca665fbb3c2a13195e3f3f563cf227d",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 197 status 201": {
+                        "name": "create event user 197 status 201",
+                        "path": "::setup::create event user 197 status 201",
+                        "id": "e107998f2957c7f871ae960a0945cdf7",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 198 status 201": {
+                        "name": "create event user 198 status 201",
+                        "path": "::setup::create event user 198 status 201",
+                        "id": "22344a9c8823401c47f89eb3bf710db7",
+                        "passes": 1,
+                        "fails": 0
+                    },
+                    "create event user 199 status 201": {
+                        "name": "create event user 199 status 201",
+                        "path": "::setup::create event user 199 status 201",
+                        "id": "95224c04b0d2c3a6327aee43f198d83e",
+                        "passes": 1,
+                        "fails": 0
+                    }
+                },
+                "name": "setup",
+                "path": "::setup",
+                "id": "5c0f8025f7e0b6654089e5b00e950f1a",
+                "groups": {}
+            }
+        },
+        "checks": {
+            "idempotent event status is 200": {
+                "id": "414bb58ac9ce59359feb947e653510bf",
+                "passes": 50,
+                "fails": 0,
+                "name": "idempotent event status is 200",
+                "path": "::idempotent event status is 200"
+            }
+        },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "metrics": {
+        "http_reqs": {
+            "count": 262,
+            "rate": 34.69556372379734
+        },
+        "vus": {
+            "value": 0,
+            "min": 0,
+            "max": 0
+        },
+        "data_sent": {
+            "count": 51296,
+            "rate": 6792.914644182857
+        },
+        "iterations": {
+            "count": 50,
+            "rate": 6.621290786984226
+        },
+        "http_req_blocked": {
+            "min": 0,
+            "med": 0.00275,
+            "max": 2.454791,
+            "p(90)": 0.20909530000000004,
+            "p(95)": 0.4957079999999995,
+            "avg": 0.11173851908396942
+        },
+        "http_req_connecting": {
+            "max": 2.345959,
+            "p(90)": 0.14786280000000002,
+            "p(95)": 0.42085834999999977,
+            "avg": 0.08745929389312977,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_receiving": {
+            "avg": 0.3652377709923663,
+            "min": 0,
+            "med": 0.29660450000000005,
+            "max": 5.031458,
+            "p(90)": 0.5850794,
+            "p(95)": 0.7445943999999999
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_duration": {
+            "avg": 27.542610438931302,
+            "min": 0,
+            "med": 4.4199795,
+            "max": 317.32425,
+            "p(90)": 116.77137470000001,
+            "p(95)": 118.57531495
+        },
+        "data_received": {
+            "count": 60190,
+            "rate": 7970.709849371611
+        },
+        "http_req_sending": {
+            "p(90)": 0.09382050000000003,
+            "p(95)": 0.9349826999999965,
+            "avg": 0.13722712595419848,
+            "min": 0,
+            "med": 0.011542,
+            "max": 2.574958
+        },
+        "http_req_failed": {
+            "fails": 256,
+            "passes": 6,
+            "thresholds": {
+                "rate==0": true
+            },
+            "value": 0.022900763358778626
+        },
+        "processed_error_total": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(95)": 118.63206275,
+            "avg": 28.188140371093755,
+            "min": 2.535334,
+            "med": 4.434229,
+            "max": 317.32425,
+            "p(90)": 116.8079795
+        },
+        "checks": {
+            "passes": 255,
+            "fails": 0,
+            "value": 1
+        },
+        "vus_max": {
+            "min": 50,
+            "max": 50,
+            "value": 50
+        },
+        "iteration_duration": {
+            "p(95)": 121.0488003,
+            "avg": 117.33014953999998,
+            "min": 113.761125,
+            "med": 117.06323,
+            "max": 121.652042,
+            "p(90)": 120.7065087
+        },
+        "http_req_waiting": {
+            "p(95)": 117.25633844999999,
+            "avg": 27.040145541984725,
+            "min": 0,
+            "med": 4.0692495,
+            "max": 312.101084,
+            "p(90)": 115.79026669999999
+        },
+        "processed_new_total": {
+            "rate": 0.1324258157396845,
+            "count": 1,
+            "thresholds": {
+                "count==1": false
+            }
+        },
+        "processed_replay_total": {
+            "count": 49,
+            "rate": 6.488864971244541,
+            "thresholds": {
+                "count==49": false
+            }
+        }
+    },
+    "setup_data": {
+        "adminJwt": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwidXNlcklkIjoxLCJleHRlcm5hbElkIjoiazYtYWRtaW4tMTc3NDkyOTQxNzAzNSIsImlhdCI6MTc3NDkyOTQxNywiZXhwIjoxNzc0OTMzMDE3fQ.pThJD-qPGBOhvQeMIVnJyNnTi940xalMrlEokM-e7I0",
+        "baseUrl": "http://app:8080",
+        "defaultApiKeyId": 1,
+        "projectId": "8bfdf622-a32f-4c15-b33e-e707c54318cd",
+        "sharedIdempotencyKey": "8971c898-7a53-40f3-b6bc-35536d3872c4",
+        "userIds": [
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            "14",
+            "15",
+            "16",
+            "17",
+            "18",
+            "19",
+            "20",
+            "21",
+            "22",
+            "23",
+            "24",
+            "25",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32",
+            "33",
+            "34",
+            "35",
+            "36",
+            "37",
+            "38",
+            "39",
+            "40",
+            "41",
+            "42",
+            "43",
+            "44",
+            "45",
+            "46",
+            "47",
+            "48",
+            "49",
+            "50",
+            "51",
+            "52",
+            "53",
+            "54",
+            "55",
+            "56",
+            "57",
+            "58",
+            "59",
+            "60",
+            "61",
+            "62",
+            "63",
+            "64",
+            "65",
+            "66",
+            "67",
+            "68",
+            "69",
+            "70",
+            "71",
+            "72",
+            "73",
+            "74",
+            "75",
+            "76",
+            "77",
+            "78",
+            "79",
+            "80",
+            "81",
+            "82",
+            "83",
+            "84",
+            "85",
+            "86",
+            "87",
+            "88",
+            "89",
+            "90",
+            "91",
+            "92",
+            "93",
+            "94",
+            "95",
+            "96",
+            "97",
+            "98",
+            "99",
+            "100",
+            "101",
+            "102",
+            "103",
+            "104",
+            "105",
+            "106",
+            "107",
+            "108",
+            "109",
+            "110",
+            "111",
+            "112",
+            "113",
+            "114",
+            "115",
+            "116",
+            "117",
+            "118",
+            "119",
+            "120",
+            "121",
+            "122",
+            "123",
+            "124",
+            "125",
+            "126",
+            "127",
+            "128",
+            "129",
+            "130",
+            "131",
+            "132",
+            "133",
+            "134",
+            "135",
+            "136",
+            "137",
+            "138",
+            "139",
+            "140",
+            "141",
+            "142",
+            "143",
+            "144",
+            "145",
+            "146",
+            "147",
+            "148",
+            "149",
+            "150",
+            "151",
+            "152",
+            "153",
+            "154",
+            "155",
+            "156",
+            "157",
+            "158",
+            "159",
+            "160",
+            "161",
+            "162",
+            "163",
+            "164",
+            "165",
+            "166",
+            "167",
+            "168",
+            "169",
+            "170",
+            "171",
+            "172",
+            "173",
+            "174",
+            "175",
+            "176",
+            "177",
+            "178",
+            "179",
+            "180",
+            "181",
+            "182",
+            "183",
+            "184",
+            "185",
+            "186",
+            "187",
+            "188",
+            "189",
+            "190",
+            "191",
+            "192",
+            "193",
+            "194",
+            "195",
+            "196",
+            "197",
+            "198",
+            "199",
+            "200",
+            "201"
+        ],
+        "apiKeyId": 2,
+        "benchmarkDailyQuota": 2000000000,
+        "benchmarkRateLimitPerSec": 1000000,
+        "leaderboardId": "887ba142-b529-48b5-ac30-61fe02a0362d",
+        "rawApiKey": "rk_311853aac2f2007570031cb115f0d6ddf128b28169bb0b8d"
+    }
+}
