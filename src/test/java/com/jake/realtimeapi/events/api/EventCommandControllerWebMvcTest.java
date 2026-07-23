@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = EventCommandController.class)
 @Import(GlobalExceptionHandler.class)
-class EventCommandControllerIntegrationTest {
+class EventCommandControllerWebMvcTest {
 
     @Autowired
     private MockMvc mockMvc;
