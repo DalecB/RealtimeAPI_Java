@@ -673,7 +673,7 @@ T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행
 **Streams**
 
 - `stream_pending_entries`: 현재 구현에서는 dedicated consumer group이 없어 항상 `0`
-- `stream_consumer_lag`: 현재 구현에서는 consumer group lag 대신 audit stream length 근사치
+- `stream_length`: audit stream 길이(XLEN). consumer group 도입 시 실제 lag 메트릭으로 대체 예정
 
 ### Logs (Structured JSON)
 
@@ -777,13 +777,13 @@ GET /internal/snapshot/status
   → { "lastSuccessfulSnapshotAt": "ISO8601", "snapshotLagSeconds": number }
 
 GET /internal/streams/status
-  → { "pendingEntries": number, "consumerLag": number, "lastDeliveredId": "string" }
+  → { "pendingEntries": number, "streamLength": number, "lastDeliveredId": "string" }
 
 GET /internal/circuit-breaker/status
   → { "state": "CLOSED|HALF_OPEN|OPEN", "failureRate": number }
 ```
 
-> **현재 구현 메모**: `/internal/streams/status`는 dedicated consumer group 없이 audit stream만 기록한다. 따라서 `pendingEntries=0`, `consumerLag=stream length` 근사치로 해석한다.
+> **현재 구현 메모**: `/internal/streams/status`는 dedicated consumer group 없이 audit stream만 기록한다. 따라서 `pendingEntries=0`이고, `streamLength`는 stream 길이(XLEN) 그대로다.
 
 ### Admin / Seed (테스트 자동화)
 

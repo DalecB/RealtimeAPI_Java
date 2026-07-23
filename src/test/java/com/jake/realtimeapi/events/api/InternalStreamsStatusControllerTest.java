@@ -37,7 +37,7 @@ class InternalStreamsStatusControllerTest {
         mockMvc.perform(get("/internal/streams/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pendingEntries").value(0))
-                .andExpect(jsonPath("$.consumerLag").value(12))
+                .andExpect(jsonPath("$.streamLength").value(12))
                 .andExpect(jsonPath("$.lastDeliveredId").value("1710000000000-0"));
 
         verify(getStreamsStatusUseCase).getStatus();

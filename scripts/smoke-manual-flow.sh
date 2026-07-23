@@ -151,7 +151,7 @@ echo "$USER_RANK_RESPONSE" | jq
 
 # 8. audit stream 내부 상태 확인.
 # 현재 범위에서는 consumer group이 없어서 pendingEntries=0,
-# consumerLag는 누적 stream 길이로 해석한다.
+# streamLength는 audit stream의 누적 길이다.
 print_section "8. internal streams status"
 STREAMS_STATUS_RESPONSE="$(json_request GET /internal/streams/status "")"
 echo "$STREAMS_STATUS_RESPONSE" | jq

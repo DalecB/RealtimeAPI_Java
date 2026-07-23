@@ -50,7 +50,7 @@ class EventApplicationServiceTest {
         StreamsStatus result = eventApplicationService.getStatus();
 
         assertEquals(0L, result.pendingEntries());
-        assertEquals(8L, result.consumerLag());
+        assertEquals(8L, result.streamLength());
         assertEquals("101-0", result.lastDeliveredId());
     }
 }

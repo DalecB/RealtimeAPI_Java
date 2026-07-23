@@ -18,9 +18,9 @@ public class StreamsMetricsBinder {
                 })
                 .register(meterRegistry);
 
-        Gauge.builder("stream_consumer_lag", getStreamsStatusUseCase, useCase -> {
+        Gauge.builder("stream_length", getStreamsStatusUseCase, useCase -> {
                     try {
-                        return useCase.getStatus().consumerLag();
+                        return useCase.getStatus().streamLength();
                     } catch (RuntimeException exception) {
                         return -1L;
                     }

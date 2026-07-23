@@ -20,6 +20,6 @@ public class InternalStreamsStatusController {
     @GetMapping("/status")
     public StreamsStatusResponse getStatus() {
         StreamsStatus status = getStreamsStatusUseCase.getStatus();
-        return new StreamsStatusResponse(status.pendingEntries(), status.consumerLag(), status.lastDeliveredId());
+        return new StreamsStatusResponse(status.pendingEntries(), status.streamLength(), status.lastDeliveredId());
     }
 }

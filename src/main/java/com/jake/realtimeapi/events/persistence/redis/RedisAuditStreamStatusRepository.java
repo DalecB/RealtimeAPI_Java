@@ -35,7 +35,7 @@ public class RedisAuditStreamStatusRepository implements AuditStreamStatusReposi
         String lastDeliveredId = lastRecords.isEmpty() ? null : lastRecords.get(0).getId().getValue();
 
         // The current implementation only appends audit events and does not run a dedicated consumer group yet.
-        // Until a real stream consumer exists, pending entries stay 0 and consumer lag is approximated by stream length.
+        // Until a real stream consumer exists, pending entries stay 0 and the reported value is the raw stream length.
         return new StreamsStatus(0L, safeLength, lastDeliveredId);
     }
 }

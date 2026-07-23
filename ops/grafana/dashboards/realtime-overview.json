@@ -102,7 +102,7 @@
       "id": 9,
       "targets": [
         {"expr": "stream_pending_entries", "legendFormat": "pending", "refId": "A"},
-        {"expr": "stream_consumer_lag", "legendFormat": "lag", "refId": "B"}
+        {"expr": "stream_length", "legendFormat": "length", "refId": "B"}
       ],
       "title": "Streams",
       "type": "timeseries"

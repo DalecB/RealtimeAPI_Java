@@ -70,19 +70,19 @@ public class EventApplicationService implements GetTopRanksUseCase, GetUserRankU
     @Override
     public StreamsStatus getStatus() {
         long pendingEntries = 0L;
-        long consumerLag = 0L;
+        long streamLength = 0L;
         String lastDeliveredId = null;
 
         for (var leaderboardId : leaderboardRepository.findAllIds()) {
             StreamsStatus status = auditStreamStatusRepository.getStatus(leaderboardId);
             pendingEntries += status.pendingEntries();
-            consumerLag += status.consumerLag();
+            streamLength += status.streamLength();
             if (isLaterStreamId(status.lastDeliveredId(), lastDeliveredId)) {
                 lastDeliveredId = status.lastDeliveredId();
             }
         }
 
-        return new StreamsStatus(pendingEntries, consumerLag, lastDeliveredId);
+        return new StreamsStatus(pendingEntries, streamLength, lastDeliveredId);
     }
 
     private boolean isLaterStreamId(String candidate, String current) {

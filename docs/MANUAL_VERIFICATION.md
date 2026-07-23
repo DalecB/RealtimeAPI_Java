@@ -237,7 +237,7 @@ curl -s http://localhost:8080/internal/streams/status
 
 기대 결과:
 - 현재 구현에서는 별도 consumer group이 없으므로 `pendingEntries = 0`
-- `consumerLag`는 audit stream 누적 길이로 증가
+- `streamLength`는 audit stream 누적 길이로 증가
 - `lastDeliveredId`는 마지막으로 기록된 stream entry id
 
 주의:

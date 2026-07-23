@@ -43,7 +43,7 @@ docker compose up -d postgres redis app prometheus grafana
 
 ### Streams
 - `stream_pending_entries`
-- `stream_consumer_lag`
+- `stream_length`
 
 ## 3. Grafana 대시보드
 
@@ -78,8 +78,8 @@ docker compose up -d postgres redis app prometheus grafana
 
 ## 5. 주의할 점
 
-- `stream_pending_entries`, `stream_consumer_lag`는 현재 dedicated consumer group이 없어서 임시 정의입니다.
-  - `pendingEntries = 0`
-  - `consumerLag = audit stream length`
+- `stream_pending_entries`는 현재 dedicated consumer group이 없어서 항상 `0`입니다.
+  - `stream_length = audit stream length (XLEN)`
+  - consumer group 도입 시 실제 lag 메트릭을 별도로 추가한다
 - `snapshot status`는 메모리 tracker 기반이라 앱 재시작 시 마지막 성공 시각은 초기화됩니다.
 - recovery 검증 스크립트는 compose의 `app` 컨테이너를 재시작하는 방식이라, `bootRun` 로컬 프로세스가 아니라 compose app 기준으로 사용해야 합니다.
