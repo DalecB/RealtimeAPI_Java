@@ -2,3 +2,5 @@
 *.bat text eol=crlf
 *.jar binary
 erd/** linguist-vendored
+console/** linguist-vendored
+src/main/resources/static/console/** linguist-generated
