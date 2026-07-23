@@ -56,7 +56,15 @@ docker compose up -d postgres redis app prometheus renderer grafana
 테스트:
 
 - `./gradlew test`
-- 현재 테스트 스위트는 통과 기준으로 정리되어 있습니다.
+- 단위 테스트(WebMvc 슬라이스, mock 기반)와 Testcontainers 통합 테스트(실제 Redis·PostgreSQL 컨테이너)로 구성됩니다.
+
+Testcontainers 통합 테스트:
+
+| Scenario | 검증 내용 | Test |
+| --- | --- | --- |
+| 동시 멱등 처리 | 동일 Idempotency Key·동일 payload 50건 동시 요청(k6 T4의 JVM판). Lua 원자 블록이 check-and-act를 한 단위로 묶어 신규 1건/replay 49건, 점수 반영 정확히 1회(ZSCORE), audit 기록 정확히 1건(XLEN)을 보장하는지 검증 | `ProcessEventConcurrencyTest` |
+| 멱등키 재사용 충돌 | 동일 키에 payload 해시(`userId:delta`)가 다르면 replay가 아닌 데이터 변주로 간주하고 409를 반환하는지 검증 | `ProcessEventConcurrencyTest` |
+| Redis 장애 fail-fast | 성공 10건으로 sliding window를 채운 상태에서 Redis 컨테이너를 중단 — 임계(50%) 도달인 5번째 실패에서 브레이커가 OPEN 되고, 이후 요청은 커넥션 타임아웃을 기다리지 않고 즉시 실패하는지 검증 | `RedisOutageCircuitBreakerTest` |
 
 수집된 benchmark evidence:
 
