@@ -8,7 +8,7 @@ export interface Session {
   leaderboardId: string
 }
 
-export type FireOutcome = 'NEW' | 'REPLAY' | 'CONFLICT_409' | 'BLOCKED_503' | 'ERROR'
+export type FireOutcome = 'NEW' | 'REPLAY' | 'CONFLICT_409' | 'RATE_LIMITED_429' | 'BLOCKED_503' | 'ERROR'
 
 export interface FireResult {
   outcome: FireOutcome
@@ -115,6 +115,7 @@ export async function fireEvent(
     const latencyMs = performance.now() - started
     const base = { latencyMs, idempotencyKey: opts.idempotencyKey, at: Date.now(), status: res.status }
     if (res.status === 409) return { ...base, outcome: 'CONFLICT_409' }
+    if (res.status === 429) return { ...base, outcome: 'RATE_LIMITED_429', retryAfter: res.headers.get('Retry-After') }
     if (res.status === 503) return { ...base, outcome: 'BLOCKED_503', retryAfter: res.headers.get('Retry-After') }
     if (!res.ok) return { ...base, outcome: 'ERROR' }
     const body = (await res.json()) as { replayed: boolean }
@@ -157,3 +158,17 @@ export const getSnapshotEntries = (leaderboardId: string) =>
 
 export const getSnapshotStatus = () =>
   fetch('/internal/snapshot/status').then((r) => json<SnapshotStatus>(r))
+
+export interface DepsHealth {
+  redis: boolean
+  db: boolean
+}
+
+// actuator health (show-details=always) — 상단바 Redis/Postgres 칩은 장식이 아니라 실측
+export const getDepsHealth = (): Promise<DepsHealth> =>
+  fetch('/actuator/health')
+    .then((r) => r.json())
+    .then((h: { components?: Record<string, { status?: string }> }) => ({
+      redis: h.components?.redis?.status === 'UP',
+      db: h.components?.db?.status === 'UP',
+    }))

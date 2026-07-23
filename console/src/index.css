@@ -1,37 +1,39 @@
-/* 디자인 토큰 — 클로드 디자인 산출물(RealtimeAPI Ops Console.dc.html)에서 이식 */
+/* 디자인 토큰 v2 — 클로드 디자인 산출물(RealtimeAPI Ops Console v2.dc.html)에서 이식 */
 :root {
-  --color-bg: #0b0e13;
-  --color-surface: #11151d;
-  --color-surface-2: #181e28;
-  --color-surface-3: #1f2733;
-  --color-border: #232b38;
-  --color-border-strong: #313c4c;
-  --color-text: #dbe3ee;
-  --color-text-dim: #8a97a8;
-  --color-text-faint: #5b6675;
-  --color-blue: #4c9aff;
-  --color-green: #3fb950;
-  --color-red: #f0524f;
-  --color-amber: #e3b341;
-  --color-orange: #ec8340;
-  --color-gray: #768390;
-  --color-blue-dim: rgba(76, 154, 255, 0.13);
-  --color-green-dim: rgba(63, 185, 80, 0.13);
-  --color-red-dim: rgba(240, 82, 79, 0.13);
-  --color-amber-dim: rgba(227, 179, 65, 0.13);
-  --color-orange-dim: rgba(236, 131, 64, 0.13);
-  --color-gray-dim: rgba(118, 131, 144, 0.16);
+  --color-bg: #0d0d0f;
+  --color-surface: rgba(255, 255, 255, 0.055);
+  --color-surface-2: rgba(255, 255, 255, 0.08);
+  --color-surface-3: rgba(255, 255, 255, 0.12);
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-text: #f5f5f7;
+  --color-text-dim: rgba(235, 235, 245, 0.62);
+  --color-text-faint: rgba(235, 235, 245, 0.36);
+  --color-blue: #0a84ff;
+  --color-green: #30d158;
+  --color-red: #ff453a;
+  --color-amber: #ffd60a;
+  --color-orange: #ff9f0a;
+  --color-gray: #98989d;
+  --color-blue-dim: rgba(10, 132, 255, 0.16);
+  --color-green-dim: rgba(48, 209, 88, 0.16);
+  --color-red-dim: rgba(255, 69, 58, 0.16);
+  --color-amber-dim: rgba(255, 214, 10, 0.14);
+  --color-orange-dim: rgba(255, 159, 10, 0.16);
+  --color-gray-dim: rgba(152, 152, 157, 0.18);
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
   --radius-pill: 999px;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -46,8 +48,9 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 @keyframes pulse {
@@ -63,9 +66,9 @@ body {
 @keyframes glowPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(240, 82, 79, 0.35);
+    box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.4);
   }
   50% {
-    box-shadow: 0 0 14px 2px rgba(240, 82, 79, 0.25);
+    box-shadow: 0 0 18px 3px rgba(255, 69, 58, 0.28);
   }
 }
