@@ -63,8 +63,9 @@ Testcontainers 통합 테스트:
 | Scenario | 검증 내용 | Test |
 | --- | --- | --- |
 | 동시 멱등 처리 | 동일 Idempotency Key·동일 payload 50건 동시 요청(k6 T4의 JVM판). Lua 원자 블록이 check-and-act를 한 단위로 묶어 신규 1건/replay 49건, 점수 반영 정확히 1회(ZSCORE), audit 기록 정확히 1건(XLEN)을 보장하는지 검증 | `ProcessEventConcurrencyTest` |
-| 멱등키 재사용 충돌 | 동일 키에 payload 해시(`userId:delta`)가 다르면 replay가 아닌 데이터 변주로 간주하고 409를 반환하는지 검증 | `ProcessEventConcurrencyTest` |
+| 멱등키 재사용 충돌 | 동일 키에 payload 해시(`userId:delta`)가 다르면 replay가 아닌 데이터 변주로 간주하고 `IdempotencyKeyReuseMismatchException`을 던지며 점수가 반영되지 않는지 검증 (HTTP 409 매핑은 `EventCommandControllerWebMvcTest` 몫) | `ProcessEventConcurrencyTest` |
 | Redis 장애 fail-fast | 성공 10건으로 sliding window를 채운 상태에서 Redis 컨테이너를 중단 — 임계(50%) 도달인 5번째 실패에서 브레이커가 OPEN 되고, 이후 요청은 커넥션 타임아웃을 기다리지 않고 즉시 실패하는지 검증 | `RedisOutageCircuitBreakerTest` |
+| Snapshot 왕복 복구 | Redis ZSET 3건을 PostgreSQL snapshot으로 capture → 랭킹 키 삭제 → recover. `recovered=true` / `RECOVERED` / 복구 행 수 3을 먼저 확정해 skip(`REDIS_ALREADY_WARM`)에 의한 거짓 통과를 배제하고, 유저별 ZSCORE와 ZCARD가 원본과 일치하는지 검증 | `SnapshotRoundTripTest` |
 
 수집된 benchmark evidence:
 
