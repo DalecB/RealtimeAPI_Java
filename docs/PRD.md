@@ -1043,6 +1043,48 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 ---
 
+### ADR-009: Audit Log 소비 도입 여부와 전송 계층 선택
+
+**상태:** 제안 중 (2026-07-27 착수). 결정란은 근거 확정 후 작성한다.
+
+**재검토 대상:** `17. Non-goals`의 "Kafka 기반 메시지 브로커 — Redis Streams로 감사 로그 파이프라인 충분히 증명 가능" 한 줄. 당시 판단의 근거와 **뒤집힘 조건이 문서에 남아 있지 않았다.** 본 ADR은 그 결정을 수치와 함께 정식화하고 재검토한다.
+
+**상황:** audit stream(`lb:{leaderboardId}:events`)은 XADD로 append만 되고 **읽는 코드가 없다.** 이 사실이 두 곳에 흔적으로 남아 있다.
+
+| 위치 | 내용 |
+| --- | --- |
+| `RedisAuditStreamStatusRepository:39` | `pendingEntries`가 리터럴 `0L`. 이 상수가 API 응답 → `stream_pending_entries` gauge → Grafana 패널까지 노출되지만 어떤 판단의 입력도 아니다 |
+| `RedisAuditStreamStatusRepository:33-35` | `lastDeliveredId`가 실제로는 `XREVRANGE` 결과, 즉 last-generated-id다. Redis의 `last-delivered-id`는 컨슈머 그룹 커서이므로 그룹이 없는 현재 **개념 자체가 존재하지 않는다** |
+
+두 지점은 결함이라기보다 **소비자가 없다는 사실이 인터페이스에 드러난 것**이다. 따라서 이것만으로는 소비 도입의 근거가 되지 않는다.
+
+**측정된 현재 값:**
+
+| 항목 | 값 | 출처 |
+| --- | --- | --- |
+| audit 유입 (평균) | 약 3.5/s | `0. Scenario` 30만 건/일 ÷ 86,400 |
+| audit 유입 (피크) | 1,000/s | `0. Scenario` 목표 TPS (시스템 전체값, 리더보드별 아님) |
+| 현재 보존 창 | 약 8시간 | `MAXLEN ~ 100000` ÷ 30만 건/일 |
+| 한 달 보존 시 Redis 메모리 | 약 900MB / 리더보드 | 30일 × 30만 × ~100B |
+| 메모리 초과 시 거동 | **write 실패** | `maxmemory-policy noeviction` |
+
+**검토한 대안:** 도입 안 함 / 인프로세스 큐 / Redis Streams 컨슈머 그룹 / PostgreSQL 적재 / Kafka
+
+**대안 간 구조적 차이:** 단일 writer(PG primary) vs 파티션 분산(Kafka), MAXLEN 링 버퍼 vs 시간 기반 리텐션. 내구성은 저장 매체가 아니라 복제 구성에서 갈린다 — 단일 브로커 Kafka의 유실 창은 Redis AOF everysec과 같은 성격이다.
+
+**뒤집힘 조건:**
+
+- **ⓐ 보존** — 현재 보존 창(약 8시간)이 **실제 요구를 막을 때**. 보존이 부족하다는 사실만으로는 조건이 아니다. 현재 한 달 단위 사후 분석을 요구하는 주체가 없다. ⓐ가 선택하는 것은 **내구 저장소**이며 Kafka로 직결되지 않는다 (파티셔닝한 PG 테이블로 900만 행/월은 일상적 규모).
+- **ⓑ 기록 종류 증가** — 현재 audit 엔트리는 `userId`, `delta` 두 필드뿐이다(`process_event.lua:27`). 기록 종류가 늘거나 서로 다른 목적의 소비자가 복수로 생겨 파티션 분산과 독립 오프셋이 필요해질 때. **Kafka는 ⓑ에서만 선택된다.**
+
+**결정:** *(제안 중 — 미작성)*
+
+**트레이드오프:** *(결정 확정 후 작성)*
+
+**관련 문서:** 트리거 ⓑ의 이행 경로 검증은 [SPIKE-001](SPIKE-001-kafka-migration-path.md)에서 별도로 다룬다. 해당 스파이크는 본 ADR의 결정을 대체하지 않는다.
+
+---
+
 ## 20. 핵심 설계 요약
 
 - **TPS 목표 1,000**: 비즈니스 시나리오(DAU 50만, 이벤트 집중 2시간)에서 역산한 수치 기반
