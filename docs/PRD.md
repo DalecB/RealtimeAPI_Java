@@ -23,12 +23,12 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 
 다음 서비스 규모를 기준으로 시스템을 설계한다.
 
-| 항목 | 가정값 |
-| --- | --- |
-| DAU | 50만 |
-| 이벤트 집중 시간대 | 2시간 (푸시/프로모션 기준) |
-| 유저당 평균 이벤트 액션 수 | 3회 |
-| 집중 시간 내 참여 유저 비율 | 20% (10만 명) |
+| 항목                        | 가정값                     |
+| --------------------------- | -------------------------- |
+| DAU                         | 50만                       |
+| 이벤트 집중 시간대          | 2시간 (푸시/프로모션 기준) |
+| 유저당 평균 이벤트 액션 수  | 3회                        |
+| 집중 시간 내 참여 유저 비율 | 20% (10만 명)              |
 
 **Peak TPS 역산:**
 
@@ -55,7 +55,7 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 - 실시간 이벤트 로그 전체를 DB에 적재하지 않고, **Top-N snapshot + 운영 지표 중심**으로 저장
 - 성능은 TPS 자랑이 아니라 **SLO(p99/오류율/회복 시간)** 기반으로 정의
 - 배포/재현성: `docker compose up` 이후 **5분 내 실행/테스트 가능**해야 함
-- 메시지 브로커: 1차 스코프에서 Kafka 제외. 대신 **Redis Streams**로 감사 로그(Audit Log) 파이프라인 구성
+- 메시지 브로커: 1차 스코프에서 Kafka 제외. 대신 **Redis Streams**로 감사 로그(Audit Log) 파이프라인 구성 (→ ADR-009에서 재검토해 Kafka 채택으로 대체됨)
 
 ---
 
@@ -67,27 +67,27 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 
 ### 1.1 API SLO
 
-| API | p50 | p99 | Error Rate | 비고 |
-| --- | --- | --- | --- | --- |
-| POST /events | < 10ms | < 50ms | < 0.1% | Hot Path, Redis Lua 처리 기준 |
-| GET /leaderboards/{leaderboardId}/tops?offset=0&limit=50 | < 5ms | < 20ms | < 0.1% | Redis ZRANGE 기준 |
-| GET /leaderboards/{leaderboardId}/users/{userId} | < 5ms | < 20ms | < 0.1% | Redis ZSCORE + ZCOUNT 기준 |
+| API                                                      | p50    | p99    | Error Rate | 비고                          |
+| -------------------------------------------------------- | ------ | ------ | ---------- | ----------------------------- |
+| POST /events                                             | < 10ms | < 50ms | < 0.1%     | Hot Path, Redis Lua 처리 기준 |
+| GET /leaderboards/{leaderboardId}/tops?offset=0&limit=50 | < 5ms  | < 20ms | < 0.1%     | Redis ZRANGE 기준             |
+| GET /leaderboards/{leaderboardId}/users/{userId}         | < 5ms  | < 20ms | < 0.1%     | Redis ZSCORE + ZCOUNT 기준    |
 
 ### 1.2 운영 SLO
 
-| 지표 | 목표값 | 측정 방법 |
-| --- | --- | --- |
-| Snapshot Lag | < 30초 (30초 주기 기준) | `snapshot_lag_seconds` Prometheus 메트릭 |
-| Snapshot 성공률 | > 99% | `snapshot_failure_total` 기준 |
-| Redis 장애 시 Fail Fast 응답 | < 500ms | Circuit Breaker OPEN 상태 기준 |
-| Worker 재시작 후 Lag catch-up 시간 | < 2분 | Streams consumer lag 기준 |
+| 지표                               | 목표값                  | 측정 방법                                |
+| ---------------------------------- | ----------------------- | ---------------------------------------- |
+| Snapshot Lag                       | < 30초 (30초 주기 기준) | `snapshot_lag_seconds` Prometheus 메트릭 |
+| Snapshot 성공률                    | > 99%                   | `snapshot_failure_total` 기준            |
+| Redis 장애 시 Fail Fast 응답       | < 500ms                 | Circuit Breaker OPEN 상태 기준           |
+| Worker 재시작 후 Lag catch-up 시간 | < 2분                   | Streams consumer lag 기준                |
 
 ### 1.3 Idempotency SLO
 
-| 지표 | 목표값 |
-| --- | --- |
-| 동일 키 중복 요청 시 점수 오염 | 0건 |
-| 동시 100 요청 동일 키 → 정확히 1회 반영 | 100% |
+| 지표                                    | 목표값 |
+| --------------------------------------- | ------ |
+| 동일 키 중복 요청 시 점수 오염          | 0건    |
+| 동시 100 요청 동일 키 → 정확히 1회 반영 | 100%   |
 
 ---
 
@@ -269,11 +269,11 @@ rank = ZCOUNT(lb:{leaderboardId}:z, ({myScore}, +inf]) + 1
 **예시:**
 
 | userId | score | rank |
-| --- | --- | --- |
-| userA | 1000 | 1 |
-| userB | 800 | 2 |
-| userC | 800 | 2 |
-| userD | 600 | 4 |
+| ------ | ----- | ---- |
+| userA  | 1000  | 1    |
+| userB  | 800   | 2    |
+| userC  | 800   | 2    |
+| userD  | 600   | 4    |
 
 ### 5.2 동점 내 정렬 (Tie-break)
 
@@ -281,13 +281,13 @@ Redis ZSET은 동일 score에 대해 member 값의 **lex 오름차순**으로 �
 
 ### 5.3 deltaScore 정책
 
-| 항목 | 정책 |
-| --- | --- |
-| 허용 범위 | 양의 정수만 허용 (1 이상) |
-| 음수 delta | 허용하지 않음. 랭킹의 단조 증가(monotonic increase) 보장 |
-| 최대값 | Long 범위 내 (Redis ZINCRBY는 double 처리, 정수 범위 내 사용) |
-| 소수점 | 허용하지 않음 (integer only) |
-| 위반 시 응답 | 400 Bad Request + `INVALID_DELTA_SCORE` |
+| 항목         | 정책                                                          |
+| ------------ | ------------------------------------------------------------- |
+| 허용 범위    | 양의 정수만 허용 (1 이상)                                     |
+| 음수 delta   | 허용하지 않음. 랭킹의 단조 증가(monotonic increase) 보장      |
+| 최대값       | Long 범위 내 (Redis ZINCRBY는 double 처리, 정수 범위 내 사용) |
+| 소수점       | 허용하지 않음 (integer only)                                  |
+| 위반 시 응답 | 400 Bad Request + `INVALID_DELTA_SCORE`                       |
 
 ---
 
@@ -295,12 +295,12 @@ Redis ZSET은 동일 score에 대해 member 값의 **lex 오름차순**으로 �
 
 모든 Redis Key는 `{leaderboardId}`를 hash tag로 사용하여 Redis Cluster 환경에서 동일 슬롯에 배치되도록 설계한다.
 
-| 용도 | Key 형식 | 타입 | TTL |
-| --- | --- | --- | --- |
-| 랭킹 ZSET | `lb:{leaderboardId}:z` | ZSET | 없음 |
-| Idempotency Key | `lb:{leaderboardId}:idem:{eventUuid}` | STRING | 24시간 |
-| Audit Log Stream | `lb:{leaderboardId}:events` | STREAM | 없음 |
-| Rate Limit Counter | `rl:{apiKeyId}:{windowStart}` | STRING | windowTTL |
+| 용도               | Key 형식                              | 타입   | TTL       |
+| ------------------ | ------------------------------------- | ------ | --------- |
+| 랭킹 ZSET          | `lb:{leaderboardId}:z`                | ZSET   | 없음      |
+| Idempotency Key    | `lb:{leaderboardId}:idem:{eventUuid}` | STRING | 24시간    |
+| Audit Log Stream   | `lb:{leaderboardId}:events`           | STREAM | 없음      |
+| Rate Limit Counter | `rl:{apiKeyId}:{windowStart}`         | STRING | windowTTL |
 
 > **leaderboardId 스코프**: leaderboardId는 UUID 기반 전역 고유값으로 관리한다. Redis Key에 projectId를 별도로 포함하지 않으며, projectId는 REST URL의 리소스 계층 표현에만 사용한다.
 
@@ -351,12 +351,12 @@ return {1, newScore}  -- {isNew=true, newScore}
 
 ### 7.2 Lua 제약 조건
 
-| 항목 | 규칙 | 이유 |
-| --- | --- | --- |
-| 연산 복잡도 | O(1) 또는 O(log N) 이하만 허용 | Redis 단일 스레드 블로킹 방지 |
-| 반복문 | 금지 (상수 횟수 연산만) | p99 latency 보호 |
-| KEYS 수 | 최대 3개 (모두 `{leaderboardId}` hash tag 적용) | Redis Cluster 키 슬롯 일치 요구사항 대비 |
-| 모니터링 | `redis_lua_duration_ms` 메트릭 + Redis slowlog | Lua 블로킹 조기 감지 |
+| 항목        | 규칙                                            | 이유                                     |
+| ----------- | ----------------------------------------------- | ---------------------------------------- |
+| 연산 복잡도 | O(1) 또는 O(log N) 이하만 허용                  | Redis 단일 스레드 블로킹 방지            |
+| 반복문      | 금지 (상수 횟수 연산만)                         | p99 latency 보호                         |
+| KEYS 수     | 최대 3개 (모두 `{leaderboardId}` hash tag 적용) | Redis Cluster 키 슬롯 일치 요구사항 대비 |
+| 모니터링    | `redis_lua_duration_ms` 메트릭 + Redis slowlog  | Lua 블로킹 조기 감지                     |
 
 ---
 
@@ -468,12 +468,12 @@ CREATE INDEX idx_snapshot_entries_snapshot_rank_user
 
 Redis를 Source of Truth로 사용하는 구조에서 데이터 유실 허용 범위(RPO)는 계층별로 다음과 같이 정의된다.
 
-| 계층 | 설정 | RPO (최대 유실) | 역할 |
-| --- | --- | --- | --- |
-| AOF | everysec | 최대 1초 | Redis crash 시 1차 복구 |
-| RDB | 12시간 주기 | 최대 12시간 | AOF 손상 시 fallback |
-| PostgreSQL Snapshot | 30초 주기 | 최대 30초 | Redis + AOF 모두 유실 시 fallback |
-| DB Full Backup | 1시간 주기 | 최대 1시간 | DB 재난 시 최종 복구 수단 |
+| 계층                | 설정        | RPO (최대 유실) | 역할                              |
+| ------------------- | ----------- | --------------- | --------------------------------- |
+| AOF                 | everysec    | 최대 1초        | Redis crash 시 1차 복구           |
+| RDB                 | 12시간 주기 | 최대 12시간     | AOF 손상 시 fallback              |
+| PostgreSQL Snapshot | 30초 주기   | 최대 30초       | Redis + AOF 모두 유실 시 fallback |
+| DB Full Backup      | 1시간 주기  | 최대 1시간      | DB 재난 시 최종 복구 수단         |
 
 > **운영 기준 RPO**: 정상 운영 시 AOF everysec에 의해 최대 1초 유실. Redis + AOF 동시 유실이라는 재난 시나리오에서도 PostgreSQL Snapshot 기준 최대 30초 유실로 제한.
 
@@ -502,13 +502,13 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 
 ### 10.1 장애 시나리오별 대응
 
-| 시나리오 | 대응 방식 | 비고 |
-| --- | --- | --- |
-| Redis 일시 응답 지연 | Circuit Breaker (Closed → Half-Open → Open) | Resilience4j 활용 |
-| Redis 완전 장애 | Circuit Breaker OPEN → 503 즉시 반환 | Write 요청 차단으로 데이터 오염 방지 |
-| Redis 재시작 | AOF Persistence로 데이터 복구 (최대 1초 유실) | AOF fsync: everysec |
-| Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구 | 최대 30초 유실 |
-| Snapshot Worker 실패 | 재시도 3회 후 알림, 다음 주기 재개 | Cold Path 장애는 Hot Path와 독립 |
+| 시나리오              | 대응 방식                                     | 비고                                 |
+| --------------------- | --------------------------------------------- | ------------------------------------ |
+| Redis 일시 응답 지연  | Circuit Breaker (Closed → Half-Open → Open)   | Resilience4j 활용                    |
+| Redis 완전 장애       | Circuit Breaker OPEN → 503 즉시 반환          | Write 요청 차단으로 데이터 오염 방지 |
+| Redis 재시작          | AOF Persistence로 데이터 복구 (최대 1초 유실) | AOF fsync: everysec                  |
+| Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 최대 30초 유실                       |
+| Snapshot Worker 실패  | 재시도 3회 후 알림, 다음 주기 재개            | Cold Path 장애는 Hot Path와 독립     |
 
 ### 10.2 Circuit Breaker 설정
 
@@ -569,12 +569,12 @@ return 1  -- 허용
 
 Rate Limit은 단순 제한이 아니라 **정상 API Key의 SLO를 보호**하는 정책이다.
 
-| 정책 | 기준 |
-| --- | --- |
-| 기본 Rate Limit | API Key당 초당 100 요청 |
-| 일일 Quota | API Key당 100만 요청 |
-| 초과 응답 | HTTP 429 + `X-RateLimit-Remaining`, `Retry-After` 헤더 |
-| 악성 트래픽 차단 효과 | T7 테스트에서 attackKey vs normalKey 격리 증명 |
+| 정책                  | 기준                                                   |
+| --------------------- | ------------------------------------------------------ |
+| 기본 Rate Limit       | API Key당 초당 100 요청                                |
+| 일일 Quota            | API Key당 100만 요청                                   |
+| 초과 응답             | HTTP 429 + `X-RateLimit-Remaining`, `Retry-After` 헤더 |
+| 악성 트래픽 차단 효과 | T7 테스트에서 attackKey vs normalKey 격리 증명         |
 
 ---
 
@@ -582,12 +582,12 @@ Rate Limit은 단순 제한이 아니라 **정상 API Key의 SLO를 보호**하�
 
 ### 12.1 TTL 기준 처리 정책
 
-| 상황 | 처리 방식 | 응답 |
-| --- | --- | --- |
-| TTL 내 동일 Key + 동일 payload | 중복으로 간주, 점수 미반영 | 200 OK + `replayed: true` |
-| TTL 내 동일 Key + **다른 payload** | 재사용 오류 | 409 Conflict + `IDEMPOTENCY_KEY_REUSE_MISMATCH` |
-| TTL 이후 동일 Key 재요청 | 신규 요청으로 간주, 점수 반영 | 200 OK + `replayed: false` |
-| TTL 경계 레이스 컨디션 | Lua Script 원자성으로 처리 | 별도 보호 불필요 |
+| 상황                               | 처리 방식                     | 응답                                            |
+| ---------------------------------- | ----------------------------- | ----------------------------------------------- |
+| TTL 내 동일 Key + 동일 payload     | 중복으로 간주, 점수 미반영    | 200 OK + `replayed: true`                       |
+| TTL 내 동일 Key + **다른 payload** | 재사용 오류                   | 409 Conflict + `IDEMPOTENCY_KEY_REUSE_MISMATCH` |
+| TTL 이후 동일 Key 재요청           | 신규 요청으로 간주, 점수 반영 | 200 OK + `replayed: false`                      |
+| TTL 경계 레이스 컨디션             | Lua Script 원자성으로 처리    | 별도 보호 불필요                                |
 
 > **payload 비교 기준**: `(userId, deltaScore)` 조합. Key 저장 시 두 필드의 해시값을 Redis에 함께 저장하여 비교.
 
@@ -631,11 +631,11 @@ TTL 기본값: **24시간** (일 단위 이벤트 기준)
 
 ### Snapshot Lag 관리
 
-| 주기 | 예상 Lag | DB 부하 | 적합한 상황 |
-| --- | --- | --- | --- |
-| 10초 | < 15초 | 높음 | 라이브 이벤트, 실시간성 중요 |
-| 30초 | < 45초 | 중간 | 기본값 (본 프로젝트 기준) |
-| 5분 | < 6분 | 낮음 | 일반 운영, 비용 절감 |
+| 주기 | 예상 Lag | DB 부하 | 적합한 상황                  |
+| ---- | -------- | ------- | ---------------------------- |
+| 10초 | < 15초   | 높음    | 라이브 이벤트, 실시간성 중요 |
+| 30초 | < 45초   | 중간    | 기본값 (본 프로젝트 기준)    |
+| 5분  | < 6분    | 낮음    | 일반 운영, 비용 절감         |
 
 T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행, lag/latency trade-off를 수치화한다.
 
@@ -803,15 +803,15 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 ## 17. Non-goals (의도적으로 제외한 항목)
 
-| 항목 | 제외 이유 |
-| --- | --- |
-| WebSocket 기반 실시간 Push | 복잡도 대비 본 프로젝트 범위 밖 |
-| 모든 이벤트의 영구 보관 | 운영 비용 및 스토리지 현실적 제약 |
-| Strong Consistency 보장 | Eventually Consistent 선택과 트레이드오프 관계 |
-| Redis Sentinel / Cluster | 본 프로젝트 범위 외, 향후 확장 방향만 문서화 |
-| Kafka 기반 메시지 브로커 | Redis Streams로 감사 로그 파이프라인 충분히 증명 가능 |
-| Streams Replay 복구 | Cold Start 복구는 PostgreSQL Snapshot 기준으로 충분 |
-| Top API Cursor Pagination | offset 기반 + 상한 제한으로 운영 범위 충분 |
+| 항목                       | 제외 이유                                             |
+| -------------------------- | ----------------------------------------------------- |
+| WebSocket 기반 실시간 Push | 복잡도 대비 본 프로젝트 범위 밖                       |
+| 모든 이벤트의 영구 보관    | 운영 비용 및 스토리지 현실적 제약                     |
+| Strong Consistency 보장    | Eventually Consistent 선택과 트레이드오프 관계        |
+| Redis Sentinel / Cluster   | 본 프로젝트 범위 외, 향후 확장 방향만 문서화          |
+| ~~Kafka 기반 메시지 브로커~~ | ~~Redis Streams로 감사 로그 파이프라인 충분히 증명 가능~~ → **ADR-009에서 대체됨.** 보관 30일·복수 소비자를 가정으로 선언하면서 Kafka를 채택했다 |
+| Streams Replay 복구        | Cold Start 복구는 PostgreSQL Snapshot 기준으로 충분   |
+| Top API Cursor Pagination  | offset 기반 + 상한 제한으로 운영 범위 충분            |
 
 ---
 
@@ -827,13 +827,13 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 ### 18.1 테스트 환경 (재현 가능성 보장)
 
-| 항목 | 사양 |
-| --- | --- |
-| 테스트 실행 환경 | Docker Compose (로컬 Mac M-series) |
-| API Server | Spring Boot, JVM heap 512MB |
-| Redis | 7.x, AOF everysec, maxmemory 256MB |
-| PostgreSQL | 15.x, max_connections 100 |
-| k6 실행 | 로컬 동일 머신 (네트워크 오버헤드 배제 목적) |
+| 항목             | 사양                                         |
+| ---------------- | -------------------------------------------- |
+| 테스트 실행 환경 | Docker Compose (로컬 Mac M-series)           |
+| API Server       | Spring Boot, JVM heap 512MB                  |
+| Redis            | 7.x, AOF everysec, maxmemory 256MB           |
+| PostgreSQL       | 15.x, max_connections 100                    |
+| k6 실행          | 로컬 동일 머신 (네트워크 오버헤드 배제 목적) |
 
 > ⚠️ 로컬 환경 수치임을 결과 보고서에 명시. 절대값보다 SLO 달성 여부와 병목 분석이 핵심.
 
@@ -841,27 +841,27 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **Tier 0 (Must-have, 결과 공개 필수)**
 
-| 테스트 | 목적 | 핵심 검증 지표 |
-| --- | --- | --- |
-| T1: Hot Path Write Throughput | 1,000 TPS 목표 달성 여부 | p99 < 50ms, error rate < 0.1% |
-| T3: Mixed Workload (Write+Read) | Read SLO 보호 여부 | Read p99 < 20ms (Write 부하 중) |
-| T4: Idempotency Correctness | 동시 중복 요청 정합성 | 점수 오염 0건, 200 OK 정상 반환 |
-| T8: Snapshot Pipeline Impact | Snapshot lag/latency trade-off | lag < 30초, Write p99 영향 < 10% |
+| 테스트                          | 목적                           | 핵심 검증 지표                   |
+| ------------------------------- | ------------------------------ | -------------------------------- |
+| T1: Hot Path Write Throughput   | 1,000 TPS 목표 달성 여부       | p99 < 50ms, error rate < 0.1%    |
+| T3: Mixed Workload (Write+Read) | Read SLO 보호 여부             | Read p99 < 20ms (Write 부하 중)  |
+| T4: Idempotency Correctness     | 동시 중복 요청 정합성          | 점수 오염 0건, 200 OK 정상 반환  |
+| T8: Snapshot Pipeline Impact    | Snapshot lag/latency trade-off | lag < 30초, Write p99 영향 < 10% |
 
 **Tier 1 (Differentiator)**
 
-| 테스트 | 목적 |
-| --- | --- |
-| T5: Hot Key / Skew Test | 편향 트래픽에서 p99 보호 여부 |
+| 테스트                       | 목적                                            |
+| ---------------------------- | ----------------------------------------------- |
+| T5: Hot Key / Skew Test      | 편향 트래픽에서 p99 보호 여부                   |
 | T6: Spike / Burst Resilience | 급격한 트래픽 증가 시 Circuit Breaker 동작 확인 |
-| T7: Rate Limit Enforcement | normalKey vs attackKey SLO 격리 증명 |
+| T7: Rate Limit Enforcement   | normalKey vs attackKey SLO 격리 증명            |
 
 **Tier 2 (Optional)**
 
-| 테스트 | 목적 |
-| --- | --- |
-| T2: Read Performance (limit별) | Top-100 vs Top-1000 응답시간 비교 |
-| T9: Soak Test (30분+) | TTL 만료/메모리 드리프트/Lag 장시간 안정성 |
+| 테스트                         | 목적                                       |
+| ------------------------------ | ------------------------------------------ |
+| T2: Read Performance (limit별) | Top-100 vs Top-1000 응답시간 비교          |
+| T9: Soak Test (30분+)          | TTL 만료/메모리 드리프트/Lag 장시간 안정성 |
 
 ### 18.3 Tier 0 상세 설계
 
@@ -914,30 +914,35 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 ## T1: Hot Path Write Throughput
 
 ### SLO 목표
+
 - p99 < 50ms at 1,000 TPS
 - error rate < 0.1%
 
 ### 환경
+
 - 스펙: Apple M2, Docker Compose, Redis 7.2, PostgreSQL 15
 - 설정: JVM heap 512MB, Redis maxmemory 256MB
 
 ### 시나리오
+
 - arrival-rate: 100 → 500 → 1000 → 1500 TPS (단계별 2분)
 - 분포: leaderboard 1개, userId 무작위 10만 명
 
 ### 결과
 
-| TPS | p50 | p95 | p99 | Error Rate |
-|-----|-----|-----|-----|------------|
-| 100 | Xms | Xms | Xms | X% |
-| 500 | Xms | Xms | Xms | X% |
-| 1000 | Xms | Xms | Xms | X% |
-| 1500 | Xms | Xms | Xms | X% |
+| TPS  | p50 | p95 | p99 | Error Rate |
+| ---- | --- | --- | --- | ---------- |
+| 100  | Xms | Xms | Xms | X%         |
+| 500  | Xms | Xms | Xms | X%         |
+| 1000 | Xms | Xms | Xms | X%         |
+| 1500 | Xms | Xms | Xms | X%         |
 
 ### 병목 분석
+
 - (메트릭/로그 스크린샷 첨부)
 
 ### 결론
+
 - 안정 TPS: N
 - 병목 원인: X
 - SLO 달성 여부: ✅/❌
@@ -1045,43 +1050,61 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 ### ADR-009: Audit Log 소비 도입 여부와 전송 계층 선택
 
-**상태:** 제안 중 (2026-07-27 착수). 결정란은 근거 확정 후 작성한다.
+**상태:** 확정 (2026-07-27 착수, 2026-07-28 결정)
 
 **재검토 대상:** `17. Non-goals`의 "Kafka 기반 메시지 브로커 — Redis Streams로 감사 로그 파이프라인 충분히 증명 가능" 한 줄. 당시 판단의 근거와 **뒤집힘 조건이 문서에 남아 있지 않았다.** 본 ADR은 그 결정을 수치와 함께 정식화하고 재검토한다.
 
 **상황:** audit stream(`lb:{leaderboardId}:events`)은 XADD로 append만 되고 **읽는 코드가 없다.** 이 사실이 두 곳에 흔적으로 남아 있다.
 
-| 위치 | 내용 |
-| --- | --- |
-| `RedisAuditStreamStatusRepository:39` | `pendingEntries`가 리터럴 `0L`. 이 상수가 API 응답 → `stream_pending_entries` gauge → Grafana 패널까지 노출되지만 어떤 판단의 입력도 아니다 |
+| 위치                                     | 내용                                                                                                                                                                         |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RedisAuditStreamStatusRepository:39`    | `pendingEntries`가 리터럴 `0L`. 이 상수가 API 응답 → `stream_pending_entries` gauge → Grafana 패널까지 노출되지만 어떤 판단의 입력도 아니다                                  |
 | `RedisAuditStreamStatusRepository:33-35` | `lastDeliveredId`가 실제로는 `XREVRANGE` 결과, 즉 last-generated-id다. Redis의 `last-delivered-id`는 컨슈머 그룹 커서이므로 그룹이 없는 현재 **개념 자체가 존재하지 않는다** |
 
 두 지점은 결함이라기보다 **소비자가 없다는 사실이 인터페이스에 드러난 것**이다. 따라서 이것만으로는 소비 도입의 근거가 되지 않는다.
 
 **측정된 현재 값:**
 
-| 항목 | 값 | 출처 |
-| --- | --- | --- |
-| audit 유입 (평균) | 약 3.5/s | `0. Scenario` 30만 건/일 ÷ 86,400 |
-| audit 유입 (피크) | 1,000/s | `0. Scenario` 목표 TPS (시스템 전체값, 리더보드별 아님) |
-| 현재 보존 창 | 약 8시간 | `MAXLEN ~ 100000` ÷ 30만 건/일 |
-| 한 달 보존 시 Redis 메모리 | 약 900MB / 리더보드 | 30일 × 30만 × ~100B |
-| 메모리 초과 시 거동 | **write 실패** | `maxmemory-policy noeviction` |
+| 항목                       | 값                  | 출처                                                                                                                           |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| audit 유입 (평균)          | 약 3.5/s            | `0. Scenario` 30만 건/일 ÷ 86,400                                                                                              |
+| audit 유입 (피크)          | 1,000/s             | `0. Scenario` 목표 TPS (시스템 전체값, 리더보드별 아님)                                                                        |
+| 현재 보존 창               | 약 8시간            | `MAXLEN ~ 100000` ÷ 30만 건/일                                                                                                 |
+| 한 달 보존 시 Redis 메모리 | 약 900MB / 리더보드 | 30일 × 30만 × ~100B                                                                                                            |
+| 메모리 초과 시 거동        | **write 실패**      | `maxmemory-policy noeviction`                                                                                                  |
+| Redis 버전                 | 7.x                 | `docker-compose.yml` `redis:7`. `lag`/`entries-read`/`entries-added`는 7.0+ 필드이므로, Streams 쪽 관측 가능 범위는 이 버전 조건에서만 성립한다 |
 
 **검토한 대안:** 도입 안 함 / 인프로세스 큐 / Redis Streams 컨슈머 그룹 / PostgreSQL 적재 / Kafka
 
 **대안 간 구조적 차이:** 단일 writer(PG primary) vs 파티션 분산(Kafka), MAXLEN 링 버퍼 vs 시간 기반 리텐션. 내구성은 저장 매체가 아니라 복제 구성에서 갈린다 — 단일 브로커 Kafka의 유실 창은 Redis AOF everysec과 같은 성격이다.
 
-**뒤집힘 조건:**
+**선언한 가정:** 본 결정은 아래 두 가정 위에 선다. `0. Scenario`가 DAU 50만을 선언하고 거기서 목표 TPS를 역산한 것과 같은 방식이며, 실측이 아니라 **설계 기준**이다.
 
-- **ⓐ 보존** — 현재 보존 창(약 8시간)이 **실제 요구를 막을 때**. 보존이 부족하다는 사실만으로는 조건이 아니다. 현재 한 달 단위 사후 분석을 요구하는 주체가 없다. ⓐ가 선택하는 것은 **내구 저장소**이며 Kafka로 직결되지 않는다 (파티셔닝한 PG 테이블로 900만 행/월은 일상적 규모).
-- **ⓑ 기록 종류 증가** — 현재 audit 엔트리는 `userId`, `delta` 두 필드뿐이다(`process_event.lua:27`). 기록 종류가 늘거나 서로 다른 목적의 소비자가 복수로 생겨 파티션 분산과 독립 오프셋이 필요해질 때. **Kafka는 ⓑ에서만 선택된다.**
+- **가정 1 — 보관 요구 30일.** 유저 단위 점수 추이를 30일 범위에서 조회할 수 있어야 한다.
+- **가정 2 — 소비자가 하나로 끝나지 않는다.** 최소 두 종류를 예정한다: **추이 집계**(과거 지향, 지연 허용), **이상 탐지**(현재 지향, 지연 시 의미 소멸). 둘은 같은 로그를 서로 다른 위치에서 서로 다른 속도로 읽으며, 탐지 규칙 변경 시 **한쪽만 과거 구간을 되감아 재평가**해야 한다.
 
-**결정:** *(제안 중 — 미작성)*
+**각 가정이 탈락시키는 것:**
 
-**트레이드오프:** *(결정 확정 후 작성)*
+| 대안                      | 탈락 사유                                                                                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 인프로세스 큐             | 회수 메커니즘 부재. 처리 중 프로세스가 죽으면 해당 일감이 소멸한다                                                                                                                                                                           |
+| Redis Streams 컨슈머 그룹 | **가정 1.** 보관 정책을 기간과 용량 양쪽으로 고정할 수 없다. `MAXLEN`(건수)은 보관 기간이 유입률에 반비례해 정책으로 선언할 수 없고, `MINID`(시간)로 30일을 걸면 리더보드당 약 900MB가 필요해 `noeviction` 정책과 만나 write 실패로 이어진다 |
+| PostgreSQL 적재           | **가정 2.** 30일 900만 행 자체는 파티셔닝으로 일상적 규모이나, 복수 소비자의 오프셋·체크포인트·재처리 되감기를 애플리케이션이 직접 구현해야 한다                                                                                             |
+| 도입 안 함                | 가정 1과 2를 모두 충족하지 못한다                                                                                                                                                                                                            |
 
-**관련 문서:** 트리거 ⓑ의 이행 경로 검증은 [SPIKE-001](SPIKE-001-kafka-migration-path.md)에서 별도로 다룬다. 해당 스파이크는 본 ADR의 결정을 대체하지 않는다.
+**결정:** Kafka를 audit log 전송 계층으로 채택한다. 리텐션은 `retention.ms`(30일)와 `retention.bytes`를 병기해 기간과 용량을 함께 고정한다. 소비는 목적별 컨슈머 그룹으로 분리하고, 오프셋은 처리 완료 후 수동 커밋한다.
+
+이 결정은 `17. Non-goals`의 "Kafka 기반 메시지 브로커" 제외를 **대체한다.** 당시 판단은 소비자가 없고 최근 N건 추적으로 충분하다는 전제 위에 있었으며, 위 두 가정이 그 전제를 무효화한다.
+
+**트레이드오프:**
+
+- **조회 계층이 추가된다.** Kafka는 로그이지 데이터베이스가 아니다. "유저 X의 30일 이벤트"를 뽑으려면 순차 재소비이거나 별도 조회 계층이 필요하다.
+- **구성 요소가 늘어난다.** 현재 6개 서비스에 브로커가 추가된다. 복제까지 세우면 증가폭이 더 커진다.
+- **새 실패 모드가 한 세트 들어온다.** 컨슈머 리밸런싱, ISR 축소, 파티션 편중, 컨슈머 랙. 도입 비용은 설치가 아니라 모르는 고장 방식의 개수다.
+- **현 규모 대비 과잉이다.** 평균 유입 3.5/s는 Kafka의 설계 지점보다 네 자릿수 아래다.
+- **ADR-002를 재결정 해야 한다.** Kafka producer는 Lua 블록 안에 들어갈 수 없다. score 반영과 감사 기록의 원자성을 어떻게 유지할지는 미결이며 [SPIKE-001](SPIKE-001-kafka-migration-path.md)의 선결 쟁점으로 다룬다.
+
+**관련 문서:** 구현 스펙과 검증 항목은 [SPIKE-001](SPIKE-001-kafka-migration-path.md)에서 다룬다.
 
 ---
 
