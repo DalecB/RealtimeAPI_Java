@@ -974,6 +974,8 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **트레이드오프:** Lua Script에 KEYS 3개 필요. Redis Cluster 환경에서 `{leaderboardId}` hash tag 통일이 선행 조건
 
+**후속 (2026-07-29):** ADR-009가 Kafka를 채택하면서 이 결정의 유지 여부가 쟁점이 됐다. Kafka producer는 Lua 블록 안에 들어갈 수 없기 때문이다. 검토 결과 **본 결정은 유지된다** — Lua의 4연산 원자성은 그대로 두고, 스트림의 역할만 최종 저장소에서 **outbox**로 바뀐다. 별도 relay가 스트림을 읽어 Kafka로 옮긴다. 선택 근거는 [SPIKE-001](SPIKE-001-kafka-migration-path.md)의 선결 쟁점 항목에 있다.
+
 ---
 
 ### ADR-003: Snapshot Worker 분산 락 구현 방식
