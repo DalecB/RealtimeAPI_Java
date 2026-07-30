@@ -39,7 +39,7 @@ public class EventCommandRepositoryAdapter implements EventCommandRepository {
     }
 
     @Override
-    public ProcessEventResult process(EventPayload payload) {
+    public ProcessEventResult process(EventPayload payload, long apiKeyId) {
         String incomingPayloadHash = payloadHash(payload.payloadHashSource());
         Instant processedAt = Instant.now();
         String idempotencyValue = idempotencyValue(incomingPayloadHash, processedAt);
@@ -53,7 +53,8 @@ public class EventCommandRepositoryAdapter implements EventCommandRepository {
                         UserIdCodec.format(payload.userId()),
                         payload.deltaScore(),
                         IDEMPOTENCY_TTL_SECONDS,
-                        idempotencyValue
+                        idempotencyValue,
+                        apiKeyId
                 )
         );
 

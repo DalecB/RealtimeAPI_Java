@@ -37,7 +37,8 @@ public class ProcessEventLuaExecutor {
             String userId,
             long deltaScore,
             long ttlSeconds,
-            String idempotencyValue
+            String idempotencyValue,
+            long apiKeyId
     ) {
         if (leaderboardId == null) {
             throw new IllegalArgumentException("leaderboardId is required");
@@ -57,6 +58,9 @@ public class ProcessEventLuaExecutor {
         if (idempotencyValue == null || idempotencyValue.isBlank()) {
             throw new IllegalArgumentException("idempotencyValue is required");
         }
+        if (apiKeyId <= 0) {
+            throw new IllegalArgumentException("apiKeyId must be positive");
+        }
 
         List<String> keys = List.of(
                 EventRedisKeyFactory.idempotencyKey(leaderboardId, eventUuid),
@@ -71,7 +75,9 @@ public class ProcessEventLuaExecutor {
                 userId,
                 Long.toString(deltaScore),
                 Long.toString(ttlSeconds),
-                idempotencyValue
+                idempotencyValue,
+                Long.toString(apiKeyId),
+                eventUuid.toString()
         );
         hotPathMetrics.recordProcessEventLuaDuration(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
 

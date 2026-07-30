@@ -35,6 +35,7 @@ class RedisOutageCircuitBreakerTest {
     // 실패 k건이면 실패율 k/10, threshold 50% → 정확히 5번째 실패에서 OPEN
     private static final int WARMUP_CALLS = 10;      // sliding-window-size와 동일
     private static final int FAILURES_TO_TRIP = 5;   // window(10) × threshold(50%)
+    private static final long API_KEY_ID = 1L;
 
     @Autowired
     private EventCommandRepository eventCommandRepository;
@@ -63,7 +64,7 @@ class RedisOutageCircuitBreakerTest {
         // 웜업: 성공 호출로 sliding window를 채운다 (실패하면 테스트가 죽는 게 맞으므로 try/catch 없음)
         for (int i = 0; i < WARMUP_CALLS; i++) {
             EventPayload payload = newPayload(leaderboardId);
-            eventCommandRepository.process(payload);
+            eventCommandRepository.process(payload, API_KEY_ID);
         }
 
         redisContainer.stop();
@@ -72,7 +73,7 @@ class RedisOutageCircuitBreakerTest {
         for (int i = 0; i < FAILURES_TO_TRIP; i++) {
             EventPayload payload = newPayload(leaderboardId);
             try {
-                eventCommandRepository.process(payload);
+                eventCommandRepository.process(payload, API_KEY_ID);
             } catch (Exception e) {
                 assertNotEquals(RedisCircuitBreakerOpenException.class, e.getClass());
             }
@@ -82,7 +83,7 @@ class RedisOutageCircuitBreakerTest {
         CircuitBreakerStatus cbs = circuitBreaker.getStatus();
         assertEquals("OPEN", cbs.state());
 
-        assertThrows(RedisCircuitBreakerOpenException.class, () -> eventCommandRepository.process(newPayload(leaderboardId)));
+        assertThrows(RedisCircuitBreakerOpenException.class, () -> eventCommandRepository.process(newPayload(leaderboardId), API_KEY_ID));
     }
 
     private EventPayload newPayload(UUID leaderboardId) {

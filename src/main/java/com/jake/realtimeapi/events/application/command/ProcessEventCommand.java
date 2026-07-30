@@ -6,7 +6,8 @@ public record ProcessEventCommand(
         UUID leaderboardId,
         long userId,
         long deltaScore,
-        UUID idempotencyKey
+        UUID idempotencyKey,
+        long apiKeyId
 ) {
     public ProcessEventCommand {
         if (leaderboardId == null) {
@@ -20,6 +21,9 @@ public record ProcessEventCommand(
         }
         if (idempotencyKey == null) {
             throw new IllegalArgumentException("idempotencyKey is required");
+        }
+        if (apiKeyId <= 0) {
+            throw new IllegalArgumentException("apiKeyId must be positive");
         }
     }
 }

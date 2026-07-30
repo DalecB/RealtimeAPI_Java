@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -31,6 +32,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EventCommandRepositoryAdapterTest {
+
+    private static final long API_KEY_ID = 1L;
 
     @Mock
     private ProcessEventLuaExecutor processEventLuaExecutor;
@@ -62,10 +65,11 @@ class EventCommandRepositoryAdapterTest {
                 eq("101"),
                 eq(50L),
                 eq(86400L),
-                anyString()
+                anyString(),
+                anyLong()
         )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(true, "f34ad01d9184e83d23855dd4aa9011cfdbcbf8199b13f40f81f26871032d9a03"));
 
-        ProcessEventResult result = repository.process(payload);
+        ProcessEventResult result = repository.process(payload, API_KEY_ID);
 
         assertEquals(payload.idempotencyKey(), result.idempotencyKey());
         assertFalse(result.replayed());
@@ -75,7 +79,8 @@ class EventCommandRepositoryAdapterTest {
                 eq("101"),
                 eq(50L),
                 eq(86400L),
-                anyString()
+                anyString(),
+                anyLong()
         );
     }
 
@@ -94,13 +99,14 @@ class EventCommandRepositoryAdapterTest {
                 eq("101"),
                 eq(50L),
                 eq(86400L),
-                anyString()
+                anyString(),
+                anyLong()
         )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(
                 false,
                 "v2:358712c8a759753081014787e39822f9afed47aee1ce8a3026ce855f3afcf4e6:" + firstProcessedAt.toEpochMilli()
         ));
 
-        ProcessEventResult result = repository.process(payload);
+        ProcessEventResult result = repository.process(payload, API_KEY_ID);
 
         assertTrue(result.replayed());
         assertEquals(firstProcessedAt, result.processedAt());
@@ -121,13 +127,14 @@ class EventCommandRepositoryAdapterTest {
                 eq("101"),
                 eq(50L),
                 eq(86400L),
-                anyString()
+                anyString(),
+                anyLong()
         )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(
                 false,
                 "358712c8a759753081014787e39822f9afed47aee1ce8a3026ce855f3afcf4e6"
         ));
 
-        ProcessEventResult result = repository.process(payload);
+        ProcessEventResult result = repository.process(payload, API_KEY_ID);
         Instant after = Instant.now();
 
         assertTrue(result.replayed());
@@ -142,7 +149,7 @@ class EventCommandRepositoryAdapterTest {
 
         RedisCircuitBreakerOpenException exception = assertThrows(
                 RedisCircuitBreakerOpenException.class,
-                () -> repository.process(payload)
+                () -> repository.process(payload, API_KEY_ID)
         );
 
         assertEquals(10L, exception.getRetryAfterSeconds());
@@ -162,9 +169,10 @@ class EventCommandRepositoryAdapterTest {
                 eq("101"),
                 eq(50L),
                 eq(86400L),
-                anyString()
+                anyString(),
+                anyLong()
         )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(false, "another-hash"));
 
-        assertThrows(IdempotencyKeyReuseMismatchException.class, () -> repository.process(payload));
+        assertThrows(IdempotencyKeyReuseMismatchException.class, () -> repository.process(payload, API_KEY_ID));
     }
 }

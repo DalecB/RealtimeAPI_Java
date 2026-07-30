@@ -13,10 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -37,6 +40,7 @@ class ProcessEventConcurrencyTest {
     private static final int THREAD_COUNT = 50;
     private static final long DELTA_SCORE = 10L;
     private static final long USER_ID = 1L;
+    private static final long API_KEY_ID = 1L;
 
     @Autowired
     private EventCommandRepository eventCommandRepository;
@@ -71,7 +75,7 @@ class ProcessEventConcurrencyTest {
             executor.submit(() -> {
                 try{
                     startGate.await();
-                    results.add(eventCommandRepository.process(payload));
+                    results.add(eventCommandRepository.process(payload, API_KEY_ID));
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
@@ -109,7 +113,8 @@ class ProcessEventConcurrencyTest {
         assertEquals(49, replayCount);
         assertEquals(0, exceptionCount);
         assertEquals(DELTA_SCORE, score);
-        // XLEN: XADD는 신규 경로에서만 실행되므로, 점수가 우연히 맞아도 부수효과 중복은 여기서 걸린다
+        // XLEN: replay 경로는 기록을 남기지 않으므로 49건이 재시도돼도 엔트리는 1건이다.
+        // 점수가 우연히 맞더라도 부수효과 중복은 여기서 걸린다.
         assertEquals(1, xLen);
     }
 
@@ -119,15 +124,31 @@ class ProcessEventConcurrencyTest {
         UUID idempotencyKey = UUID.randomUUID();
 
         EventPayload payload1 = new EventPayload(leaderboardId, USER_ID, DELTA_SCORE, idempotencyKey);
-        eventCommandRepository.process(payload1);
+        eventCommandRepository.process(payload1, API_KEY_ID);
 
         final EventPayload payload2 = new EventPayload(leaderboardId, USER_ID, DELTA_SCORE + 3, idempotencyKey);
-        assertThrows(IdempotencyKeyReuseMismatchException.class, () -> eventCommandRepository.process(payload2));
+        assertThrows(IdempotencyKeyReuseMismatchException.class, () -> eventCommandRepository.process(payload2, API_KEY_ID));
 
         String rankingKey = EventRedisKeyFactory.rankingKey(leaderboardId);
         String member = UserIdCodec.format(payload1.userId());
 
         Double score = redisTemplate.opsForZSet().score(rankingKey, member);
         assertEquals(DELTA_SCORE, score);
+
+        // 감사 기록은 2건이어야 한다: 최초 처리(new) + 키 재사용 충돌(conflict).
+        // conflict 기록이 없으면 이상 탐지가 키 재사용을 볼 수 없다.
+        String auditStreamKey = EventRedisKeyFactory.auditStreamKey(leaderboardId);
+        List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
+                .range(auditStreamKey, Range.unbounded());
+
+        assertEquals(2, records.size());
+        assertEquals("new", records.get(0).getValue().get("type"));
+
+        Map<Object, Object> conflict = records.get(1).getValue();
+        assertEquals("conflict", conflict.get("type"));
+        // delta는 반영된 값이 아니라 거부된 값이어야 한다 — 무엇을 시도했는지가 이상 탐지의 신호다
+        assertEquals(Long.toString(DELTA_SCORE + 3), conflict.get("delta"));
+        assertEquals(idempotencyKey.toString(), conflict.get("idempotencyKey"));
+        assertEquals(Long.toString(API_KEY_ID), conflict.get("apiKeyId"));
     }
 }

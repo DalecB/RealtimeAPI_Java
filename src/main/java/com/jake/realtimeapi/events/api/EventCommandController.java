@@ -53,7 +53,8 @@ public class EventCommandController {
                             request.leaderboardId(),
                             UserIdCodec.parse(request.userId()),
                             request.deltaScore(),
-                            idempotencyKey
+                            idempotencyKey,
+                            authorizedApiKey.apiKeyId()
                     )
             );
 

@@ -51,7 +51,7 @@ public class EventApplicationService implements GetTopRanksUseCase, GetUserRankU
                 command.idempotencyKey()
         );
 
-        return eventCommandRepository.process(payload);
+        return eventCommandRepository.process(payload, command.apiKeyId());
     }
 
     @Override
