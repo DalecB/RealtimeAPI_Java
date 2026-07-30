@@ -65,6 +65,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: realtime-api
+    # relay 컨슈머 이름이 HOSTNAME이다. 명시하지 않으면 컨테이너 ID가 들어가고,
+    # 컨테이너를 재생성할 때마다 이름이 바뀌어 이전 이름이 잡고 있던 미처리 항목이 주인 없이 남는다.
+    hostname: realtime-api
     depends_on:
       postgres:
         condition: service_healthy
