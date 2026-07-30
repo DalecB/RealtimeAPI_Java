@@ -2,7 +2,7 @@ package com.jake.realtimeapi.events.persistence;
 
 import com.jake.realtimeapi.events.domain.model.TopRankItem;
 import com.jake.realtimeapi.events.domain.model.UserRankResult;
-import com.jake.realtimeapi.events.persistence.redis.EventRedisKeyFactory;
+import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class RankingQueryRepositoryAdapterTest {
     @Test
     void findTopByLeaderboardId_returnsCompetitionRanksUsingRedisSortedSet() {
         UUID leaderboardId = UUID.randomUUID();
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
 
         Set<ZSetOperations.TypedTuple<String>> tuples = new LinkedHashSet<>();
         tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(10L), 1000.0));
@@ -70,7 +70,7 @@ class RankingQueryRepositoryAdapterTest {
     @Test
     void findTopByLeaderboardId_usesOffsetAndEndRangeFromLimit() {
         UUID leaderboardId = UUID.randomUUID();
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
 
         Set<ZSetOperations.TypedTuple<String>> tuples = new LinkedHashSet<>();
         tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(40L), 700.0));
@@ -91,7 +91,7 @@ class RankingQueryRepositoryAdapterTest {
     @Test
     void findUserRank_returnsNullRankAndZeroScoreWhenUserDoesNotExist() {
         UUID leaderboardId = UUID.randomUUID();
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
 
         when(zSetOperations.score(key, UserIdCodec.format(999L))).thenReturn(null);
 
@@ -105,7 +105,7 @@ class RankingQueryRepositoryAdapterTest {
     @Test
     void findUserRank_returnsCompetitionRankForExistingUser() {
         UUID leaderboardId = UUID.randomUUID();
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
 
         when(zSetOperations.score(key, UserIdCodec.format(20L))).thenReturn(800.0);
         when(zSetOperations.count(key, 800.0, Double.POSITIVE_INFINITY)).thenReturn(3L);
@@ -119,7 +119,7 @@ class RankingQueryRepositoryAdapterTest {
     @Test
     void findTopByLeaderboardId_rejectsNonIntegerScore() {
         UUID leaderboardId = UUID.randomUUID();
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
 
         Set<ZSetOperations.TypedTuple<String>> tuples = new LinkedHashSet<>();
         tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(10L), 1000.5));

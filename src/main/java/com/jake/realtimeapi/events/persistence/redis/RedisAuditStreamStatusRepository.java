@@ -1,5 +1,6 @@
 package com.jake.realtimeapi.events.persistence.redis;
 
+import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.events.domain.model.StreamsStatus;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
 import org.springframework.data.domain.Range;
@@ -22,7 +23,7 @@ public class RedisAuditStreamStatusRepository implements AuditStreamStatusReposi
 
     @Override
     public StreamsStatus getStatus(UUID leaderboardId) {
-        String key = EventRedisKeyFactory.auditStreamKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId);
         Long streamLength = redisTemplate.opsForStream().size(key);
         long safeLength = streamLength == null ? 0L : streamLength;
 

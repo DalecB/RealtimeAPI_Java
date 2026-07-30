@@ -5,7 +5,7 @@ import com.jake.realtimeapi.events.domain.exception.IdempotencyKeyReuseMismatchE
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.model.ProcessEventResult;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
-import com.jake.realtimeapi.events.persistence.redis.EventRedisKeyFactory;
+import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -102,8 +102,8 @@ class ProcessEventConcurrencyTest {
 
         exceptionCount = THREAD_COUNT - (replayCount + newCount);
 
-        String rankingKey = EventRedisKeyFactory.rankingKey(leaderboardId);
-        String auditStreamKey = EventRedisKeyFactory.auditStreamKey(leaderboardId);
+        String rankingKey = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
+        String auditStreamKey = LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId);
         String member = UserIdCodec.format(payload.userId());
 
         Double score = redisTemplate.opsForZSet().score(rankingKey, member);
@@ -129,7 +129,7 @@ class ProcessEventConcurrencyTest {
         final EventPayload payload2 = new EventPayload(leaderboardId, USER_ID, DELTA_SCORE + 3, idempotencyKey);
         assertThrows(IdempotencyKeyReuseMismatchException.class, () -> eventCommandRepository.process(payload2, API_KEY_ID));
 
-        String rankingKey = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String rankingKey = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
         String member = UserIdCodec.format(payload1.userId());
 
         Double score = redisTemplate.opsForZSet().score(rankingKey, member);
@@ -137,7 +137,7 @@ class ProcessEventConcurrencyTest {
 
         // 감사 기록은 2건이어야 한다: 최초 처리(new) + 키 재사용 충돌(conflict).
         // conflict 기록이 없으면 이상 탐지가 키 재사용을 볼 수 없다.
-        String auditStreamKey = EventRedisKeyFactory.auditStreamKey(leaderboardId);
+        String auditStreamKey = LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId);
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
                 .range(auditStreamKey, Range.unbounded());
 

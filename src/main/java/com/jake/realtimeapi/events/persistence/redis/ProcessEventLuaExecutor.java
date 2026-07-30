@@ -1,5 +1,6 @@
 package com.jake.realtimeapi.events.persistence.redis;
 
+import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.infra.metrics.HotPathMetrics;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -63,9 +64,9 @@ public class ProcessEventLuaExecutor {
         }
 
         List<String> keys = List.of(
-                EventRedisKeyFactory.idempotencyKey(leaderboardId, eventUuid),
-                EventRedisKeyFactory.rankingKey(leaderboardId),
-                EventRedisKeyFactory.auditStreamKey(leaderboardId)
+                LeaderboardRedisKeyFactory.idempotencyKey(leaderboardId, eventUuid),
+                LeaderboardRedisKeyFactory.rankingKey(leaderboardId),
+                LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId)
         );
 
         long startedAt = System.nanoTime();

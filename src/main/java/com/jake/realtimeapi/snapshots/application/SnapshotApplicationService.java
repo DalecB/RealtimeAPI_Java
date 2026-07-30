@@ -9,7 +9,6 @@ import com.jake.realtimeapi.snapshots.application.model.SnapshotEntryResult;
 import com.jake.realtimeapi.snapshots.application.model.SnapshotStatus;
 import com.jake.realtimeapi.snapshots.application.query.GetSnapshotEntriesQuery;
 import com.jake.realtimeapi.snapshots.application.usecase.CaptureSnapshotUseCase;
-import com.jake.realtimeapi.snapshots.application.usecase.FindTopRanksUseCase;
 import com.jake.realtimeapi.snapshots.application.usecase.GetSnapshotEntriesUseCase;
 import com.jake.realtimeapi.snapshots.application.usecase.GetSnapshotStatusUseCase;
 import com.jake.realtimeapi.snapshots.application.usecase.RecoverLeaderboardSnapshotUseCase;
@@ -32,9 +31,7 @@ import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
-public class SnapshotApplicationService implements
-        FindTopRanksUseCase,
-        CaptureSnapshotUseCase,
+public class SnapshotApplicationService implements        CaptureSnapshotUseCase,
         GetSnapshotStatusUseCase,
         GetSnapshotEntriesUseCase,
         RecoverLeaderboardSnapshotUseCase {
@@ -63,9 +60,8 @@ public class SnapshotApplicationService implements
         this.snapshotStatusTracker = snapshotStatusTracker;
     }
 
-    @Override
     public List<SnapshotRankingRow> findTopRanks(UUID leaderboardId, int limit) {
-        // 조회 전용 유스케이스: Redis Top-N을 그대로 반환한다.
+        // 스냅샷을 뜨기 위해 Redis Top-N을 읽는다. 이 클래스 안에서만 쓰인다.
         return snapshotRankingQueryRepository.findTopRanks(leaderboardId, limit);
     }
 

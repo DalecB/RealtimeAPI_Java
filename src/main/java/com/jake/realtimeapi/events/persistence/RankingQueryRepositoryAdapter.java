@@ -3,7 +3,7 @@ package com.jake.realtimeapi.events.persistence;
 import com.jake.realtimeapi.events.domain.model.TopRankItem;
 import com.jake.realtimeapi.events.domain.model.UserRankResult;
 import com.jake.realtimeapi.events.domain.repository.RankingQueryRepository;
-import com.jake.realtimeapi.events.persistence.redis.EventRedisKeyFactory;
+import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -25,7 +25,7 @@ public class RankingQueryRepositoryAdapter implements RankingQueryRepository {
 
     @Override
     public List<TopRankItem> findTopByLeaderboardId(UUID leaderboardId, int offset, int limit) {
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
         long end = (long) offset + limit - 1;
 
         Set<ZSetOperations.TypedTuple<String>> tuples = redisTemplate.opsForZSet().reverseRangeWithScores(key, offset, end);
@@ -62,7 +62,7 @@ public class RankingQueryRepositoryAdapter implements RankingQueryRepository {
 
     @Override
     public UserRankResult findUserRank(UUID leaderboardId, long userId) {
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
         Double score = redisTemplate.opsForZSet().score(key, UserIdCodec.format(userId));
         if (score == null) {
             return new UserRankResult(userId, 0L, null);
@@ -74,7 +74,7 @@ public class RankingQueryRepositoryAdapter implements RankingQueryRepository {
 
     @Override
     public long countParticipants(UUID leaderboardId) {
-        String key = EventRedisKeyFactory.rankingKey(leaderboardId);
+        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
         Long total = redisTemplate.opsForZSet().zCard(key);
         return total == null ? 0L : total;
     }
