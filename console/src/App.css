@@ -205,7 +205,7 @@
 /* ── Live metrics (3-col, top) ───────────────────────── */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-4);
 }
 .metric-card {
@@ -240,10 +240,10 @@
   height: 22px;
   border-radius: 4px;
   overflow: hidden;
-  gap: 2px;
   margin-top: auto;
 }
-.breaker-timeline .tick { flex: 1; border-radius: 2px; }
+/* gap 없이 flex:1 → 개수와 무관하게 항상 꽉 찬 띠. 틱이 얇아져 사라지지 않는다. */
+.breaker-timeline .tick { flex: 1; min-width: 1px; }
 .tick-closed { background: var(--color-green); }
 .tick-open { background: var(--color-red); }
 .tick-half_open { background: var(--color-amber); }

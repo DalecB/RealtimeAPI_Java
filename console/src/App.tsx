@@ -45,32 +45,21 @@ const ZERO_TOTALS: Record<FireOutcome, number> = {
   ERROR: 0,
 }
 
-// 각 시리즈를 "창 최대값 대비 비율"로 정규화한다. 누적 카운터(Kafka)는 값이 전부 최대치 근처라 위쪽에
-// 붙고, outbox는 비면 바닥·쌓이면 위로 간다. min~max 정규화를 쓰면 값이 안 변하는 창에서 누적선이
-// 바닥에 붙어(min==max) "줄어든 것처럼" 보이므로 쓰지 않는다.
+// 각 시리즈를 자기 범위(min~max)로 정규화해 그 시리즈 고유의 변화를 최대로 보여준다.
 function toPoints(values: number[], W: number, H: number): string {
-  const max = Math.max(...values, 1)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
   return values
-    .map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - (v / max) * (H - 8)).toFixed(1)}`)
+    .map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / span) * (H - 8)).toFixed(1)}`)
     .join(' ')
 }
 
-function Sparkline({
-  values,
-  stroke,
-  fill,
-  overlay,
-}: {
-  values: number[]
-  stroke: string
-  fill: string
-  overlay?: { values: number[]; stroke: string }
-}) {
+function Sparkline({ values, stroke, fill }: { values: number[]; stroke: string; fill: string }) {
   const W = 300
   const H = 60
   if (values.length < 2) return <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="spark-svg" />
   const pts = toPoints(values, W, H)
-  const overlayPts = overlay && overlay.values.length >= 2 ? toPoints(overlay.values, W, H) : null
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="spark-svg">
       <polygon points={`${pts} ${W},${H} 0,${H}`} style={{ fill }} />
@@ -78,12 +67,6 @@ function Sparkline({
         points={pts}
         style={{ fill: 'none', stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
       />
-      {overlayPts && (
-        <polyline
-          points={overlayPts}
-          style={{ fill: 'none', stroke: overlay!.stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
-        />
-      )}
     </svg>
   )
 }
@@ -105,9 +88,12 @@ export default function App() {
   const auditTopic = usePoll(getAuditTopicStatus)
   const deps = usePoll(getDepsHealth, 2000)
   const snapStatus = usePoll(getSnapshotStatus, 1000)
-  const breakerStates = useRingBuffer(breaker?.state ?? null, 240)
+  // 브레이커 타임라인은 틱을 굵게 유지하려고 창을 작게 잡는다(240이면 틱이 1px 미만으로 사라진다).
+  const breakerStates = useRingBuffer(breaker?.state ?? null, 90)
   const streamLengths = useRingBuffer(streams?.streamLength ?? null, 240)
   const producedSeries = useRingBuffer(auditTopic?.totalMessages ?? null, 240)
+  // Kafka는 누적 총계라 그대로 그리면 납작하다. 폴 사이 증가분(delivery rate)을 그려 relay가 옮기는 순간을 보인다.
+  const kafkaThroughput = producedSeries.map((v, i) => (i === 0 ? 0 : Math.max(0, v - producedSeries[i - 1])))
   const tops = usePoll(() => (session ? getTops(session.leaderboardId, 50) : Promise.resolve(null)), 1000)
   const snapshot = usePoll(
     () => (session ? getSnapshotEntries(session.leaderboardId).catch(() => null) : Promise.resolve(null)),
@@ -264,23 +250,22 @@ export default function App() {
             </div>
             <div className="metric-card">
               <div className="metric-head">
-                <span className="title">Outbox → Kafka</span>
-                <span className="value plain">
-                  <span style={{ color: 'var(--color-blue)' }}>outbox {streams?.streamLength ?? '—'}</span>
-                  {' · '}
-                  <span style={{ color: 'var(--color-green)' }}>kafka {auditTopic?.totalMessages ?? '—'}</span>
-                </span>
+                <span className="title">Audit Stream (outbox)</span>
+                <span className="value plain">len {streams?.streamLength ?? '—'} · pending {streams?.pendingEntries ?? '—'}</span>
               </div>
-              <Sparkline
-                values={streamLengths}
-                stroke="var(--color-blue)"
-                fill="rgba(10,132,255,.12)"
-                overlay={{ values: producedSeries, stroke: 'var(--color-green)' }}
-              />
+              <Sparkline values={streamLengths} stroke="var(--color-blue)" fill="rgba(10,132,255,.12)" />
               <div className="metric-note">
-                <span style={{ color: 'var(--color-blue)' }}>outbox</span> 쌓였다 relay가 빼감 ·{' '}
-                <span style={{ color: 'var(--color-green)' }}>kafka</span> 옮긴 만큼 오름 · pending{' '}
-                {streams?.pendingEntries ?? '—'}(<span className="mono">relay 밀림</span>)
+                len = 쌓인 감사 기록(relay가 빼감) · pending = 아직 못 옮긴 건수(<span className="mono">relay 밀림</span>)
+              </div>
+            </div>
+            <div className="metric-card">
+              <div className="metric-head">
+                <span className="title">Kafka Delivery</span>
+                <span className="value plain">produced {auditTopic?.totalMessages ?? '—'} · retained {auditTopic?.retained ?? '—'}</span>
+              </div>
+              <Sparkline values={kafkaThroughput} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
+              <div className="metric-note">
+                그래프 = relay가 Kafka로 옮긴 초당 건수(<span className="mono">delivery rate</span>) · produced = 누적 총계
               </div>
             </div>
             <div className="metric-card">
