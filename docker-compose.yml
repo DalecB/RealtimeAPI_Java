@@ -38,11 +38,13 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      # 리스너 두 개: INTERNAL은 compose 네트워크 안(app 컨테이너)에서, EXTERNAL은 호스트(bootRun·테스트)에서 접속한다.
+      # 클라이언트는 처음 붙은 뒤 브로커가 알려주는 접속 주소로 다시 연결한다. 접속 경로별로 그 주소가 달라야 양쪽 다 붙는다.
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       # 단일 브로커이므로 복제 계수는 1이 강제된다.
       # 프로덕션에서는 acks=all + replication.factor>=3 + min.insync.replicas=2. 근거는 SPIKE-001.
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -51,7 +53,7 @@ services:
       # 토픽은 relay/컨슈머 쪽에서 리텐션 설정과 함께 명시적으로 만든다.
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
     ports:
-      - "9092:9092"
+      - "29092:29092"
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -81,6 +83,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: app
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SNAPSHOTS_WORKER_ENABLED: "true"
