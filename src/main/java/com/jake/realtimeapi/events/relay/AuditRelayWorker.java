@@ -44,7 +44,8 @@ public class AuditRelayWorker {
 
     private static final Logger log = LoggerFactory.getLogger(AuditRelayWorker.class);
 
-    private static final String GROUP = "audit-relay";
+    // 트림 워커도 같은 그룹의 PEL·last-delivered로 워터마크를 잡으므로 공유한다.
+    public static final String GROUP = "audit-relay";
     private static final String SCHEMA_VERSION_HEADER = "schema-version";
     private static final byte[] SCHEMA_VERSION = "1".getBytes(StandardCharsets.UTF_8);
 
