@@ -45,14 +45,13 @@ const ZERO_TOTALS: Record<FireOutcome, number> = {
   ERROR: 0,
 }
 
-// 각 시리즈를 자기 범위(min~max)로 정규화한다. 절대 스케일이 크게 달라도(outbox 수백 vs Kafka 수천)
-// 한 그래프에서 둘 다 움직임이 보인다.
+// 각 시리즈를 "창 최대값 대비 비율"로 정규화한다. 누적 카운터(Kafka)는 값이 전부 최대치 근처라 위쪽에
+// 붙고, outbox는 비면 바닥·쌓이면 위로 간다. min~max 정규화를 쓰면 값이 안 변하는 창에서 누적선이
+// 바닥에 붙어(min==max) "줄어든 것처럼" 보이므로 쓰지 않는다.
 function toPoints(values: number[], W: number, H: number): string {
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const span = max - min || 1
+  const max = Math.max(...values, 1)
   return values
-    .map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / span) * (H - 8)).toFixed(1)}`)
+    .map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - (v / max) * (H - 8)).toFixed(1)}`)
     .join(' ')
 }
 
