@@ -3,9 +3,11 @@ package com.jake.realtimeapi.events.persistence.redis;
 import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.events.domain.model.StreamsStatus;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.PendingMessagesSummary;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -35,8 +37,19 @@ public class RedisAuditStreamStatusRepository implements AuditStreamStatusReposi
                 .reverseRange(key, Range.unbounded(), Limit.limit().count(1));
         String lastDeliveredId = lastRecords.isEmpty() ? null : lastRecords.get(0).getId().getValue();
 
-        // The current implementation only appends audit events and does not run a dedicated consumer group yet.
-        // Until a real stream consumer exists, pending entries stay 0 and the reported value is the raw stream length.
-        return new StreamsStatus(0L, safeLength, lastDeliveredId);
+        return new StreamsStatus(pendingCount(key), safeLength, lastDeliveredId);
+    }
+
+    private long pendingCount(String key) {
+        // relay 컨슈머 그룹의 미처리(PEL) 크기 = relay가 받았지만 아직 Kafka로 못 옮긴 건수.
+        // relay가 밀리거나 멈추면 이 값이 자란다 → relay 건강 지표.
+        try {
+            PendingMessagesSummary summary = redisTemplate.opsForStream()
+                    .pending(key, LeaderboardRedisKeyFactory.AUDIT_RELAY_GROUP);
+            return summary == null ? 0L : summary.getTotalPendingMessages();
+        } catch (DataAccessException ex) {
+            // relay가 아직 그룹을 안 만들었으면(비활성/미기동) 대기 0으로 본다.
+            return 0L;
+        }
     }
 }

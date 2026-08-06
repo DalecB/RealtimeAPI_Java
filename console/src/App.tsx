@@ -237,12 +237,12 @@ export default function App() {
             </div>
             <div className="metric-card">
               <div className="metric-head">
-                <span className="title">Audit Stream Length</span>
-                <span className="value plain">len {streams?.streamLength ?? '—'}</span>
+                <span className="title">Audit Stream (outbox)</span>
+                <span className="value plain">len {streams?.streamLength ?? '—'} · pending {streams?.pendingEntries ?? '—'}</span>
               </div>
               <Sparkline values={streamLengths} stroke="var(--color-blue)" fill="rgba(10,132,255,.12)" />
               <div className="metric-note">
-                XADD rate ≈ write throughput · <span className="mono">new-path only</span>
+                len = 쌓인 감사 기록 · pending = relay가 아직 Kafka로 못 옮긴 건수(<span className="mono">relay 밀림</span>)
               </div>
             </div>
             <div className="metric-card">

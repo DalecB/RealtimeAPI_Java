@@ -4,6 +4,9 @@ import java.util.UUID;
 
 public final class LeaderboardRedisKeyFactory {
 
+    /** audit 스트림을 Kafka로 옮기는 relay 컨슈머 그룹. relay·트림·상태 조회가 공유한다. */
+    public static final String AUDIT_RELAY_GROUP = "audit-relay";
+
     private LeaderboardRedisKeyFactory() {}
 
     public static String rankingKey(UUID leaderboardId) {
