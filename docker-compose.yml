@@ -87,6 +87,7 @@ services:
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SNAPSHOTS_WORKER_ENABLED: "true"
+      EVENTS_RELAY_ENABLED: "true"
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx512m"
     ports:
       - "8080:8080"

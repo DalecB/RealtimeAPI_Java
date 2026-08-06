@@ -45,14 +45,33 @@ const ZERO_TOTALS: Record<FireOutcome, number> = {
   ERROR: 0,
 }
 
-function Sparkline({ values, stroke, fill }: { values: number[]; stroke: string; fill: string }) {
+// 각 시리즈를 자기 범위(min~max)로 정규화한다. 절대 스케일이 크게 달라도(outbox 수백 vs Kafka 수천)
+// 한 그래프에서 둘 다 움직임이 보인다.
+function toPoints(values: number[], W: number, H: number): string {
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
+  return values
+    .map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - ((v - min) / span) * (H - 8)).toFixed(1)}`)
+    .join(' ')
+}
+
+function Sparkline({
+  values,
+  stroke,
+  fill,
+  overlay,
+}: {
+  values: number[]
+  stroke: string
+  fill: string
+  overlay?: { values: number[]; stroke: string }
+}) {
   const W = 300
   const H = 60
   if (values.length < 2) return <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="spark-svg" />
-  const max = Math.max(...values, 1)
-  const pts = values
-    .map((v, i) => `${((i / (values.length - 1)) * W).toFixed(1)},${(H - 4 - (v / max) * (H - 8)).toFixed(1)}`)
-    .join(' ')
+  const pts = toPoints(values, W, H)
+  const overlayPts = overlay && overlay.values.length >= 2 ? toPoints(overlay.values, W, H) : null
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="spark-svg">
       <polygon points={`${pts} ${W},${H} 0,${H}`} style={{ fill }} />
@@ -60,6 +79,12 @@ function Sparkline({ values, stroke, fill }: { values: number[]; stroke: string;
         points={pts}
         style={{ fill: 'none', stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
       />
+      {overlayPts && (
+        <polyline
+          points={overlayPts}
+          style={{ fill: 'none', stroke: overlay!.stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
+        />
+      )}
     </svg>
   )
 }
@@ -83,6 +108,7 @@ export default function App() {
   const snapStatus = usePoll(getSnapshotStatus, 1000)
   const breakerStates = useRingBuffer(breaker?.state ?? null, 240)
   const streamLengths = useRingBuffer(streams?.streamLength ?? null, 240)
+  const producedSeries = useRingBuffer(auditTopic?.totalMessages ?? null, 240)
   const tops = usePoll(() => (session ? getTops(session.leaderboardId, 50) : Promise.resolve(null)), 1000)
   const snapshot = usePoll(
     () => (session ? getSnapshotEntries(session.leaderboardId).catch(() => null) : Promise.resolve(null)),
@@ -239,23 +265,23 @@ export default function App() {
             </div>
             <div className="metric-card">
               <div className="metric-head">
-                <span className="title">Audit Stream (outbox)</span>
-                <span className="value plain">len {streams?.streamLength ?? '—'} · pending {streams?.pendingEntries ?? '—'}</span>
-              </div>
-              <Sparkline values={streamLengths} stroke="var(--color-blue)" fill="rgba(10,132,255,.12)" />
-              <div className="metric-note">
-                len = 쌓인 감사 기록 · pending = relay가 아직 Kafka로 못 옮긴 건수(<span className="mono">relay 밀림</span>)
-              </div>
-            </div>
-            <div className="metric-card">
-              <div className="metric-head">
-                <span className="title">Kafka Audit Topic</span>
+                <span className="title">Outbox → Kafka</span>
                 <span className="value plain">
-                  produced {auditTopic?.totalMessages ?? '—'} · retained {auditTopic?.retained ?? '—'}
+                  <span style={{ color: 'var(--color-blue)' }}>outbox {streams?.streamLength ?? '—'}</span>
+                  {' · '}
+                  <span style={{ color: 'var(--color-green)' }}>kafka {auditTopic?.totalMessages ?? '—'}</span>
                 </span>
               </div>
+              <Sparkline
+                values={streamLengths}
+                stroke="var(--color-blue)"
+                fill="rgba(10,132,255,.12)"
+                overlay={{ values: producedSeries, stroke: 'var(--color-green)' }}
+              />
               <div className="metric-note">
-                토픽 offset을 직접 읽는다 · relay가 실제로 옮겼는지 앱과 무관하게 확인 · <span className="mono">lb-audit-events</span>
+                <span style={{ color: 'var(--color-blue)' }}>outbox</span> 쌓였다 relay가 빼감 ·{' '}
+                <span style={{ color: 'var(--color-green)' }}>kafka</span> 옮긴 만큼 오름 · pending{' '}
+                {streams?.pendingEntries ?? '—'}(<span className="mono">relay 밀림</span>)
               </div>
             </div>
             <div className="metric-card">
