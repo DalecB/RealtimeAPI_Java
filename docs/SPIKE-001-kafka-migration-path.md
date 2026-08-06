@@ -135,6 +135,18 @@ D-010에서 "relay가 마지막으로 produce한 엔트리 ID"로 잘랐으나, 
 
 기준은 `XPENDING`이 돌려주는 **그룹 전체에서 가장 오래된 미처리 ID**다. 그 앞은 모든 인스턴스가 끝낸 구간이므로 자를 수 있다. 미처리가 하나도 없으면 그룹이 마지막으로 받아간 지점까지 자른다.
 
+### relay 루프 — produce 먼저, XACK 나중, PEL 먼저
+
+한 스트림을 처리하는 순서다(`AuditRelayWorker`).
+
+1. **PEL 재처리 먼저** — `XREADGROUP ... 0`으로 이 컨슈머가 **받았지만 아직 XACK 못 한 것**을 다시 읽는다. relay가 처리 도중 죽으면 그 기록이 PEL에 남는데, 이 단계가 없으면 다음 재시작까지 방치된다. 매 틱마다 하므로 어떤 경로로 멈춘 기록이든 한 주기 안에 복구된다. 정상 상태에서는 PEL이 비어 빈손으로 돌아온다.
+2. **새 기록 드레인** — `XREADGROUP ... >`을 빌 때까지 반복한다.
+3. 각 배치: **모두 produce → 성공을 확인한 것만 XACK.** 실패한 것은 PEL에 남겨 다음 틱에 재시도한다.
+
+**produce 성공 확인 전에 XACK 하면 안 된다.** XACK 직후 produce 전에 죽으면 PEL에도 Kafka에도 없는 유실이 된다. 이 순서 덕에 최악은 "produce는 됐는데 XACK 전에 죽어 다음 틱에 다시 보냄"(중복)이고, 중복은 소비자 멱등으로 흡수한다.
+
+> **Redis 자체가 죽으면?** Stream과 PEL은 일반 Redis 데이터이고, `XREADGROUP`/`XACK`은 쓰기 명령이라 AOF에 기록된다. 따라서 재부팅 시 Stream 본문과 PEL이 함께 복구된다(everysec 기준 ≤1초 유실). outbox/PEL은 relay 크래시를, AOF/RDB는 Redis 크래시를 막는 서로 다른 계층이다. 1초 유실 창에서 감사 기록이 날아가면 같은 Lua 블록의 점수도 함께 날아가므로 불일치는 생기지 않는다(PRD 9 계층별 RPO).
+
 ### relay 건강 지표 — `stream_pending_entries`
 
 relay가 멈추면 Kafka로 아무것도 들어오지 않으므로 **컨슈머 lag은 자라지 않는다.** Kafka 쪽 지표만 보면 조용한 장애가 된다.
