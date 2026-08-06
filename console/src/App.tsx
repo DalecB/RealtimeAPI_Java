@@ -3,6 +3,7 @@ import {
   bootstrapSession,
   ensureUsers,
   fireEvent,
+  getAuditTopicStatus,
   getBreakerStatus,
   getDepsHealth,
   getSnapshotEntries,
@@ -77,6 +78,7 @@ export default function App() {
 
   const breaker = usePoll(getBreakerStatus)
   const streams = usePoll(getStreamsStatus)
+  const auditTopic = usePoll(getAuditTopicStatus)
   const deps = usePoll(getDepsHealth, 2000)
   const snapStatus = usePoll(getSnapshotStatus, 1000)
   const breakerStates = useRingBuffer(breaker?.state ?? null, 240)
@@ -243,6 +245,17 @@ export default function App() {
               <Sparkline values={streamLengths} stroke="var(--color-blue)" fill="rgba(10,132,255,.12)" />
               <div className="metric-note">
                 len = 쌓인 감사 기록 · pending = relay가 아직 Kafka로 못 옮긴 건수(<span className="mono">relay 밀림</span>)
+              </div>
+            </div>
+            <div className="metric-card">
+              <div className="metric-head">
+                <span className="title">Kafka Audit Topic</span>
+                <span className="value plain">
+                  produced {auditTopic?.totalMessages ?? '—'} · retained {auditTopic?.retained ?? '—'}
+                </span>
+              </div>
+              <div className="metric-note">
+                토픽 offset을 직접 읽는다 · relay가 실제로 옮겼는지 앱과 무관하게 확인 · <span className="mono">lb-audit-events</span>
               </div>
             </div>
             <div className="metric-card">

@@ -30,6 +30,11 @@ export interface StreamsStatus {
   lastDeliveredId: string | null
 }
 
+export interface AuditTopicStatus {
+  totalMessages: number
+  retained: number
+}
+
 export interface TopRankItem {
   rank: number
   userId: string
@@ -136,6 +141,9 @@ export const getBreakerStatus = () =>
 
 export const getStreamsStatus = () =>
   fetch('/internal/streams/status').then((r) => json<StreamsStatus>(r))
+
+export const getAuditTopicStatus = () =>
+  fetch('/internal/kafka/audit-topic/status').then((r) => json<AuditTopicStatus>(r))
 
 export const getTops = (leaderboardId: string, limit = 10) =>
   fetch(`/leaderboards/${leaderboardId}/tops?limit=${limit}`).then((r) =>

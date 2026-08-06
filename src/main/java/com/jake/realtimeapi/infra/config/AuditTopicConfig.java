@@ -1,5 +1,6 @@
 package com.jake.realtimeapi.infra.config;
 
+import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.common.config.TopicConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,5 +38,11 @@ public class AuditTopicConfig {
                         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_DELETE)
                         .build()
         );
+    }
+
+    /** 토픽 offset 조회용. KafkaAdmin의 접속 설정을 재사용해 하나만 만들어 공유한다(스레드 안전). */
+    @Bean
+    public AdminClient kafkaAdminClient(KafkaAdmin kafkaAdmin) {
+        return AdminClient.create(kafkaAdmin.getConfigurationProperties());
     }
 }
