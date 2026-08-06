@@ -65,7 +65,7 @@ function Sparkline({ values, stroke, fill }: { values: number[]; stroke: string;
       <polygon points={`${pts} ${W},${H} 0,${H}`} style={{ fill }} />
       <polyline
         points={pts}
-        style={{ fill: 'none', stroke, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}
+        style={{ fill: 'none', stroke, strokeWidth: 1.25, strokeLinecap: 'round', strokeLinejoin: 'round' }}
       />
     </svg>
   )
@@ -88,12 +88,14 @@ export default function App() {
   const auditTopic = usePoll(getAuditTopicStatus)
   const deps = usePoll(getDepsHealth, 2000)
   const snapStatus = usePoll(getSnapshotStatus, 1000)
-  // 브레이커 타임라인은 틱을 굵게 유지하려고 창을 작게 잡는다(240이면 틱이 1px 미만으로 사라진다).
-  const breakerStates = useRingBuffer(breaker?.state ?? null, 90)
+  // 브레이커 타임라인 창 = 80 샘플 × 0.5s = 40s. 10초 간격으로 축 눈금이 딱 떨어진다.
+  const breakerStates = useRingBuffer(breaker?.state ?? null, 80)
   const streamLengths = useRingBuffer(streams?.streamLength ?? null, 240)
   const producedSeries = useRingBuffer(auditTopic?.totalMessages ?? null, 240)
-  // Kafka는 누적 총계라 그대로 그리면 납작하다. 폴 사이 증가분(delivery rate)을 그려 relay가 옮기는 순간을 보인다.
+  // Kafka는 누적 총계라 그대로 그리면 납작하다. 폴 사이 증가분(옮긴 건수)을 그려 relay가 옮기는 순간을 보인다.
   const kafkaThroughput = producedSeries.map((v, i) => (i === 0 ? 0 : Math.max(0, v - producedSeries[i - 1])))
+  const kafkaPeak = kafkaThroughput.length ? Math.max(...kafkaThroughput) : 0
+  const kafkaNow = kafkaThroughput.at(-1) ?? 0
   const tops = usePoll(() => (session ? getTops(session.leaderboardId, 50) : Promise.resolve(null)), 1000)
   const snapshot = usePoll(
     () => (session ? getSnapshotEntries(session.leaderboardId).catch(() => null) : Promise.resolve(null)),
@@ -236,6 +238,15 @@ export default function App() {
                   <span key={i} className={`tick tick-${s.toLowerCase()}`} />
                 ))}
               </div>
+              <div className="breaker-axis">
+                <span>40s</span>
+                <span>30s</span>
+                <span>20s</span>
+                <span>10s</span>
+                <span className="now">
+                  <i className="live-dot" />now
+                </span>
+              </div>
               <div className="legend">
                 <span>
                   <i style={{ background: 'var(--color-green)' }} />Closed
@@ -261,11 +272,11 @@ export default function App() {
             <div className="metric-card">
               <div className="metric-head">
                 <span className="title">Kafka Delivery</span>
-                <span className="value plain">produced {auditTopic?.totalMessages ?? '—'} · retained {auditTopic?.retained ?? '—'}</span>
+                <span className="value plain">peak {kafkaPeak} · now {kafkaNow}</span>
               </div>
               <Sparkline values={kafkaThroughput} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
               <div className="metric-note">
-                그래프 = relay가 Kafka로 옮긴 초당 건수(<span className="mono">delivery rate</span>) · produced = 누적 총계
+                그래프 = relay가 한 번에 옮긴 건수(peak = 창 내 최대) · produced {auditTopic?.totalMessages ?? '—'} 누적
               </div>
             </div>
             <div className="metric-card">

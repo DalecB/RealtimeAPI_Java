@@ -248,6 +248,28 @@
 .tick-open { background: var(--color-red); }
 .tick-half_open { background: var(--color-amber); }
 .tick-unknown { background: var(--color-surface-3); }
+/* 40s 창의 10초 눈금. 폭 전체에 균등 배치되어 지나간 시간을 표시한다. */
+.breaker-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+  margin-top: 6px;
+}
+.breaker-axis .now {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-green);
+}
+.breaker-axis .live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-green);
+  animation: pulse 1.4s ease-in-out infinite;
+}
 .legend {
   display: flex;
   gap: var(--space-4);
