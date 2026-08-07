@@ -286,9 +286,12 @@ export default function App() {
                 <span className="value plain">peak {kafkaPeak} · now {kafkaNow}</span>
               </div>
               <Sparkline values={kafkaThroughput} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
-              <div className="metric-note">
-                그래프 = relay가 한 번에 옮긴 건수 · produced {auditTopic?.totalMessages ?? '—'} → PG stored{' '}
-                {stored?.count ?? '—'}
+              <div className="metric-flow">
+                <span>Kafka produced</span>
+                <b>{auditTopic?.totalMessages ?? '—'}</b>
+                <span className="arrow">→</span>
+                <span>PG stored</span>
+                <b className="stored">{stored?.count ?? '—'}</b>
               </div>
             </div>
             <div className="metric-card">

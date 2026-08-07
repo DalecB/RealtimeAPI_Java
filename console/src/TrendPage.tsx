@@ -68,6 +68,8 @@ function LineChart({ buckets, range }: { buckets: TrendBucket[]; range: RangeKey
       ))}
       <polygon points={area} className="trend-area" />
       <polyline points={line} className="trend-line" />
+      {/* 끝점 앵커. 누적은 단조 증가라 이 값은 y축 최댓값·summary와 같으므로 텍스트는 생략. */}
+      <circle cx={x(points.length - 1)} cy={y(points[points.length - 1].cumulative)} r="3.5" className="trend-dot" />
     </svg>
   )
 }
