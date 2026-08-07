@@ -3,6 +3,7 @@ import {
   bootstrapSession,
   ensureUsers,
   fireEvent,
+  getAuditEventCount,
   getAuditTopicStatus,
   getBreakerStatus,
   getDepsHealth,
@@ -15,6 +16,7 @@ import {
   type Session,
 } from './api'
 import { usePoll, useRingBuffer } from './hooks'
+import TrendPage from './TrendPage'
 import './App.css'
 
 // 모드별로 의미 있는 입력만 노출한다 — 관계없는 필드가 보이면 설계자도 헷갈린다
@@ -72,6 +74,7 @@ function Sparkline({ values, stroke, fill }: { values: number[]; stroke: string;
 }
 
 export default function App() {
+  const [view, setView] = useState<'dashboard' | 'trends'>('dashboard')
   const [session, setSession] = useState<Session | null>(null)
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<FireMode>('single')
@@ -85,6 +88,7 @@ export default function App() {
 
   const breaker = usePoll(getBreakerStatus)
   const streams = usePoll(getStreamsStatus)
+  const stored = usePoll(getAuditEventCount, 1000)
   const auditTopic = usePoll(getAuditTopicStatus)
   const deps = usePoll(getDepsHealth, 2000)
   const snapStatus = usePoll(getSnapshotStatus, 1000)
@@ -175,6 +179,10 @@ export default function App() {
   const uses = MODE_DEFS.find((m) => m.key === mode)!.uses
   const fieldCols = `1.4fr repeat(${1 + (uses.n ? 1 : 0) + (uses.users ? 1 : 0)}, 0.7fr)`
 
+  if (view === 'trends') {
+    return <TrendPage onBack={() => setView('dashboard')} />
+  }
+
   return (
     <div className="app">
       <header className="topbar">
@@ -201,6 +209,9 @@ export default function App() {
           <span className="dot" />
           Breaker {stateLabel}
         </div>
+        <button className="trend-nav" onClick={() => setView('trends')}>
+          Score Trends →
+        </button>
       </header>
 
       {isOpen && <div className="hazard-strip" />}
@@ -276,7 +287,8 @@ export default function App() {
               </div>
               <Sparkline values={kafkaThroughput} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
               <div className="metric-note">
-                그래프 = relay가 한 번에 옮긴 건수(peak = 창 내 최대) · produced {auditTopic?.totalMessages ?? '—'} 누적
+                그래프 = relay가 한 번에 옮긴 건수 · produced {auditTopic?.totalMessages ?? '—'} → PG stored{' '}
+                {stored?.count ?? '—'}
               </div>
             </div>
             <div className="metric-card">

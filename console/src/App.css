@@ -606,3 +606,85 @@ button:disabled { opacity: 0.45; cursor: default; }
 .drift-note { font-size: 13px; color: var(--color-text-faint); }
 .drift-note.active { color: var(--color-amber); }
 .hint { font-size: 13px; color: var(--color-text-faint); }
+
+/* --- Score Trends 진입 버튼 (대시보드 헤더) --- */
+.trend-nav {
+  margin-left: var(--space-4);
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.trend-nav:hover { background: var(--color-surface-2); }
+
+/* --- Score Trends 페이지 --- */
+.trend-topbar { gap: var(--space-4); }
+.back-link {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+.back-link:hover { color: var(--color-text); }
+.trend-title { font-size: 17px; font-weight: 700; }
+
+.trend-content { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5) var(--space-6); max-width: 1100px; }
+.trend-controls { display: flex; align-items: center; gap: var(--space-4); }
+.lb-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+.range-seg { display: inline-flex; background: var(--color-surface); border-radius: 8px; padding: 3px; gap: 2px; }
+.range-seg button {
+  border: none;
+  background: none;
+  color: var(--color-text-dim);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.range-seg button.on { background: var(--color-surface-3); color: var(--color-text); }
+
+.trend-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.trend-card-head { display: flex; align-items: baseline; justify-content: space-between; }
+.trend-card-head .title { font-size: 15px; font-weight: 600; }
+.trend-summary { font-size: 13px; color: var(--color-text-dim); font-variant-numeric: tabular-nums; }
+.trend-note { font-size: 12px; color: var(--color-text-faint); }
+.trend-empty {
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  font-size: 14px;
+}
+
+.trend-chart { width: 100%; height: auto; }
+.trend-chart .grid { stroke: var(--color-border); stroke-width: 1; }
+.trend-chart .ylabel { fill: var(--color-text-faint); font-size: 12px; text-anchor: end; font-variant-numeric: tabular-nums; }
+.trend-chart .xlabel { fill: var(--color-text-faint); font-size: 12px; text-anchor: middle; }
+.trend-area { fill: rgba(48, 209, 88, 0.10); }
+.trend-line { fill: none; stroke: var(--color-green); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

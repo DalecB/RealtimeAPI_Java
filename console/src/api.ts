@@ -34,6 +34,12 @@ export interface AuditTopicStatus {
   retained: number
 }
 
+export interface TrendBucket {
+  bucketStart: string
+  eventCount: number
+  deltaSum: number
+}
+
 export interface TopRankItem {
   rank: number
   userId: string
@@ -143,6 +149,17 @@ export const getStreamsStatus = () =>
 
 export const getAuditTopicStatus = () =>
   fetch('/internal/kafka/audit-topic/status').then((r) => json<AuditTopicStatus>(r))
+
+export const getAuditEventCount = () =>
+  fetch('/internal/audit-events/count').then((r) => json<{ count: number }>(r))
+
+export const getAuditLeaderboards = () =>
+  fetch('/internal/audit-events/leaderboards').then((r) => json<string[]>(r))
+
+export const getScoreTrend = (leaderboardId: string, from: string, to: string, bucket: string) =>
+  fetch(`/internal/audit-events/trend?leaderboardId=${leaderboardId}&from=${from}&to=${to}&bucket=${bucket}`).then(
+    (r) => json<TrendBucket[]>(r),
+  )
 
 export const getTops = (leaderboardId: string, limit = 10) =>
   fetch(`/leaderboards/${leaderboardId}/tops?limit=${limit}`).then((r) =>
