@@ -31,14 +31,13 @@ class InternalStreamsStatusControllerTest {
     private AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase;
 
     @Test
-    void getStatus_returnsPendingLagAndLastDeliveredId() throws Exception {
-        when(getStreamsStatusUseCase.getStatus()).thenReturn(new StreamsStatus(0L, 12L, "1710000000000-0"));
+    void getStatus_returnsPendingAndStreamLength() throws Exception {
+        when(getStreamsStatusUseCase.getStatus()).thenReturn(new StreamsStatus(0L, 12L));
 
         mockMvc.perform(get("/internal/streams/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pendingEntries").value(0))
-                .andExpect(jsonPath("$.streamLength").value(12))
-                .andExpect(jsonPath("$.lastDeliveredId").value("1710000000000-0"));
+                .andExpect(jsonPath("$.streamLength").value(12));
 
         verify(getStreamsStatusUseCase).getStatus();
     }

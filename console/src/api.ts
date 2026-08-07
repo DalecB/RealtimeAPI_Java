@@ -27,7 +27,6 @@ export interface BreakerStatus {
 export interface StreamsStatus {
   pendingEntries: number
   streamLength: number
-  lastDeliveredId: string | null
 }
 
 export interface AuditTopicStatus {

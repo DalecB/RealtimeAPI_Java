@@ -4,14 +4,10 @@ import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.events.domain.model.StreamsStatus;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
 import org.springframework.dao.DataAccessException;
-import org.springframework.data.domain.Range;
-import org.springframework.data.redis.connection.Limit;
-import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.PendingMessagesSummary;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -30,14 +26,10 @@ public class RedisAuditStreamStatusRepository implements AuditStreamStatusReposi
         long safeLength = streamLength == null ? 0L : streamLength;
 
         if (safeLength == 0L) {
-            return new StreamsStatus(0L, 0L, null);
+            return new StreamsStatus(0L, 0L);
         }
 
-        List<MapRecord<String, Object, Object>> lastRecords = redisTemplate.opsForStream()
-                .reverseRange(key, Range.unbounded(), Limit.limit().count(1));
-        String lastDeliveredId = lastRecords.isEmpty() ? null : lastRecords.get(0).getId().getValue();
-
-        return new StreamsStatus(pendingCount(key), safeLength, lastDeliveredId);
+        return new StreamsStatus(pendingCount(key), safeLength);
     }
 
     private long pendingCount(String key) {

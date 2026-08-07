@@ -2,7 +2,6 @@ package com.jake.realtimeapi.events.domain.model;
 
 public record StreamsStatus(
         long pendingEntries,
-        long streamLength,
-        String lastDeliveredId
+        long streamLength
 ) {
 }

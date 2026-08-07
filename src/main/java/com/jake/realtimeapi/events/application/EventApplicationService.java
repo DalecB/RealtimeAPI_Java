@@ -71,40 +71,13 @@ public class EventApplicationService implements GetTopRanksUseCase, GetUserRankU
     public StreamsStatus getStatus() {
         long pendingEntries = 0L;
         long streamLength = 0L;
-        String lastDeliveredId = null;
 
         for (var leaderboardId : leaderboardRepository.findAllIds()) {
             StreamsStatus status = auditStreamStatusRepository.getStatus(leaderboardId);
             pendingEntries += status.pendingEntries();
             streamLength += status.streamLength();
-            if (isLaterStreamId(status.lastDeliveredId(), lastDeliveredId)) {
-                lastDeliveredId = status.lastDeliveredId();
-            }
         }
 
-        return new StreamsStatus(pendingEntries, streamLength, lastDeliveredId);
-    }
-
-    private boolean isLaterStreamId(String candidate, String current) {
-        if (candidate == null) {
-            return false;
-        }
-        if (current == null) {
-            return true;
-        }
-
-        String[] candidateParts = candidate.split("-", 2);
-        String[] currentParts = current.split("-", 2);
-
-        long candidateTimestamp = Long.parseLong(candidateParts[0]);
-        long currentTimestamp = Long.parseLong(currentParts[0]);
-
-        if (candidateTimestamp != currentTimestamp) {
-            return candidateTimestamp > currentTimestamp;
-        }
-
-        long candidateSequence = Long.parseLong(candidateParts[1]);
-        long currentSequence = Long.parseLong(currentParts[1]);
-        return candidateSequence > currentSequence;
+        return new StreamsStatus(pendingEntries, streamLength);
     }
 }
