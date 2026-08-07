@@ -118,7 +118,7 @@ public class AuditRelayWorker {
         List<CompletableFuture<SendResult<String, String>>> futures = new ArrayList<>(records.size());
         for (MapRecord<String, Object, Object> record : records) {
             ProducerRecord<String, String> producerRecord = new ProducerRecord<>(
-                    AuditTopicConfig.AUDIT_TOPIC, partitionKey, toJson(record.getValue()));
+                    AuditTopicConfig.AUDIT_TOPIC, partitionKey, toJson(record.getId().getValue(), record.getValue()));
             producerRecord.headers().add(SCHEMA_VERSION_HEADER, SCHEMA_VERSION);
             futures.add(kafkaTemplate.send(producerRecord));
         }
@@ -150,9 +150,12 @@ public class AuditRelayWorker {
         }
     }
 
-    private String toJson(Map<Object, Object> fields) {
+    private String toJson(String eventId, Map<Object, Object> fields) {
         // 스트림 필드는 문자열 쌍이다. 순서를 유지해 직렬화한다.
+        // eventId(스트림 엔트리 ID)를 함께 실어 컨슈머가 (leaderboardId, eventId)로 전송 중복을 걸러낸다.
+        // 엔트리 ID는 한 리더보드 스트림 안에서만 고유하므로 leaderboardId(=Kafka 키)와 짝으로만 유일하다.
         Map<String, String> ordered = new LinkedHashMap<>();
+        ordered.put("eventId", eventId);
         fields.forEach((k, v) -> ordered.put(String.valueOf(k), String.valueOf(v)));
         try {
             return objectMapper.writeValueAsString(ordered);
