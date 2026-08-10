@@ -56,7 +56,7 @@ docker compose up -d postgres redis app prometheus renderer grafana
 테스트:
 
 - `./gradlew test`
-- 단위 테스트(WebMvc 슬라이스, mock 기반)와 Testcontainers 통합 테스트(실제 Redis·PostgreSQL 컨테이너)로 구성됩니다.
+- 단위 테스트(WebMvc 슬라이스, mock 기반)와 Testcontainers 통합 테스트(실제 Redis·Kafka·PostgreSQL 컨테이너)로 구성됩니다.
 
 Testcontainers 통합 테스트:
 
@@ -66,6 +66,10 @@ Testcontainers 통합 테스트:
 | 멱등키 재사용 충돌 | 동일 키에 payload 해시(`userId:delta`)가 다르면 replay가 아닌 데이터 변주로 간주하고 `IdempotencyKeyReuseMismatchException`을 던지며 점수가 반영되지 않는지 검증 (HTTP 409 매핑은 `EventCommandControllerWebMvcTest` 몫) | `ProcessEventConcurrencyTest` |
 | Redis 장애 fail-fast | 성공 10건으로 sliding window를 채운 상태에서 Redis 컨테이너를 중단 — 임계(50%) 도달인 5번째 실패에서 브레이커가 OPEN 되고, 이후 요청은 커넥션 타임아웃을 기다리지 않고 즉시 실패하는지 검증 | `RedisOutageCircuitBreakerTest` |
 | Snapshot 왕복 복구 | Redis ZSET 3건을 PostgreSQL snapshot으로 capture → 랭킹 키 삭제 → recover. `recovered=true` / `RECOVERED` / 복구 행 수 3을 먼저 확정해 skip(`REDIS_ALREADY_WARM`)에 의한 거짓 통과를 배제하고, 유저별 ZSCORE와 ZCARD가 원본과 일치하는지 검증 | `SnapshotRoundTripTest` |
+| Kafka audit 왕복 | 이벤트 처리의 Lua XADD → relay 1회 → Kafka consumer → PostgreSQL `audit_events` 적재를 실제 컨테이너로 연결하고, `eventId`·`userId`·`delta`·`apiKeyId` 등 원본 필드와 relay 후 Redis PEL 0건을 검증 | `KafkaAuditRoundTripTest` |
+| Kafka 중복 전달 멱등 | 동일 `eventId`의 Kafka 메시지를 2회 전달해도 `(leaderboard_id, event_id)` UNIQUE와 `ON CONFLICT DO NOTHING`으로 `audit_events`가 1행인지 검증. consumer 저장 멱등성의 검증이며 relay 장애 복구 검증은 아님 | `KafkaAuditRoundTripTest` |
+
+현재 relay 운용 범위는 **단일 인스턴스 + 고정 consumer name**이다. 다른 relay가 orphan PEL을 `XAUTOCLAIM`으로 회수하는 장애 인계는 [SPIKE-001의 후속 TODO](docs/SPIKE-001-kafka-migration-path.md#현재-운용-경계와-후속-todo-2026-08-10-결정)로 둔다.
 
 수집된 benchmark evidence:
 
