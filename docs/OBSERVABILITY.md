@@ -5,6 +5,8 @@
 - `10.2 Circuit Breaker 설정`
 - `8.4/9. Cold Start Recovery`
 
+> **정본 표시**: 어떤 지표를 왜 두는가(계약)는 PRD `15. Observability`가 정본이다. 이 문서는 **실제로 계측된 이름과 읽는 방법**이 정본이다. 지표 목록이 어긋나면 이 문서를 따르고, PRD를 고칠 것.
+
 ## 1. 로컬 스택 실행
 
 ```bash
@@ -78,8 +80,7 @@ docker compose up -d postgres redis app prometheus grafana
 
 ## 5. 주의할 점
 
-- `stream_pending_entries`는 현재 dedicated consumer group이 없어서 항상 `0`입니다.
-  - `stream_length = audit stream length (XLEN)`
-  - consumer group 도입 시 실제 lag 메트릭을 별도로 추가한다
+- `stream_pending_entries`는 relay 컨슈머 그룹(`audit-relay`)의 미처리(PEL) 건수입니다. relay가 밀리거나 멈추면 자라므로 relay 건강 지표로 씁니다. relay가 꺼져 있으면 그룹이 없어 `0`으로 나옵니다.
+  - `stream_length = audit stream length (XLEN)`. 리텐션(트림)의 결과이지 밀린 양이 아닙니다.
 - `snapshot status`는 메모리 tracker 기반이라 앱 재시작 시 마지막 성공 시각은 초기화됩니다.
 - recovery 검증 스크립트는 compose의 `app` 컨테이너를 재시작하는 방식이라, `bootRun` 로컬 프로세스가 아니라 compose app 기준으로 사용해야 합니다.

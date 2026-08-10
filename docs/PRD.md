@@ -325,29 +325,43 @@ XADD를 Lua 내부에 포함함으로써 score 반영과 감사 로그 기록이
 -- ARGV[1] = userId
 -- ARGV[2] = deltaScore
 -- ARGV[3] = ttlSeconds
--- ARGV[4] = payloadHash  (userId + deltaScore 해시값, 409 검사용)
+-- ARGV[4] = 멱등 레코드 "v2:<payloadHash>:<processedAtEpochMillis>"
+--           (payloadHash = userId + deltaScore 해시. processedAt은 replay 응답에 최초 처리 시각을 돌려주기 위해 함께 저장)
+-- ARGV[5] = apiKeyId
+-- ARGV[6] = 멱등키(eventUuid)
 
 -- 1. 멱등키 중복 검사
 local existing = redis.call('GET', KEYS[1])
 if existing then
-    -- storedPayloadHash를 반환. Java Layer에서 incomingPayloadHash와 비교하여
-    -- 일치 → 200 replayed:true / 불일치 → 409 IDEMPOTENCY_KEY_REUSE_MISMATCH 결정
+    -- 저장값을 그대로 반환. Java Layer가 해시를 비교해 200 replayed / 409를 판정한다.
+    -- Lua도 해시만 잘라 비교하는데, 이는 판정이 아니라 conflict를 감사 기록에 남기기 위해서다.
+    local existingHash = string.match(existing, "^v2:([^:]+):")
+    local incomingHash = string.match(ARGV[4], "^v2:([^:]+):")
+    if existingHash and incomingHash and existingHash ~= incomingHash then
+        redis.call('XADD', KEYS[3], 'MAXLEN', '~', 100000, '*',
+            'type', 'conflict', 'userId', ARGV[1], 'delta', ARGV[2],
+            'apiKeyId', ARGV[5], 'idempotencyKey', ARGV[6])
+    end
     return {0, existing}
 end
 
 -- 2. ZSET 점수 업데이트
 local newScore = redis.call('ZINCRBY', KEYS[2], tonumber(ARGV[2]), ARGV[1])
 
--- 3. 멱등키 저장 (TTL 적용, payloadHash 저장)
+-- 3. 멱등키 저장 (TTL 적용, v2 레코드 저장)
 redis.call('SET', KEYS[1], ARGV[4], 'EX', tonumber(ARGV[3]))
 
 -- 4. Audit Log Streams 기록 (score 반영과 원자적으로 처리)
--- MAXLEN ~ 100000: 최근 10만 건만 유지하는 Ring Buffer 방식. Consumer 없이 XADD만 지속하면
--- Redis 메모리(maxmemory 256MB)가 소진되는 OOM 위험을 방지한다. '~'(근사치)는 성능 최적화 옵션.
-redis.call('XADD', KEYS[3], 'MAXLEN', '~', 100000, '*', 'userId', ARGV[1], 'delta', ARGV[2])
+-- MAXLEN ~ 100000: relay가 영구히 멈췄을 때 무한 증식을 막는 최후 방어선.
+-- 평상시 정리는 relay 진행 기준 트림이 담당한다(SPIKE-001).
+redis.call('XADD', KEYS[3], 'MAXLEN', '~', 100000, '*',
+    'type', 'new', 'userId', ARGV[1], 'delta', ARGV[2],
+    'apiKeyId', ARGV[5], 'idempotencyKey', ARGV[6])
 
 return {1, newScore}  -- {isNew=true, newScore}
 ```
+
+> replay(같은 payload 재요청)는 기록하지 않고 `conflict`만 남긴다. 판단 근거는 [SPIKE-001](SPIKE-001-kafka-migration-path.md).
 
 ### 7.2 Lua 제약 조건
 
@@ -368,7 +382,7 @@ return {1, newScore}  -- {isNew=true, newScore}
 
 ```
 Lock 구현: PostgreSQL pg_try_advisory_lock(lockKey)
-Lock Key: leaderboardId 문자열의 hashCode() 반환 값 (long)
+Lock Key: leaderboardId(UUID)의 hashCode() 반환 값. int(2^32 공간)이며 long으로 확대해 전달한다
 
 획득 방법: pg_try_advisory_lock(lockKey)  -- non-blocking, 즉시 반환
 해제 조건:
@@ -672,8 +686,8 @@ T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행
 
 **Streams**
 
-- `stream_pending_entries`: 현재 구현에서는 dedicated consumer group이 없어 항상 `0`
-- `stream_length`: audit stream 길이(XLEN). consumer group 도입 시 실제 lag 메트릭으로 대체 예정
+- `stream_pending_entries`: relay 컨슈머 그룹(`audit-relay`)의 미처리(PEL) 건수. relay가 밀리거나 멈추면 자라므로 relay 건강 지표다
+- `stream_length`: audit stream 길이(XLEN). 리텐션의 결과이지 밀린 양이 아니다
 
 ### Logs (Structured JSON)
 
@@ -777,13 +791,13 @@ GET /internal/snapshot/status
   → { "lastSuccessfulSnapshotAt": "ISO8601", "snapshotLagSeconds": number }
 
 GET /internal/streams/status
-  → { "pendingEntries": number, "streamLength": number, "lastDeliveredId": "string" }
+  → { "pendingEntries": number, "streamLength": number }
 
 GET /internal/circuit-breaker/status
   → { "state": "CLOSED|HALF_OPEN|OPEN", "failureRate": number }
 ```
 
-> **현재 구현 메모**: `/internal/streams/status`는 dedicated consumer group 없이 audit stream만 기록한다. 따라서 `pendingEntries=0`이고, `streamLength`는 stream 길이(XLEN) 그대로다.
+> **현재 구현 메모**: `pendingEntries`는 relay 컨슈머 그룹(`audit-relay`)의 XPENDING 건수 — relay가 받았지만 아직 Kafka로 못 옮긴 양이다. `streamLength`는 stream 길이(XLEN)로 리텐션의 결과다. 상세는 [SPIKE-001](SPIKE-001-kafka-migration-path.md).
 
 ### Admin / Seed (테스트 자동화)
 
@@ -816,6 +830,8 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 ---
 
 ## 18. Benchmark & Reliability Test Plan (k6)
+
+> **정본 표시**: 이 절은 벤치마크의 **의도와 성공 기준**(무엇을 왜 재는가)을 정한다. 실행 절차·명령·옵션의 정본은 [k6/BENCHMARK_RUNBOOK.md](../k6/BENCHMARK_RUNBOOK.md)다. 둘이 어긋나면 실행 방법은 런북을, 판정 기준은 이 절을 따른다.
 
 ### 18.0 목적
 
@@ -1056,7 +1072,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **재검토 대상:** `17. Non-goals`의 "Kafka 기반 메시지 브로커 — Redis Streams로 감사 로그 파이프라인 충분히 증명 가능" 한 줄. 당시 판단의 근거와 **뒤집힘 조건이 문서에 남아 있지 않았다.** 본 ADR은 그 결정을 수치와 함께 정식화하고 재검토한다.
 
-**상황:** audit stream(`lb:{leaderboardId}:events`)은 XADD로 append만 되고 **읽는 코드가 없다.** 이 사실이 두 곳에 흔적으로 남아 있다.
+**상황 (결정 시점 = 2026-07-27 기준):** audit stream(`lb:{leaderboardId}:events`)은 XADD로 append만 되고 **읽는 코드가 없었다.** 이 사실이 두 곳에 흔적으로 남아 있었다. 아래는 당시 관찰이며, 두 지점 모두 relay 도입 후 해소됐다(`pendingEntries`는 실제 PEL, `lastDeliveredId`는 제거).
 
 | 위치                                     | 내용                                                                                                                                                                         |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

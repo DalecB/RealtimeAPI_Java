@@ -26,7 +26,7 @@ Redis Hot Path와 PostgreSQL Cold Path를 분리해 실시간 랭킹 이벤트�
 
 - Snapshot worker 기본 주기는 `30초`입니다. T8 비교를 위해 `5분` 주기로도 재기동해 측정했습니다.
 - 관리용 JWT 로그인은 현재 범위에서 `users.externalId` 기반 demo auth를 사용합니다.
-- `/internal/streams/status`의 `pendingEntries`는 아직 dedicated consumer group이 없어 항상 `0`이고, `streamLength`는 audit stream의 길이(XLEN)입니다.
+- `/internal/streams/status`의 `pendingEntries`는 relay 컨슈머 그룹(`audit-relay`)의 미처리 건수(XPENDING)입니다. relay가 밀리면 이 값이 자랍니다. `streamLength`는 audit stream의 길이(XLEN)입니다.
 
 ## Quick Start
 

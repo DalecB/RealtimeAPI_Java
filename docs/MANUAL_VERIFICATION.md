@@ -236,15 +236,13 @@ curl -s http://localhost:8080/internal/streams/status
 ```
 
 기대 결과:
-- 현재 구현에서는 별도 consumer group이 없으므로 `pendingEntries = 0`
-- `streamLength`는 audit stream 누적 길이로 증가
-- `lastDeliveredId`는 마지막으로 기록된 stream entry id
+- `pendingEntries`는 relay 컨슈머 그룹(`audit-relay`)의 미처리(PEL) 건수. relay가 따라잡고 있으면 대개 `0`이고, 밀리면 자란다
+- `streamLength`는 audit stream에 남아 있는 엔트리 수(XLEN). 트림의 결과이지 밀린 양이 아니다
 
 주의:
-- PRD의 consumer group lag 계약은 유지하지만, 아직 dedicated consumer가 없어서 lag 계산은 현재 stream length 기반이다.
-- 추후 consumer group이 추가되면 이 API는 group lag/pending 기준으로 바뀐다.
+- relay가 꺼져 있으면(`events.relay.enabled=false`) 그룹이 없어 `pendingEntries`는 `0`으로 나온다. 이때 `streamLength`만 계속 자란다.
 
-## 11. Cold Start Recovery 검증
+## 10. Cold Start Recovery 검증
 
 이 검증은 `docker compose`의 `app` 컨테이너로 실행할 때 가장 단순하다.
 
@@ -264,7 +262,7 @@ LEADERBOARD_ID=<LEADERBOARD_ID> bash scripts/verify-cold-start-recovery.sh
 - recovery 완료 후 `/leaderboards/{leaderboardId}/tops`에서 데이터가 다시 보여야 한다.
 - 복구된 데이터는 최신 `snapshot_entries`와 동일해야 한다.
 
-## 12. Observability / Grafana
+## 11. Observability / Grafana
 
 Prometheus + Grafana를 같이 띄우려면:
 
@@ -276,9 +274,9 @@ docker compose up -d postgres redis app prometheus grafana
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
 
-자세한 계측 항목과 대시보드 설명은 [OBSERVABILITY.md](/Users/bangjaehun/Develop/RealtimeAPI/docs/OBSERVABILITY.md) 참고.
+자세한 계측 항목과 대시보드 설명은 [OBSERVABILITY.md](OBSERVABILITY.md) 참고.
 
-## 10. usage_stats 적재 검증
+## 12. usage_stats 적재 검증
 
 `POST /events`를 몇 번 호출한 뒤, 발급된 `apiKeyId`로 아래 SQL을 본다.
 
@@ -306,7 +304,7 @@ order by bucket_start desc, bucket_type asc;
 
 `smoke-manual-flow.sh` summary는 이제 `apiKeyId`도 함께 출력한다.
 
-## 11. 실패 케이스 검증
+## 13. 실패 케이스 검증
 
 ### 관리 API를 JWT 없이 호출
 
@@ -376,7 +374,7 @@ bash scripts/verify-circuit-breaker-open.sh
 - `Retry-After`
 - `X-RateLimit-Remaining: 0`
 
-## 9. Snapshot 전용 시드가 필요할 때
+## 14. Snapshot 전용 시드가 필요할 때
 
 고정 leaderboard와 tie/empty 시나리오까지 빠르게 검증하려면 아래 스크립트를 사용한다.
 
