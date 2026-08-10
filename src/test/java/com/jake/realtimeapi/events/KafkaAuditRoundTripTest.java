@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jake.realtimeapi.TestcontainersConfiguration;
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
+import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
 import com.jake.realtimeapi.events.relay.AuditRelayWorker;
 import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import com.jake.realtimeapi.leaderboards.domain.model.Leaderboard;
@@ -21,7 +22,6 @@ import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.PendingMessagesSummary;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.time.Duration;
@@ -72,7 +72,7 @@ class KafkaAuditRoundTripTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private AuditEventQueryRepository auditEventQueryRepository;
 
     @Test
     void processedEvent_isRelayedThroughKafka_andStoredInAuditEvents() {
@@ -91,10 +91,10 @@ class KafkaAuditRoundTripTest {
         auditRelayWorker.relayAll();
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-            List<AuditRow> rows = findAuditRows(fixture.leaderboardId());
+            List<AuditEventQueryRepository.RecentAuditEvent> rows = findAuditRows(fixture.leaderboardId());
             assertEquals(1, rows.size());
 
-            AuditRow row = rows.get(0);
+            AuditEventQueryRepository.RecentAuditEvent row = rows.get(0);
             assertEquals(fixture.leaderboardId(), row.leaderboardId());
             assertEquals(eventId, row.eventId());
             assertEquals("new", row.eventType());
@@ -126,7 +126,7 @@ class KafkaAuditRoundTripTest {
         kafkaTemplate.send(AuditTopicConfig.AUDIT_TOPIC, key, sentinelJson).get();
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-            List<AuditRow> rows = findAuditRows(fixture.leaderboardId());
+            List<AuditEventQueryRepository.RecentAuditEvent> rows = findAuditRows(fixture.leaderboardId());
             assertEquals(2, rows.size());
             assertEquals(1, rows.stream().filter(row -> row.eventId().equals(eventId)).count());
             assertEquals(1, rows.stream().filter(row -> row.eventId().equals(sentinelEventId)).count());
@@ -153,35 +153,11 @@ class KafkaAuditRoundTripTest {
         return new Fixture(user.id(), leaderboard.id());
     }
 
-    private List<AuditRow> findAuditRows(UUID leaderboardId) {
-        return jdbcTemplate.query("""
-                        SELECT leaderboard_id, event_id, event_type, user_id, delta, api_key_id, idempotency_key
-                        FROM audit_events
-                        WHERE leaderboard_id = ?
-                        """,
-                (rs, rowNum) -> new AuditRow(
-                        rs.getObject("leaderboard_id", UUID.class),
-                        rs.getString("event_id"),
-                        rs.getString("event_type"),
-                        rs.getLong("user_id"),
-                        rs.getLong("delta"),
-                        rs.getLong("api_key_id"),
-                        rs.getString("idempotency_key")
-                ),
-                leaderboardId);
+    private List<AuditEventQueryRepository.RecentAuditEvent> findAuditRows(UUID leaderboardId) {
+        return auditEventQueryRepository.recent(leaderboardId, 100);
     }
 
     private record Fixture(long userId, UUID leaderboardId) {
     }
 
-    private record AuditRow(
-            UUID leaderboardId,
-            String eventId,
-            String eventType,
-            long userId,
-            long delta,
-            long apiKeyId,
-            String idempotencyKey
-    ) {
-    }
 }

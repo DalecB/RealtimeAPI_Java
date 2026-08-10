@@ -40,6 +40,31 @@ public class AuditEventQueryRepository {
                 "SELECT DISTINCT leaderboard_id FROM audit_events ORDER BY leaderboard_id", UUID.class);
     }
 
+    /** Ops Console용 최근 원본 이벤트. DB 적재 순서의 최신 항목부터 반환한다. */
+    public List<RecentAuditEvent> recent(UUID leaderboardId, int limit) {
+        String sql = """
+                SELECT leaderboard_id, event_time, event_id, event_type, user_id, delta, api_key_id, idempotency_key
+                FROM audit_events
+                WHERE leaderboard_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """;
+        return jdbcTemplate.query(
+                sql,
+                (rs, rowNum) -> new RecentAuditEvent(
+                        rs.getObject("leaderboard_id", UUID.class),
+                        rs.getTimestamp("event_time").toInstant(),
+                        rs.getString("event_id"),
+                        rs.getString("event_type"),
+                        rs.getLong("user_id"),
+                        rs.getLong("delta"),
+                        rs.getLong("api_key_id"),
+                        rs.getString("idempotency_key")
+                ),
+                leaderboardId, limit
+        );
+    }
+
     public List<TrendBucket> trend(UUID leaderboardId, Instant from, Instant to, String bucketCode) {
         String interval = BUCKET_INTERVALS.get(bucketCode);
         if (interval == null) {
@@ -67,5 +92,17 @@ public class AuditEventQueryRepository {
     }
 
     public record TrendBucket(Instant bucketStart, long eventCount, long deltaSum) {
+    }
+
+    public record RecentAuditEvent(
+            UUID leaderboardId,
+            Instant eventTime,
+            String eventId,
+            String eventType,
+            long userId,
+            long delta,
+            long apiKeyId,
+            String idempotencyKey
+    ) {
     }
 }

@@ -34,6 +34,16 @@ export interface AuditTopicStatus {
   retained: number
 }
 
+export interface AuditEventItem {
+  eventTime: string
+  eventId: string
+  eventType: 'new' | 'conflict'
+  userId: string
+  delta: number
+  apiKeyId: string
+  idempotencyKey: string
+}
+
 export interface TrendBucket {
   bucketStart: string
   eventCount: number
@@ -152,6 +162,11 @@ export const getAuditTopicStatus = () =>
 
 export const getAuditEventCount = () =>
   fetch('/internal/audit-events/count').then((r) => json<{ count: number }>(r))
+
+export const getRecentAuditEvents = (leaderboardId: string, limit = 20) =>
+  fetch(`/internal/audit-events/recent?leaderboardId=${leaderboardId}&limit=${limit}`).then((r) =>
+    json<AuditEventItem[]>(r),
+  )
 
 export const getAuditLeaderboards = () =>
   fetch('/internal/audit-events/leaderboards').then((r) => json<string[]>(r))

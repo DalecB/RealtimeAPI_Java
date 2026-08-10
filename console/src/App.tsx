@@ -4,6 +4,7 @@ import {
   ensureUsers,
   fireEvent,
   getAuditEventCount,
+  getRecentAuditEvents,
   getAuditTopicStatus,
   getBreakerStatus,
   getDepsHealth,
@@ -105,6 +106,10 @@ export default function App() {
     () => (session ? getSnapshotEntries(session.leaderboardId).catch(() => null) : Promise.resolve(null)),
     2000,
   )
+  const auditEvents = usePoll(
+    () => (session ? getRecentAuditEvents(session.leaderboardId) : Promise.resolve(null)),
+    1000,
+  )
 
   const latencies = results.slice(-120).map((r) => r.latencyMs)
   const lastBlocked = [...results].reverse().find((r) => r.outcome === 'BLOCKED_503')
@@ -119,6 +124,7 @@ export default function App() {
           : `→ fires 2 sequential · same key · delta +${delta} then +${delta + 1} · expect: 1 New + 1 409 Conflict`
 
   const state = breaker?.state ?? 'UNKNOWN'
+  const kafkaUp = auditTopic ? auditTopic.totalMessages >= 0 : null
   const stateCls = state.toLowerCase()
   const isOpen = state === 'OPEN'
   const isHalf = state === 'HALF_OPEN'
@@ -204,6 +210,11 @@ export default function App() {
           <span className="sep">·</span>
           <span>Postgres</span>
           <span className={deps?.db ? 'up' : 'downed'}>{deps ? (deps.db ? 'OK' : 'DOWN') : '—'}</span>
+          <span className="sep">·</span>
+          <span>Kafka</span>
+          <span className={kafkaUp === null ? '' : kafkaUp ? 'up' : 'downed'}>
+            {kafkaUp === null ? '—' : kafkaUp ? 'OK' : 'DOWN'}
+          </span>
         </div>
         <div className={`breaker-pill ${stateCls}`}>
           <span className="dot" />
@@ -527,7 +538,7 @@ export default function App() {
                 Idempotency Keys
               </button>
               <button className={tab === 'audit' ? 'active' : ''} onClick={() => setTab('audit')}>
-                Audit Stream
+                Audit Events
               </button>
             </div>
           </div>
@@ -588,6 +599,36 @@ export default function App() {
                   : 'No drift — snapshot is in sync with hot path'}
               </div>
             </>
+          ) : tab === 'audit' ? (
+            <div className="table-card audit-table">
+              <div className="table-card-head">
+                <span className="dot" style={{ background: 'var(--color-green)' }} />
+                <strong>PostgreSQL audit_events</strong>
+                <span className="meta">latest 20 · 1s poll</span>
+              </div>
+              <div className="audit-head audit-row">
+                <span>Time</span>
+                <span>Type</span>
+                <span>User</span>
+                <span>Delta</span>
+                <span>API Key</span>
+                <span>Event ID</span>
+                <span>Idempotency Key</span>
+              </div>
+              {(auditEvents ?? []).map((event) => (
+                <div key={event.eventId} className="audit-row">
+                  <span className="audit-time">{new Date(event.eventTime).toISOString().slice(11, 23)}</span>
+                  <span className={`audit-type ${event.eventType}`}>{event.eventType}</span>
+                  <span>{event.userId}</span>
+                  <span className="audit-delta">{event.delta > 0 ? `+${event.delta}` : event.delta}</span>
+                  <span>{event.apiKeyId}</span>
+                  <span className="audit-id" title={event.eventId}>{event.eventId}</span>
+                  <span className="audit-id" title={event.idempotencyKey}>{event.idempotencyKey}</span>
+                </div>
+              ))}
+              {!session && <div className="audit-empty">bootstrap a demo session to inspect its events</div>}
+              {session && auditEvents?.length === 0 && <div className="audit-empty">no stored events — fire Single or Same Key · Diff Payload</div>}
+            </div>
           ) : (
             <p className="hint">read-only internal API 설계 대기 (12_Ops_Console_스펙 백로그)</p>
           )}

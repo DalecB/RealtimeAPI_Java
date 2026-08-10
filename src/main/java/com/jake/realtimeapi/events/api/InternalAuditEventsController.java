@@ -1,6 +1,7 @@
 package com.jake.realtimeapi.events.api;
 
 import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
+import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +34,28 @@ public class InternalAuditEventsController {
         return auditEventQueryRepository.leaderboardsWithEvents();
     }
 
+    /** Ops Console Data Inspector: 한 리더보드의 최근 적재 이벤트. */
+    @GetMapping("/recent")
+    public List<RecentAuditEventResponse> recent(
+            @RequestParam UUID leaderboardId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        if (limit < 1 || limit > 100) {
+            throw new IllegalArgumentException("limit must be between 1 and 100");
+        }
+        return auditEventQueryRepository.recent(leaderboardId, limit).stream()
+                .map(event -> new RecentAuditEventResponse(
+                        event.eventTime(),
+                        event.eventId(),
+                        event.eventType(),
+                        UserIdCodec.format(event.userId()),
+                        event.delta(),
+                        Long.toString(event.apiKeyId()),
+                        event.idempotencyKey()
+                ))
+                .toList();
+    }
+
     /** 리더보드 점수 추이: 구간을 버킷으로 묶은 delta 합·건수. 누적은 클라이언트가 러닝 합으로 그린다. */
     @GetMapping("/trend")
     public List<AuditEventQueryRepository.TrendBucket> trend(
@@ -45,5 +68,16 @@ public class InternalAuditEventsController {
     }
 
     public record AuditEventCount(long count) {
+    }
+
+    public record RecentAuditEventResponse(
+            Instant eventTime,
+            String eventId,
+            String eventType,
+            String userId,
+            long delta,
+            String apiKeyId,
+            String idempotencyKey
+    ) {
     }
 }

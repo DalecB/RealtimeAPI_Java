@@ -607,6 +607,49 @@ button:disabled { opacity: 0.45; cursor: default; }
 .drift-note.active { color: var(--color-amber); }
 .hint { font-size: 13px; color: var(--color-text-faint); }
 
+.audit-row {
+  display: grid;
+  grid-template-columns: 105px 90px 70px 70px 75px minmax(140px, 0.7fr) minmax(220px, 1.3fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: 8px var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.audit-row:nth-child(odd) { background: rgba(255, 255, 255, 0.02); }
+.audit-head {
+  color: var(--color-text-faint);
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.audit-time { color: var(--color-text-dim); }
+.audit-type {
+  justify-self: start;
+  border-radius: var(--radius-sm);
+  padding: 2px 9px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+.audit-type.new { color: var(--color-blue); background: var(--color-blue-dim); }
+.audit-type.conflict { color: var(--color-orange); background: var(--color-orange-dim); }
+.audit-delta { color: var(--color-green); font-variant-numeric: tabular-nums; }
+.audit-id {
+  overflow: hidden;
+  color: var(--color-text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.audit-empty {
+  padding: var(--space-5);
+  color: var(--color-text-faint);
+  text-align: center;
+  font-size: 13px;
+}
+
 /* --- 메인: Kafka→PG 루프 표시 (눈에 띄게) --- */
 .metric-flow {
   display: flex;
