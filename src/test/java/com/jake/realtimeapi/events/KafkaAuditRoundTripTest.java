@@ -6,6 +6,8 @@ import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
 import com.jake.realtimeapi.events.relay.AuditRelayWorker;
+import com.jake.realtimeapi.events.relay.AuditTopicStatusReader;
+import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
 import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import com.jake.realtimeapi.leaderboards.domain.model.Leaderboard;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
@@ -87,6 +89,12 @@ class KafkaAuditRoundTripTest {
     @Autowired
     private AdminClient adminClient;
 
+    @Autowired
+    private AuditTopicStatusReader auditTopicStatusReader;
+
+    @Autowired
+    private AuditStreamStatusRepository auditStreamStatusRepository;
+
     @Test
     void processedEvent_isRelayedThroughKafka_andStoredInAuditEvents() {
         Fixture fixture = createFixture();
@@ -100,6 +108,7 @@ class KafkaAuditRoundTripTest {
                 .range(streamKey, Range.unbounded());
         assertEquals(1, streamRecords.size());
         String eventId = streamRecords.get(0).getId().getValue();
+        assertEquals(1L, auditStreamStatusRepository.getStatus(fixture.leaderboardId()).consumerGroupLag());
 
         auditRelayWorker.relayAll();
 
@@ -120,6 +129,7 @@ class KafkaAuditRoundTripTest {
         PendingMessagesSummary pending = redisTemplate.opsForStream().pending(streamKey, AuditRelayWorker.GROUP);
         assertNotNull(pending);
         assertEquals(0, pending.getTotalPendingMessages());
+        assertEquals(0L, auditStreamStatusRepository.getStatus(fixture.leaderboardId()).consumerGroupLag());
     }
 
     @Test
@@ -183,6 +193,8 @@ class KafkaAuditRoundTripTest {
                     eventJson(fixture, secondEventId, UUID.randomUUID())
             ).get();
             assertEquals(partition.partition(), second.getRecordMetadata().partition());
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                    assertTrue(auditTopicStatusReader.read().consumerLag() >= 1L));
 
             listener.start();
 
@@ -192,6 +204,7 @@ class KafkaAuditRoundTripTest {
                 assertEquals(1, rows.stream().filter(row -> row.eventId().equals(firstEventId)).count());
                 assertEquals(1, rows.stream().filter(row -> row.eventId().equals(secondEventId)).count());
                 assertTrue(committedOffset(partition) >= second.getRecordMetadata().offset() + 1);
+                assertEquals(0L, auditTopicStatusReader.read().consumerLag());
             });
         } finally {
             if (!listener.isRunning()) {

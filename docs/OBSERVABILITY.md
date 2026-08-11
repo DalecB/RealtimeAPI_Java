@@ -45,6 +45,7 @@ docker compose up -d postgres redis app prometheus grafana
 
 ### Streams
 - `stream_pending_entries`
+- `stream_consumer_group_lag`
 - `stream_length`
 
 ## 3. Grafana 대시보드
@@ -80,7 +81,9 @@ docker compose up -d postgres redis app prometheus grafana
 
 ## 5. 주의할 점
 
-- `stream_pending_entries`는 relay 컨슈머 그룹(`audit-relay`)의 미처리(PEL) 건수입니다. relay가 밀리거나 멈추면 자라므로 relay 건강 지표로 씁니다. relay가 꺼져 있으면 그룹이 없어 `0`으로 나옵니다.
-  - `stream_length = audit stream length (XLEN)`. 리텐션(트림)의 결과이지 밀린 양이 아닙니다.
+- `stream_consumer_group_lag`은 릴레이 컨슈머 그룹이 아직 읽지 않은 건수입니다.
+- `stream_pending_entries`는 릴레이가 읽었지만 XACK하지 않은 PEL 건수입니다.
+- 릴레이 상태는 두 값을 함께 봅니다. 읽기 전에 멈추면 `stream_pending_entries`는 증가하지 않습니다.
+- `stream_length`는 이미 처리했지만 아직 트림하지 않은 항목도 포함하므로 미처리 건수로 사용하지 않습니다.
 - `snapshot status`는 메모리 tracker 기반이라 앱 재시작 시 마지막 성공 시각은 초기화됩니다.
 - recovery 검증 스크립트는 compose의 `app` 컨테이너를 재시작하는 방식이라, `bootRun` 로컬 프로세스가 아니라 compose app 기준으로 사용해야 합니다.

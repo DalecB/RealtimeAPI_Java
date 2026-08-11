@@ -26,5 +26,14 @@ public class StreamsMetricsBinder {
                     }
                 })
                 .register(meterRegistry);
+
+        Gauge.builder("stream_consumer_group_lag", getStreamsStatusUseCase, useCase -> {
+                    try {
+                        return useCase.getStatus().consumerGroupLag();
+                    } catch (RuntimeException exception) {
+                        return -1L;
+                    }
+                })
+                .register(meterRegistry);
     }
 }

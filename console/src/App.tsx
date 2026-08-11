@@ -30,6 +30,15 @@ const MODE_DEFS = [
 
 type FireMode = (typeof MODE_DEFS)[number]['key']
 
+interface E2eBaseline {
+  startedAt: number
+  kafkaMessages: number
+  storedRows: number
+}
+
+const K6_E2E_COMMAND =
+  'USER_COUNT=1000 WRITE_RPS=1000 DURATION=5m bash scripts/run-k6.sh run --summary-export artifacts/k6/pending/t1-current-e2e.json k6/t1-fixed-1000-write.js'
+
 const OUTCOME_META: Record<FireOutcome, { label: string; cls: string }> = {
   NEW: { label: 'New', cls: 'new' },
   REPLAY: { label: 'Replay', cls: 'replay' },
@@ -86,21 +95,18 @@ export default function App() {
   const [results, setResults] = useState<FireResult[]>([])
   const [totals, setTotals] = useState<Record<FireOutcome, number>>(ZERO_TOTALS)
   const [tab, setTab] = useState<'ranking' | 'idem' | 'audit'>('ranking')
+  const [e2eBaseline, setE2eBaseline] = useState<E2eBaseline | null>(null)
 
   const breaker = usePoll(getBreakerStatus)
-  const streams = usePoll(getStreamsStatus)
+  const streams = usePoll(getStreamsStatus, 2000)
   const stored = usePoll(getAuditEventCount, 1000)
-  const auditTopic = usePoll(getAuditTopicStatus)
+  const auditTopic = usePoll(getAuditTopicStatus, 2000)
   const deps = usePoll(getDepsHealth, 2000)
   const snapStatus = usePoll(getSnapshotStatus, 1000)
   // 브레이커 타임라인 창 = 80 샘플 × 0.5s = 40s. 10초 간격으로 축 눈금이 딱 떨어진다.
   const breakerStates = useRingBuffer(breaker?.state ?? null, 80)
   const streamLengths = useRingBuffer(streams?.streamLength ?? null, 240)
   const producedSeries = useRingBuffer(auditTopic?.totalMessages ?? null, 240)
-  // Kafka는 누적 총계라 그대로 그리면 납작하다. 폴 사이 증가분(옮긴 건수)을 그려 relay가 옮기는 순간을 보인다.
-  const kafkaThroughput = producedSeries.map((v, i) => (i === 0 ? 0 : Math.max(0, v - producedSeries[i - 1])))
-  const kafkaPeak = kafkaThroughput.length ? Math.max(...kafkaThroughput) : 0
-  const kafkaNow = kafkaThroughput.at(-1) ?? 0
   const tops = usePoll(() => (session ? getTops(session.leaderboardId, 50) : Promise.resolve(null)), 1000)
   const snapshot = usePoll(
     () => (session ? getSnapshotEntries(session.leaderboardId).catch(() => null) : Promise.resolve(null)),
@@ -113,6 +119,25 @@ export default function App() {
 
   const latencies = results.slice(-120).map((r) => r.latencyMs)
   const lastBlocked = [...results].reverse().find((r) => r.outcome === 'BLOCKED_503')
+  const e2eReady = Boolean(
+    streams &&
+      auditTopic &&
+      stored &&
+      auditTopic.totalMessages >= 0 &&
+      auditTopic.consumerLag === 0 &&
+      streams.consumerGroupLag === 0 &&
+      streams.pendingEntries === 0,
+  )
+  const e2eKafkaDelta = e2eBaseline && auditTopic ? Math.max(0, auditTopic.totalMessages - e2eBaseline.kafkaMessages) : 0
+  const e2eStoredDelta = e2eBaseline && stored ? Math.max(0, stored.count - e2eBaseline.storedRows) : 0
+  const e2eCaughtUp = Boolean(
+    e2eBaseline &&
+      e2eKafkaDelta > 0 &&
+      e2eKafkaDelta === e2eStoredDelta &&
+      streams?.consumerGroupLag === 0 &&
+      streams.pendingEntries === 0 &&
+      auditTopic?.consumerLag === 0,
+  )
 
   const preview =
     mode === 'single'
@@ -247,7 +272,7 @@ export default function App() {
         <section className="section">
           <div className="section-title">
             Live Metrics <span className={`dot ${breaker ? 'ok' : 'down'} pulse`} />
-            <span className="meta">0.5s poll</span>
+            <span className="meta">0.5–2s poll</span>
           </div>
           <div className="metrics-grid">
             <div className="metric-card">
@@ -284,19 +309,22 @@ export default function App() {
             <div className="metric-card">
               <div className="metric-head">
                 <span className="title">Audit Stream (outbox)</span>
-                <span className="value plain">len {streams?.streamLength ?? '—'} · pending {streams?.pendingEntries ?? '—'}</span>
+                <span className="value plain">
+                  len {streams?.streamLength ?? '—'} · unread {streams?.consumerGroupLag ?? '—'} · unacked{' '}
+                  {streams?.pendingEntries ?? '—'}
+                </span>
               </div>
               <Sparkline values={streamLengths} stroke="var(--color-blue)" fill="rgba(10,132,255,.12)" />
               <div className="metric-note">
-                len = 쌓인 감사 기록(relay가 빼감) · pending = 아직 못 옮긴 건수(<span className="mono">relay 밀림</span>)
+                len = 트림 전 전체 길이 · unread = 릴레이가 아직 읽지 않은 건수 · unacked = 읽었지만 XACK 전인 건수
               </div>
             </div>
             <div className="metric-card">
               <div className="metric-head">
                 <span className="title">Kafka Delivery</span>
-                <span className="value plain">peak {kafkaPeak} · now {kafkaNow}</span>
+                <span className="value plain">consumer lag {auditTopic?.consumerLag ?? '—'}</span>
               </div>
-              <Sparkline values={kafkaThroughput} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
+              <Sparkline values={producedSeries} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
               <div className="metric-flow">
                 <span>Kafka produced</span>
                 <b>{auditTopic?.totalMessages ?? '—'}</b>
@@ -304,6 +332,7 @@ export default function App() {
                 <span>PG stored</span>
                 <b className="stored">{stored?.count ?? '—'}</b>
               </div>
+              <div className="metric-note">누적 발행량과 PostgreSQL 저장량 · lag = 아직 처리하지 않은 Kafka 메시지</div>
             </div>
             <div className="metric-card">
               <div className="metric-head">
@@ -322,6 +351,74 @@ export default function App() {
                   ? 'Fail-fast: breaker rejects before Redis I/O — no thread pile-up'
                   : 'Hot path: Lua (idem check + ZINCRBY + XADD), single round trip'}
               </div>
+            </div>
+          </div>
+
+          <div className={`card e2e-observer ${e2eCaughtUp ? 'caught-up' : ''}`}>
+            <div className="card-title-row">
+              <span className="title">k6 E2E Observer</span>
+              <span
+                className={`chip ${e2eBaseline && e2eKafkaDelta > 0 && !e2eCaughtUp ? 'alert' : ''}`}
+                aria-live="polite"
+              >
+                {!e2eBaseline
+                  ? e2eReady
+                    ? 'ready'
+                    : 'clear backlog first'
+                  : e2eKafkaDelta === 0
+                    ? 'observing'
+                    : e2eCaughtUp
+                      ? 'caught up'
+                      : 'processing'}
+              </span>
+              <button
+                className={e2eBaseline ? 'btn-ghost' : 'btn-primary'}
+                disabled={!e2eBaseline && !e2eReady}
+                onClick={() =>
+                  e2eBaseline
+                    ? setE2eBaseline(null)
+                    : setE2eBaseline({
+                        startedAt: Date.now(),
+                        kafkaMessages: auditTopic!.totalMessages,
+                        storedRows: stored!.count,
+                      })
+                }
+              >
+                {e2eBaseline ? 'Reset' : 'Start baseline'}
+              </button>
+            </div>
+
+            <code className="e2e-command">{K6_E2E_COMMAND}</code>
+
+            <div className="e2e-grid">
+              <div className="e2e-stat">
+                <span>Kafka received</span>
+                <b>{e2eKafkaDelta.toLocaleString()}</b>
+                <small>since baseline</small>
+              </div>
+              <div className="e2e-stat">
+                <span>PostgreSQL stored</span>
+                <b>{e2eStoredDelta.toLocaleString()}</b>
+                <small>since baseline</small>
+              </div>
+              <div className="e2e-stat">
+                <span>Redis unread</span>
+                <b>{streams?.consumerGroupLag ?? '—'}</b>
+                <small>group lag</small>
+              </div>
+              <div className="e2e-stat">
+                <span>Redis unacked</span>
+                <b>{streams?.pendingEntries ?? '—'}</b>
+                <small>PEL pending</small>
+              </div>
+              <div className="e2e-stat">
+                <span>Kafka unprocessed</span>
+                <b>{auditTopic?.consumerLag ?? '—'}</b>
+                <small>consumer lag</small>
+              </div>
+            </div>
+            <div className="metric-note">
+              콘솔은 부하를 만들지 않습니다. 기준점을 시작한 뒤 위 명령을 터미널에서 실행하고, k6 종료 후 모든 lag이 0이며 Kafka와 PostgreSQL 증가량이 같은지 확인합니다.
             </div>
           </div>
         </section>

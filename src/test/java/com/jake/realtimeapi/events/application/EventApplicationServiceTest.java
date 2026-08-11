@@ -44,12 +44,13 @@ class EventApplicationServiceTest {
         UUID leaderboardOne = UUID.randomUUID();
         UUID leaderboardTwo = UUID.randomUUID();
         when(leaderboardRepository.findAllIds()).thenReturn(List.of(leaderboardOne, leaderboardTwo));
-        when(auditStreamStatusRepository.getStatus(leaderboardOne)).thenReturn(new StreamsStatus(0, 3));
-        when(auditStreamStatusRepository.getStatus(leaderboardTwo)).thenReturn(new StreamsStatus(0, 5));
+        when(auditStreamStatusRepository.getStatus(leaderboardOne)).thenReturn(new StreamsStatus(1, 3, 2));
+        when(auditStreamStatusRepository.getStatus(leaderboardTwo)).thenReturn(new StreamsStatus(2, 5, 4));
 
         StreamsStatus result = eventApplicationService.getStatus();
 
-        assertEquals(0L, result.pendingEntries());
+        assertEquals(3L, result.pendingEntries());
         assertEquals(8L, result.streamLength());
+        assertEquals(6L, result.consumerGroupLag());
     }
 }

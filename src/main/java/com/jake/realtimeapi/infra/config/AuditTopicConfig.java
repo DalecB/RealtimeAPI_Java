@@ -17,6 +17,7 @@ public class AuditTopicConfig {
 
     /** relay가 produce할 때, 컨슈머가 subscribe할 때 참조하는 토픽 이름. */
     public static final String AUDIT_TOPIC = "lb-audit-events";
+    public static final String AUDIT_CONSUMER_GROUP = "audit-trend";
 
     // 파티션 3: 처리량이 아니라 한 컨슈머 그룹에서 병렬로 돌릴 인스턴스 수의 상한이다.
     // 파티션은 줄일 수 없고, 늘리면 key→partition 매핑이 바뀌어 순서 보장이 깨진다.

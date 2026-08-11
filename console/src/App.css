@@ -233,6 +233,35 @@
 .metric-head .value.half_open { color: var(--color-amber); }
 .metric-head .value.plain { color: var(--color-text-dim); font-weight: 600; }
 .metric-note { font-size: 12px; color: var(--color-text-faint); }
+
+.e2e-observer.caught-up { border-color: rgba(48, 209, 88, 0.45); }
+.e2e-observer .card-title-row button { margin-left: auto; }
+.e2e-command {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--color-text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.e2e-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-3);
+}
+.e2e-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.e2e-stat span { color: var(--color-text-dim); font-size: 12px; font-weight: 600; }
+.e2e-stat b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.e2e-stat small { color: var(--color-text-faint); font-family: var(--font-mono); }
 .metric-note .mono { font-family: var(--font-mono); }
 
 .breaker-timeline {

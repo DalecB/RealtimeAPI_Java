@@ -18,7 +18,7 @@
 - `T3/T4`를 다시 깨끗하게 측정할 때는 `docker compose down -v`로 Redis volume까지 비우는 편이 안전합니다.
 
 ```bash
-docker compose up -d postgres redis app prometheus renderer grafana
+docker compose up -d --build postgres redis kafka app prometheus renderer grafana
 ```
 
 ```bash
@@ -57,6 +57,54 @@ USER_COUNT=300 DURATION=5m bash scripts/run-k6.sh run --summary-export artifacts
 bash scripts/report-k6-t1.sh artifacts/k6/t1-fixed-300.json
 ```
 
+## 현재 Kafka 파이프라인 E2E 검증
+
+기존 T1 결과는 HTTP SLO를 판정하고, Ops Console은 같은 부하가 `Redis Stream → Kafka → PostgreSQL`까지 처리되는지 확인합니다. 콘솔은 부하를 발생시키지 않습니다.
+
+1. 전체 스택을 실행합니다.
+
+```bash
+docker compose up -d --build postgres redis kafka app prometheus renderer grafana
+```
+
+2. Kafka 컨슈머를 2개 인스턴스로 검증하려면 같은 이미지로 컨슈머 전용 인스턴스를 하나 더 실행합니다. 릴레이·스냅샷·콜드 스타트 복구는 app-1에서만 실행합니다.
+
+```bash
+docker compose run -d --rm \
+  --name realtime-api-consumer \
+  --no-deps \
+  -e EVENTS_RELAY_ENABLED=false \
+  -e SNAPSHOTS_WORKER_ENABLED=false \
+  -e SNAPSHOTS_RECOVERY_ENABLED=false \
+  app
+```
+
+3. [http://localhost:8080/console/](http://localhost:8080/console/)에서 `k6 E2E Observer`의 `Start baseline`을 누릅니다. Redis와 Kafka 미처리 건수가 0일 때만 시작할 수 있습니다.
+
+4. 별도 터미널에서 현재 코드 기준 1,000 TPS 테스트를 실행합니다.
+
+```bash
+USER_COUNT=1000 WRITE_RPS=1000 DURATION=5m \
+bash scripts/run-k6.sh run \
+  --summary-export artifacts/k6/pending/t1-current-e2e.json \
+  k6/t1-fixed-1000-write.js
+```
+
+5. 결과는 두 곳에서 나눠 확인합니다.
+
+- k6: 약 1,000 RPS, p99 `< 50ms`, 오류율 `< 0.1%`
+- Ops Console: `Redis unread=0`, `Redis unacked=0`, `Kafka unprocessed=0`
+- Ops Console: `Kafka received`와 `PostgreSQL stored` 증가량 일치
+- 콘솔의 `caught up`은 메시지 수가 일치하고 모든 미처리 건수가 0일 때 표시됩니다.
+
+6. 추가 컨슈머를 종료합니다. `--rm`으로 실행했으므로 종료 후 컨테이너도 제거됩니다.
+
+```bash
+docker stop realtime-api-consumer
+```
+
+이 검증은 현재 로컬 단일 브로커 구성의 처리 결과입니다. 프로덕션 Kafka 복제 구성이나 API 요청의 멀티 인스턴스 분산까지 검증한 것은 아닙니다.
+
 ## T1 Ramp: Hot Path Write Throughput
 
 PRD 요구:
@@ -81,7 +129,7 @@ WRITE_RPS=800 READ_RPS=200 DURATION=10m bash scripts/run-k6.sh run k6/t3-mixed-w
 
 ```bash
 docker compose down -v
-docker compose up -d --build postgres redis app prometheus renderer grafana
+docker compose up -d --build postgres redis kafka app prometheus renderer grafana
 
 USER_COUNT=1000 WRITE_RPS=800 READ_RPS=200 DURATION=10m \
 bash scripts/run-k6.sh run \

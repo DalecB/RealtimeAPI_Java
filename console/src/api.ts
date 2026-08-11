@@ -27,11 +27,13 @@ export interface BreakerStatus {
 export interface StreamsStatus {
   pendingEntries: number
   streamLength: number
+  consumerGroupLag: number
 }
 
 export interface AuditTopicStatus {
   totalMessages: number
   retained: number
+  consumerLag: number
 }
 
 export interface AuditEventItem {

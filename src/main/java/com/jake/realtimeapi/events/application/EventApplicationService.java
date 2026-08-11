@@ -71,13 +71,15 @@ public class EventApplicationService implements GetTopRanksUseCase, GetUserRankU
     public StreamsStatus getStatus() {
         long pendingEntries = 0L;
         long streamLength = 0L;
+        long consumerGroupLag = 0L;
 
         for (var leaderboardId : leaderboardRepository.findAllIds()) {
             StreamsStatus status = auditStreamStatusRepository.getStatus(leaderboardId);
             pendingEntries += status.pendingEntries();
             streamLength += status.streamLength();
+            consumerGroupLag += status.consumerGroupLag();
         }
 
-        return new StreamsStatus(pendingEntries, streamLength);
+        return new StreamsStatus(pendingEntries, streamLength, consumerGroupLag);
     }
 }

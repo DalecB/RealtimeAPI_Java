@@ -11,7 +11,7 @@ export default defineConfig({
   },
   server: {
     proxy: Object.fromEntries(
-      ['/events', '/internal', '/users', '/auth', '/projects', '/leaderboards'].map((p) => [
+      ['/actuator', '/events', '/internal', '/users', '/auth', '/projects', '/leaderboards'].map((p) => [
         p,
         { target: 'http://localhost:8080', changeOrigin: true },
       ]),

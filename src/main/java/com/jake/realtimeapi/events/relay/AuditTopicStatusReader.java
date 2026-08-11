@@ -5,6 +5,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,19 +50,39 @@ public class AuditTopicStatusReader {
                 earliest.put(tp, OffsetSpec.earliest());
             });
 
-            long produced = sumOffsets(adminClient.listOffsets(latest).all().get());
-            long retained = produced - sumOffsets(adminClient.listOffsets(earliest).all().get());
-            return new AuditTopicStatus(produced, retained);
+            Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = adminClient.listOffsets(latest).all().get();
+            Map<TopicPartition, ListOffsetsResultInfo> earliestOffsets = adminClient.listOffsets(earliest).all().get();
+            long produced = sumOffsets(latestOffsets);
+            long retained = produced - sumOffsets(earliestOffsets);
+            return new AuditTopicStatus(produced, retained, consumerLag(latestOffsets, earliestOffsets));
         } catch (Exception ex) {
             log.warn("audit topic status read failed", ex);
-            return new AuditTopicStatus(-1L, -1L);
+            return new AuditTopicStatus(-1L, -1L, -1L);
         }
+    }
+
+    private long consumerLag(
+            Map<TopicPartition, ListOffsetsResultInfo> latestOffsets,
+            Map<TopicPartition, ListOffsetsResultInfo> earliestOffsets
+    ) throws Exception {
+        Map<TopicPartition, OffsetAndMetadata> committed = adminClient
+                .listConsumerGroupOffsets(AuditTopicConfig.AUDIT_CONSUMER_GROUP)
+                .partitionsToOffsetAndMetadata()
+                .get();
+
+        long lag = 0L;
+        for (var entry : latestOffsets.entrySet()) {
+            OffsetAndMetadata offset = committed.get(entry.getKey());
+            long consumed = offset == null ? earliestOffsets.get(entry.getKey()).offset() : offset.offset();
+            lag += Math.max(0L, entry.getValue().offset() - consumed);
+        }
+        return lag;
     }
 
     private long sumOffsets(Map<TopicPartition, ListOffsetsResultInfo> offsets) {
         return offsets.values().stream().mapToLong(ListOffsetsResultInfo::offset).sum();
     }
 
-    public record AuditTopicStatus(long totalMessages, long retained) {
+    public record AuditTopicStatus(long totalMessages, long retained, long consumerLag) {
     }
 }
