@@ -33,7 +33,7 @@ public class AuditEventConsumer {
         this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(topics = AuditTopicConfig.AUDIT_TOPIC, groupId = "audit-trend")
+    @KafkaListener(id = "audit-trend-consumer", topics = AuditTopicConfig.AUDIT_TOPIC, groupId = "audit-trend")
     public void consume(List<ConsumerRecord<String, String>> records) {
         List<AuditEventRepository.AuditEventRow> rows = new ArrayList<>(records.size());
         for (ConsumerRecord<String, String> record : records) {

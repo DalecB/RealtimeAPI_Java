@@ -14,6 +14,9 @@ import com.jake.realtimeapi.projects.domain.repository.ProjectRepository;
 import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.users.domain.model.User;
 import com.jake.realtimeapi.users.domain.repository.UserRepository;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,7 +25,10 @@ import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.PendingMessagesSummary;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.MessageListenerContainer;
+import org.springframework.kafka.support.SendResult;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +40,7 @@ import java.util.UUID;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 실제 Redis·Kafka·PostgreSQL을 사용하는 audit event 왕복 통합 테스트. */
 @SpringBootTest(properties = {
@@ -73,6 +80,12 @@ class KafkaAuditRoundTripTest {
 
     @Autowired
     private AuditEventQueryRepository auditEventQueryRepository;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;
+
+    @Autowired
+    private AdminClient adminClient;
 
     @Test
     void processedEvent_isRelayedThroughKafka_andStoredInAuditEvents() {
@@ -133,6 +146,60 @@ class KafkaAuditRoundTripTest {
         });
     }
 
+    @Test
+    void listenerRestart_resumesFromCommittedOffset() throws Exception {
+        Fixture fixture = createFixture();
+        String key = fixture.leaderboardId().toString();
+        long now = Instant.now().toEpochMilli();
+        String firstEventId = now + "-0";
+        String secondEventId = now + "-1";
+
+        SendResult<String, String> first = kafkaTemplate.send(
+                AuditTopicConfig.AUDIT_TOPIC,
+                key,
+                eventJson(fixture, firstEventId, UUID.randomUUID())
+        ).get();
+        TopicPartition partition = new TopicPartition(
+                AuditTopicConfig.AUDIT_TOPIC,
+                first.getRecordMetadata().partition()
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(1, findAuditRows(fixture.leaderboardId()).size());
+            assertTrue(committedOffset(partition) >= first.getRecordMetadata().offset() + 1);
+        });
+
+        MessageListenerContainer listener = kafkaListenerEndpointRegistry
+                .getListenerContainer("audit-trend-consumer");
+        assertNotNull(listener);
+        listener.stop();
+
+        try {
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
+
+            SendResult<String, String> second = kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    key,
+                    eventJson(fixture, secondEventId, UUID.randomUUID())
+            ).get();
+            assertEquals(partition.partition(), second.getRecordMetadata().partition());
+
+            listener.start();
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                List<AuditEventQueryRepository.RecentAuditEvent> rows = findAuditRows(fixture.leaderboardId());
+                assertEquals(2, rows.size());
+                assertEquals(1, rows.stream().filter(row -> row.eventId().equals(firstEventId)).count());
+                assertEquals(1, rows.stream().filter(row -> row.eventId().equals(secondEventId)).count());
+                assertTrue(committedOffset(partition) >= second.getRecordMetadata().offset() + 1);
+            });
+        } finally {
+            if (!listener.isRunning()) {
+                listener.start();
+            }
+        }
+    }
+
     private String eventJson(Fixture fixture, String eventId, UUID idempotencyKey) throws Exception {
         Map<String, String> event = new LinkedHashMap<>();
         event.put("eventId", eventId);
@@ -155,6 +222,14 @@ class KafkaAuditRoundTripTest {
 
     private List<AuditEventQueryRepository.RecentAuditEvent> findAuditRows(UUID leaderboardId) {
         return auditEventQueryRepository.recent(leaderboardId, 100);
+    }
+
+    private long committedOffset(TopicPartition partition) throws Exception {
+        OffsetAndMetadata committed = adminClient.listConsumerGroupOffsets("audit-trend")
+                .partitionsToOffsetAndMetadata()
+                .get()
+                .get(partition);
+        return committed == null ? -1L : committed.offset();
     }
 
     private record Fixture(long userId, UUID leaderboardId) {
