@@ -64,7 +64,7 @@
 ### 3.1 스택 실행
 
 ```bash
-docker compose up -d postgres redis app prometheus renderer grafana
+REDIS_MAXMEMORY=256mb docker compose up -d postgres redis kafka app prometheus renderer grafana
 ```
 
 Redis는 named volume을 사용하므로, `docker compose down`만으로는 benchmark key가 남을 수 있다.
@@ -72,7 +72,7 @@ Redis는 named volume을 사용하므로, `docker compose down`만으로는 benc
 
 ```bash
 docker compose down -v
-docker compose up -d --build postgres redis app prometheus renderer grafana
+REDIS_MAXMEMORY=256mb docker compose up -d --build postgres redis kafka app prometheus renderer grafana
 ```
 
 로컬에 `k6`가 없으면 아래 래퍼를 사용한다.
@@ -88,12 +88,11 @@ bash scripts/run-k6.sh run k6/t1-hot-path-write.js
 
 즉 별도 설정을 하지 않으면 benchmark 중 rate limit 영향은 사실상 제거된다.
 
-추가로 compose의 Redis는 benchmark 편의상 `REDIS_MAXMEMORY=${REDIS_MAXMEMORY:-1gb}`를 사용한다.
-PRD 기본 가정은 `256MB`지만, 반복 benchmark로 인한 synthetic idempotency key 누적이 측정 자체를 오염시키지 않도록 기본값을 상향했다.
-필요하면 아래처럼 다시 줄일 수 있다.
+compose의 Redis 개발 기본값은 반복 실행 중 synthetic idempotency key가 누적되는 상황을 고려해 `REDIS_MAXMEMORY=${REDIS_MAXMEMORY:-1gb}`를 사용한다.
+공식 벤치마크 기준은 PRD와 동일한 `256MB`다. 최종 산출물을 수집할 때는 아래처럼 환경값을 반드시 명시한다.
 
 ```bash
-REDIS_MAXMEMORY=256mb docker compose up -d redis
+REDIS_MAXMEMORY=256mb docker compose up -d redis kafka app
 ```
 
 ### 3.2 산출물 폴더 생성

@@ -19,7 +19,20 @@ services:
   redis:
     image: redis:7
     container_name: realtime-redis
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "${REDIS_MAXMEMORY:-1gb}", "--maxmemory-policy", "noeviction"]
+    # 개발 기본값은 반복 실행 중 데이터 누적을 고려해 1GB.
+    # 공식 벤치마크는 REDIS_MAXMEMORY=256mb를 명시.
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--maxmemory",
+        "${REDIS_MAXMEMORY:-1gb}",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
     ports:
       - "6370:6379"
     volumes:
@@ -57,7 +70,11 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1",
+        ]
       interval: 5s
       timeout: 5s
       retries: 30

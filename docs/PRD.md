@@ -55,13 +55,13 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 - 실시간 이벤트 로그 전체를 DB에 적재하지 않고, **Top-N snapshot + 운영 지표 중심**으로 저장
 - 성능은 TPS 자랑이 아니라 **SLO(p99/오류율/회복 시간)** 기반으로 정의
 - 배포/재현성: `docker compose up` 이후 **5분 내 실행/테스트 가능**해야 함
-- 메시지 브로커: 1차 스코프에서 Kafka 제외. 대신 **Redis Streams**로 감사 로그(Audit Log) 파이프라인 구성 (→ ADR-009에서 재검토해 Kafka 채택으로 대체됨)
+- 메시지 브로커: 1차 스코프에서는 Redis Streams만 사용했으나, ADR-009와 Phase 2에서 **Redis Streams 아웃박스 → Kafka → PostgreSQL** 감사 로그 파이프라인으로 확장
 
 ---
 
 ## 1. SLO (Service Level Objectives)
 
-> "Production-ready"는 주장이 아니라 수치로 증명해야 한다.
+> 상용 운영 수준을 직접 주장하지 않는다. 이 문서에 선언한 SLO와 장애 범위를 수치와 테스트로 검증한다.
 >
 > 아래 SLO를 기준으로 k6 부하 테스트 결과를 평가한다.
 
@@ -75,12 +75,12 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 
 ### 1.2 운영 SLO
 
-| 지표                               | 목표값                  | 측정 방법                                |
-| ---------------------------------- | ----------------------- | ---------------------------------------- |
-| Snapshot Lag                       | < 30초 (30초 주기 기준) | `snapshot_lag_seconds` Prometheus 메트릭 |
-| Snapshot 성공률                    | > 99%                   | `snapshot_failure_total` 기준            |
-| Redis 장애 시 Fail Fast 응답       | < 500ms                 | Circuit Breaker OPEN 상태 기준           |
-| Worker 재시작 후 Lag catch-up 시간 | < 2분                   | Streams consumer lag 기준                |
+| 지표                            | 목표값                  | 측정 방법                                |
+| ------------------------------- | ----------------------- | ---------------------------------------- |
+| Snapshot Lag                    | < 30초 (30초 주기 기준) | `snapshot_lag_seconds` Prometheus 메트릭 |
+| Snapshot 성공률                 | > 99%                   | `snapshot_failure_total` 기준            |
+| Redis 장애 시 Fail Fast 응답    | < 500ms                 | Circuit Breaker OPEN 상태 기준           |
+| Worker 재시작 후 적체 해소 시간 | < 2분                   | Streams 컨슈머 지연 기준                 |
 
 ### 1.3 Idempotency SLO
 
@@ -133,27 +133,21 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
     ▼
 [API Server (Spring Boot)]
     │
-    ├──[Hot Path]──────────────────────────────────────────────────────────┐
-    │       │                                                              │
-    │   Lua Script (원자적 실행)                                              │
-    │       ├── Idempotency Key 검사 (GET)                                  │
-    │       ├── ZINCRBY (ZSET 점수 업데이트)                                  │
-    │       ├── Idempotency Key 저장 (SET EX {TTL})                         │
-    │       └── XADD (Redis Streams - Audit Log append)                    │
-    │                                                                      │
-    │   [Redis]  ←── Source of Truth                                       │
-    │       ├── ZSET: lb:{leaderboardId}:z                                 │
-    │       ├── STRING: lb:{leaderboardId}:idem:{eventUuid} (TTL)          │
-    │       └── STREAM: lb:{leaderboardId}:events                          │
-    │                                                                      │
-    └──[Cold Path]─────────────────────────────────────────────────────────┘
-            │
-    [Snapshot Worker (Spring @Scheduled + PostgreSQL Advisory Lock)]
-            │
-            ├── Redis ZREVRANGE Top-1000 조회
-            ├── Empty guard (데이터 0건 시 저장 금지)
-            ├── PostgreSQL Upsert (snapshot_batches + snapshot_entries)
-            └── snapshot_lag_seconds 갱신
+    ├──[Hot Path]
+    │       └── Lua Script (Idempotency GET + ZINCRBY + SET EX + XADD)
+    │               └── [Redis]  ←── Source of Truth
+    │                       ├── ZSET: lb:{leaderboardId}:z
+    │                       ├── STRING: lb:{leaderboardId}:idem:{eventUuid}
+    │                       └── STREAM: lb:{leaderboardId}:events (outbox)
+    │
+    ├──[Audit Path]
+    │       └── AuditRelayWorker → [Kafka: lb-audit-events]
+    │                                   └── AuditEventConsumer
+    │                                           └── PostgreSQL audit_events
+    │
+    └──[Cold Path]
+            └── Snapshot Worker (PostgreSQL Advisory Lock)
+                    └── Redis Top-1000 → PostgreSQL snapshot upsert
 
     [PostgreSQL]  ←── Source of Record
         ├── projects (프로젝트 정의)
@@ -161,13 +155,16 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
         ├── api_keys (인증/quota 관리)
         ├── snapshot_batches (스냅샷 메타)
         ├── snapshot_entries (Top-1000 스냅샷 행)
+        ├── audit_events (Kafka에서 소비한 원본 감사 이벤트)
         └── usage_stats (운영 지표)
 ```
 
 ### 핵심 의도
 
 - 실시간 트래픽은 Redis에서 처리하여 성능/확장성 확보
-- PostgreSQL은 운영/관리/리포팅을 위한 기록 저장소로 활용
+- Redis Streams는 Lua 원자성 안에서 감사 이벤트를 먼저 남기는 아웃박스로 사용
+- Kafka는 감사 이벤트 전달과 컨슈머별 처리 위치를 담당하고, PostgreSQL은 조회 가능한 원본 감사 이벤트를 저장
+- PostgreSQL snapshot은 Redis 콜드 스타트 복구 기준으로 사용
 - Strong Consistency 대신 Eventually Consistent 채택, **Snapshot Lag를 1급 지표로 관리**
 
 ---
@@ -209,7 +206,26 @@ API Server
   └── PostgreSQL에 직접 Write 없음
 ```
 
-### 4.2 Read Flow (랭킹 조회)
+### 4.2 Audit Flow (감사 이벤트 전달)
+
+```
+Redis Stream: lb:{leaderboardId}:events
+  │
+  ├── AuditRelayWorker가 현재 릴레이의 미확인 메시지를 먼저 재처리
+  ├── 새 메시지를 읽어 Kafka `lb-audit-events`에 발행
+  └── 발행 성공을 확인한 메시지만 XACK
+          │
+          ▼
+Kafka consumer group: audit-trend
+  │
+  ├── auto-commit 비활성화, 배치 처리 완료 후 오프셋 커밋
+  └── PostgreSQL audit_events 저장
+          └── UNIQUE (leaderboard_id, event_id)로 중복 저장 방지
+```
+
+Phase 2의 릴레이 범위는 단일 인스턴스와 고정 컨슈머 이름이다. 중단된 다른 릴레이가 남긴 미처리 메시지 인계와 처리 불가 메시지 보관은 Phase 3 예정 범위다.
+
+### 4.3 Read Flow (랭킹 조회)
 
 ```
 실시간 Top-N 조회 (Hot):
@@ -224,10 +240,10 @@ API Server
 
 운영/정합성 검증 (Internal):
   ├── Snapshot 상태: snapshot_lag_seconds 조회
-  └── Streams 상태: consumer group lag / pending entries
+  └── Streams 상태: 릴레이 미수신 건수 / 미확인 건수
 ```
 
-### 4.3 Snapshot Flow (Cold Path)
+### 4.4 Snapshot Flow (Cold Path)
 
 ```
 Snapshot Worker (30초 주기)
@@ -686,7 +702,8 @@ T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행
 
 **Streams**
 
-- `stream_pending_entries`: relay 컨슈머 그룹(`audit-relay`)의 미처리(PEL) 건수. relay가 밀리거나 멈추면 자라므로 relay 건강 지표다
+- `stream_consumer_group_lag`: 릴레이 컨슈머 그룹(`audit-relay`)이 아직 읽지 않은 메시지 건수
+- `stream_pending_entries`: 릴레이가 읽었지만 아직 XACK하지 않은 메시지 건수(XPENDING)
 - `stream_length`: audit stream 길이(XLEN). 리텐션의 결과이지 밀린 양이 아니다
 
 ### Logs (Structured JSON)
@@ -791,13 +808,19 @@ GET /internal/snapshot/status
   → { "lastSuccessfulSnapshotAt": "ISO8601", "snapshotLagSeconds": number }
 
 GET /internal/streams/status
-  → { "pendingEntries": number, "streamLength": number }
+  → { "pendingEntries": number, "streamLength": number, "consumerGroupLag": number }
+
+GET /internal/kafka/audit-topic/status
+  → { "totalMessages": number, "retained": number, "consumerLag": number }
+
+GET /internal/audit-events/count
+  → { "count": number }
 
 GET /internal/circuit-breaker/status
   → { "state": "CLOSED|HALF_OPEN|OPEN", "failureRate": number }
 ```
 
-> **현재 구현 메모**: `pendingEntries`는 relay 컨슈머 그룹(`audit-relay`)의 XPENDING 건수 — relay가 받았지만 아직 Kafka로 못 옮긴 양이다. `streamLength`는 stream 길이(XLEN)로 리텐션의 결과다. 상세는 [SPIKE-001](SPIKE-001-kafka-migration-path.md).
+> **현재 구현 메모**: `consumerGroupLag`는 릴레이가 아직 읽지 않은 건수, `pendingEntries`는 읽었지만 아직 Kafka로 옮기지 못해 XACK하지 않은 건수다. `streamLength`는 이미 처리한 메시지도 포함하는 스트림 전체 길이이므로 적체량으로 사용하지 않는다. 상세는 [SPIKE-001](SPIKE-001-kafka-migration-path.md).
 
 ### Admin / Seed (테스트 자동화)
 
@@ -817,15 +840,15 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 ## 17. Non-goals (의도적으로 제외한 항목)
 
-| 항목                       | 제외 이유                                             |
-| -------------------------- | ----------------------------------------------------- |
-| WebSocket 기반 실시간 Push | 복잡도 대비 본 프로젝트 범위 밖                       |
-| 모든 이벤트의 영구 보관    | 운영 비용 및 스토리지 현실적 제약                     |
-| Strong Consistency 보장    | Eventually Consistent 선택과 트레이드오프 관계        |
-| Redis Sentinel / Cluster   | 본 프로젝트 범위 외, 향후 확장 방향만 문서화          |
+| 항목                         | 제외 이유                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| WebSocket 기반 실시간 Push   | 복잡도 대비 본 프로젝트 범위 밖                                                                                                                  |
+| 모든 이벤트의 영구 보관      | 운영 비용 및 스토리지 현실적 제약                                                                                                                |
+| Strong Consistency 보장      | Eventually Consistent 선택과 트레이드오프 관계                                                                                                   |
+| Redis Sentinel / Cluster     | 본 프로젝트 범위 외, 향후 확장 방향만 문서화                                                                                                     |
 | ~~Kafka 기반 메시지 브로커~~ | ~~Redis Streams로 감사 로그 파이프라인 충분히 증명 가능~~ → **ADR-009에서 대체됨.** 보관 30일·복수 소비자를 가정으로 선언하면서 Kafka를 채택했다 |
-| Streams Replay 복구        | Cold Start 복구는 PostgreSQL Snapshot 기준으로 충분   |
-| Top API Cursor Pagination  | offset 기반 + 상한 제한으로 운영 범위 충분            |
+| Streams Replay 복구          | Cold Start 복구는 PostgreSQL Snapshot 기준으로 충분                                                                                              |
+| Top API Cursor Pagination    | offset 기반 + 상한 제한으로 운영 범위 충분                                                                                                       |
 
 ---
 
@@ -837,7 +860,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 이 섹션은 "성능 자랑"이 아니라 아래 3가지를 증명하기 위한 계획이다.
 
-- Production-ready인가? (SLO 달성 여부, 오류율, 회복 가능성)
+- 선언한 SLO와 장애 범위를 충족하는가? (지연 시간, 오류율, 복구 가능성)
 - 이 시스템의 핵심 리스크(중복/편향/폭주/스냅샷 지연)를 이해했는가?
 - 측정 결과로 트레이드오프를 설명할 수 있는가?
 
@@ -1072,7 +1095,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **재검토 대상:** `17. Non-goals`의 "Kafka 기반 메시지 브로커 — Redis Streams로 감사 로그 파이프라인 충분히 증명 가능" 한 줄. 당시 판단의 근거와 **뒤집힘 조건이 문서에 남아 있지 않았다.** 본 ADR은 그 결정을 수치와 함께 정식화하고 재검토한다.
 
-**상황 (결정 시점 = 2026-07-27 기준):** audit stream(`lb:{leaderboardId}:events`)은 XADD로 append만 되고 **읽는 코드가 없었다.** 이 사실이 두 곳에 흔적으로 남아 있었다. 아래는 당시 관찰이며, 두 지점 모두 relay 도입 후 해소됐다(`pendingEntries`는 실제 PEL, `lastDeliveredId`는 제거).
+**상황 (결정 시점 = 2026-07-27 기준):** audit stream(`lb:{leaderboardId}:events`)은 XADD로 append만 되고 **읽는 코드가 없었다.** 이 사실이 두 곳에 흔적으로 남아 있었다. 아래는 당시 관찰이며, 두 지점 모두 relay 도입 후 해소됐다(`pendingEntries`는 실제 XPENDING 건수, `lastDeliveredId`는 제거).
 
 | 위치                                     | 내용                                                                                                                                                                         |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1083,13 +1106,13 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **측정된 현재 값:**
 
-| 항목                       | 값                  | 출처                                                                                                                           |
-| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| audit 유입 (평균)          | 약 3.5/s            | `0. Scenario` 30만 건/일 ÷ 86,400                                                                                              |
-| audit 유입 (피크)          | 1,000/s             | `0. Scenario` 목표 TPS (시스템 전체값, 리더보드별 아님)                                                                        |
-| 현재 보존 창               | 약 8시간            | `MAXLEN ~ 100000` ÷ 30만 건/일                                                                                                 |
-| 한 달 보존 시 Redis 메모리 | 약 900MB / 리더보드 | 30일 × 30만 × ~100B                                                                                                            |
-| 메모리 초과 시 거동        | **write 실패**      | `maxmemory-policy noeviction`                                                                                                  |
+| 항목                       | 값                  | 출처                                                                                                                                            |
+| -------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| audit 유입 (평균)          | 약 3.5/s            | `0. Scenario` 30만 건/일 ÷ 86,400                                                                                                               |
+| audit 유입 (피크)          | 1,000/s             | `0. Scenario` 목표 TPS (시스템 전체값, 리더보드별 아님)                                                                                         |
+| 현재 보존 창               | 약 8시간            | `MAXLEN ~ 100000` ÷ 30만 건/일                                                                                                                  |
+| 한 달 보존 시 Redis 메모리 | 약 900MB / 리더보드 | 30일 × 30만 × ~100B                                                                                                                             |
+| 메모리 초과 시 거동        | **write 실패**      | `maxmemory-policy noeviction`                                                                                                                   |
 | Redis 버전                 | 7.x                 | `docker-compose.yml` `redis:7`. `lag`/`entries-read`/`entries-added`는 7.0+ 필드이므로, Streams 쪽 관측 가능 범위는 이 버전 조건에서만 성립한다 |
 
 **검토한 대안:** 도입 안 함 / 인프로세스 큐 / Redis Streams 컨슈머 그룹 / PostgreSQL 적재 / Kafka
@@ -1120,7 +1143,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 - **구성 요소가 늘어난다.** 현재 6개 서비스에 브로커가 추가된다. 복제까지 세우면 증가폭이 더 커진다.
 - **새로운 실패 유형이 여러 개 생긴다.** 컨슈머 리밸런싱, ISR 축소, 파티션 편중, 컨슈머 랙. 도입 비용은 설치가 아니라 새로 알아야 할 장애 유형의 수다.
 - **현 규모 대비 과잉이다.** 평균 유입 3.5/s는 Kafka의 설계 지점보다 네 자릿수 아래다.
-- **ADR-002를 재결정 해야 한다.** Kafka producer는 Lua 블록 안에 들어갈 수 없다. score 반영과 감사 기록의 원자성을 어떻게 유지할지는 미결이며 [SPIKE-001](SPIKE-001-kafka-migration-path.md)의 선결 쟁점으로 다룬다.
+- **Redis Streams 아웃박스가 추가된다.** Kafka producer는 Lua 블록 안에 들어갈 수 없으므로 Lua의 XADD를 유지하고, 별도 릴레이가 Kafka로 전달한다. 이 결정으로 ADR-002의 원자성 범위는 유지되지만 릴레이 운영 비용이 생긴다.
 
 **관련 문서:** 구현 스펙과 검증 항목은 [SPIKE-001](SPIKE-001-kafka-migration-path.md)에서 다룬다.
 
@@ -1136,14 +1159,15 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 - **계층별 RPO 명시**: AOF 1초 / Snapshot 30초 / DB Backup 1시간, 각 계층 역할 명확
 - **Snapshot Overwrite Guard**: Cold Start 직후 빈 데이터로 덮어쓰기 원천 차단
 - **Lua Script 원자성**: Audit Log(XADD) 포함 4연산 원자적 처리
+- **Kafka 감사 로그 파이프라인**: Redis Streams 아웃박스 → Kafka → PostgreSQL 원본 적재, DB 고유 제약으로 중복 저장 방지
 - **Circuit Breaker**: Redis SPOF를 Fail Fast + 503 + Retry-After로 안전하게 처리
 - **ADR 기반 의사결정 기록**: 모든 핵심 선택에 상황/결정/근거/트레이드오프 명시
-- **k6 Tier 0 테스트 4종**: 결과 수치로 Production-ready를 증명
+- **k6 Tier 0 테스트 4종**: 결과 수치로 선언한 SLO와 장애 거동을 검증
 
 ---
 
 ## 요약
 
-고빈도 이벤트 처리 환경에서 Redis 기반 실시간 처리와 PostgreSQL 기반 영속 저장을 분리해 성능, 정합성, 운영 안정성을 함께 설계한 백엔드 시스템이다.
+고빈도 이벤트 처리 환경에서 Redis 기반 실시간 처리, Kafka 기반 감사 이벤트 전달, PostgreSQL 기반 영속 저장을 분리해 성능, 정합성, 운영 안정성을 함께 설계한 백엔드 시스템이다.
 
 비즈니스 시나리오(DAU 50만)에서 역산한 **목표 TPS 1,000**과 **명시적 SLO(p99 < 50ms, Snapshot Lag < 30s)**를 기준으로 k6 부하 테스트 결과를 수치로 검증한다. Competition Ranking 계산식, 계층별 RPO, Idempotency 3케이스 명세, Snapshot Overwrite Guard, POST 응답 스키마 설계 근거를 문서에 함께 정리한다.

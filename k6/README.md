@@ -18,7 +18,7 @@
 - `T3/T4`를 다시 깨끗하게 측정할 때는 `docker compose down -v`로 Redis volume까지 비우는 편이 안전합니다.
 
 ```bash
-docker compose up -d --build postgres redis kafka app prometheus renderer grafana
+REDIS_MAXMEMORY=256mb docker compose up -d --build postgres redis kafka app prometheus renderer grafana
 ```
 
 ```bash
@@ -36,11 +36,11 @@ bash scripts/cleanup-k6-data.sh
 - `BOOTSTRAP_READY_INTERVAL_MS` 기본값: `1000`
 - `BENCHMARK_RATE_LIMIT_PER_SEC` 기본값: `1000000`
 - `BENCHMARK_DAILY_QUOTA` 기본값: `2000000000`
-- `REDIS_MAXMEMORY` 기본값: `1gb` (`docker-compose.yml`에서 benchmark 편의상 상향)
+- `REDIS_MAXMEMORY` 개발 기본값: `1gb` (`docker-compose.yml`)
 
 주의:
-- PRD의 benchmark 환경 가정은 `Redis maxmemory 256MB`이지만, 현재 재측정은 clean evidence 확보가 우선이라 compose 기본값을 `1gb`로 상향했다.
-- `256MB` 조건을 다시 검증하려면 `REDIS_MAXMEMORY=256mb docker compose up ...`로 명시하면 된다.
+- 공식 벤치마크 환경은 PRD 기준인 `Redis maxmemory 256MB`다.
+- 최종 측정 명령에는 `REDIS_MAXMEMORY=256mb`를 명시한다. 1GB 기본값은 반복 개발 실행용이며 공식 결과 환경이 아니다.
 
 기본 동작:
 
@@ -64,7 +64,7 @@ bash scripts/report-k6-t1.sh artifacts/k6/t1-fixed-300.json
 1. 전체 스택을 실행합니다.
 
 ```bash
-docker compose up -d --build postgres redis kafka app prometheus renderer grafana
+REDIS_MAXMEMORY=256mb docker compose up -d --build postgres redis kafka app prometheus renderer grafana
 ```
 
 2. Kafka 컨슈머를 2개 인스턴스로 검증하려면 같은 이미지로 컨슈머 전용 인스턴스를 하나 더 실행합니다. 릴레이·스냅샷·콜드 스타트 복구는 app-1에서만 실행합니다.
@@ -93,9 +93,9 @@ bash scripts/run-k6.sh run \
 5. 결과는 두 곳에서 나눠 확인합니다.
 
 - k6: 약 1,000 RPS, p99 `< 50ms`, 오류율 `< 0.1%`
-- Ops Console: `Redis unread=0`, `Redis unacked=0`, `Kafka unprocessed=0`
+- Ops Console: `Redis unread(릴레이 미수신)=0`, `Redis unacked(릴레이 미확인)=0`, `Kafka unprocessed(컨슈머 미처리)=0`
 - Ops Console: `Kafka received`와 `PostgreSQL stored` 증가량 일치
-- 콘솔의 `caught up`은 메시지 수가 일치하고 모든 미처리 건수가 0일 때 표시됩니다.
+- 콘솔의 `caught up(적체 해소)`은 메시지 수가 일치하고 모든 미처리 건수가 0일 때 표시됩니다.
 
 6. 추가 컨슈머를 종료합니다. `--rm`으로 실행했으므로 종료 후 컨테이너도 제거됩니다.
 
