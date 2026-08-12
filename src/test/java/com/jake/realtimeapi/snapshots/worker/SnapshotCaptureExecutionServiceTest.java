@@ -32,6 +32,13 @@ class SnapshotCaptureExecutionServiceTest {
     private SnapshotExecutionLockRepository snapshotExecutionLockRepository;
 
     @Test
+    void lockKey_usesBothUuidHalves() {
+        UUID leaderboardId = UUID.fromString("00000000-0000-4000-8000-000000000000");
+
+        assertEquals(Long.MIN_VALUE + 16384L, SnapshotCaptureExecutionService.lockKey(leaderboardId));
+    }
+
+    @Test
     void execute_returnsLockNotAcquiredWhenTryLockFails() {
         SnapshotCaptureExecutionService service =
                 new SnapshotCaptureExecutionService(captureSnapshotUseCase, snapshotExecutionLockRepository);

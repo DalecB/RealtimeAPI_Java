@@ -46,7 +46,6 @@ public class SnapshotCaptureExecutionService {
     }
 
     static long lockKey(UUID leaderboardId) {
-        // PRD 기준으로 leaderboard hash를 advisory lock key로 사용한다.
-        return leaderboardId.hashCode();
+        return leaderboardId.getMostSignificantBits() ^ leaderboardId.getLeastSignificantBits();
     }
 }

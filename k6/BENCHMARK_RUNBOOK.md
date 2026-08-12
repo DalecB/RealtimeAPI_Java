@@ -34,6 +34,7 @@
 - 하지만 `5분 주기`는 freshness를 크게 희생하면서도 write/read p99 이점을 만들지 못했다.
 - 현재 결론과 운영 기본값은 `30초 snapshot 주기 유지`가 타당하다.
 - Redis 256MB 공식 조건의 5분 Kafka E2E는 HTTP SLO와 전체 전달 정합성을 모두 통과했다.
+- 같은 실행에서 Redis 변경량 조건이 충족돼 BGSAVE도 수행됐다.
 
 ## 1. 목적
 

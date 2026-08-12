@@ -112,7 +112,7 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 ### Observability
 
 - Prometheus + Grafana (Metrics)
-- Structured Logging (JSON, Logback)
+- Logback 텍스트 로그
 
 ### Test
 
@@ -249,7 +249,7 @@ Phase 2의 릴레이 범위는 단일 인스턴스와 고정 컨슈머 이름이
 Snapshot Worker (30초 주기)
   │
   ├── PostgreSQL Advisory Lock 획득 시도
-  │     (pg_try_advisory_lock(leaderboardId의 hashCode() long 값))
+  │     (pg_try_advisory_lock(UUID 상·하위 64비트 XOR 값))
   │     └── 획득 실패 → Skip (중복 실행 방지)
   │
   ├── Redis ZREVRANGE Top-1000 조회
@@ -398,7 +398,7 @@ return {1, newScore}  -- {isNew=true, newScore}
 
 ```
 Lock 구현: PostgreSQL pg_try_advisory_lock(lockKey)
-Lock Key: leaderboardId(UUID)의 hashCode() 반환 값. int(2^32 공간)이며 long으로 확대해 전달한다
+Lock Key: leaderboardId UUID의 상·하위 64비트를 XOR한 long 값
 
 획득 방법: pg_try_advisory_lock(lockKey)  -- non-blocking, 즉시 반환
 해제 조건:
@@ -709,24 +709,9 @@ T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행
 - `stream_pending_entries`: 릴레이가 읽었지만 아직 XACK하지 않은 메시지 건수(XPENDING)
 - `stream_length`: audit stream 길이(XLEN). 리텐션의 결과이지 밀린 양이 아니다
 
-### Logs (Structured JSON)
+### Logs
 
-모든 로그는 JSON 포맷으로 출력한다. 공통 필드:
-
-```json
-{
-  "timestamp": "ISO8601",
-  "level": "INFO|WARN|ERROR",
-  "requestId": "uuid",
-  "apiKeyId": "key_xxx",
-  "leaderboardId": "lb_xxx",
-  "userId": "user_xxx",
-  "idempotencyKey": "idem_xxx",
-  "event": "EVENT_NAME",
-  "durationMs": 12,
-  "result": "SUCCESS|DUPLICATE|CONFLICT|RATE_LIMITED|CIRCUIT_OPEN"
-}
-```
+현재는 Spring Boot 기본 Logback 텍스트 로그를 사용한다. JSON 구조화 로그는 운영 배포 범위에서 검토한다.
 
 ---
 
@@ -1028,7 +1013,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **근거:** Cold Path(Snapshot Worker)는 Redis 장애와 독립적으로 동작해야 한다. Redis SET NX EX 방식은 Hot Path 장애 시 Lock 획득 자체가 불가능해 Cold Path까지 연쇄 중단되는 리스크 존재. PostgreSQL Advisory Lock은 세션 종료 시 자동 해제되므로 Worker 크래시 시에도 Lock 해제 보장. TTL/clock skew 리스크 없음
 
-**트레이드오프:** PostgreSQL 커넥션 소비. 단, Snapshot Worker는 주기 실행(30초 1회)이므로 커넥션 점유 시간 미미. Lock 키는 leaderboardId의 hashCode() long 값 사용
+**트레이드오프:** PostgreSQL 커넥션 소비. 단, Snapshot Worker는 주기 실행(30초 1회)이므로 커넥션 점유 시간 미미. Lock 키는 leaderboardId UUID의 상·하위 64비트를 XOR한 long 값을 사용
 
 ---
 
