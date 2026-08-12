@@ -25,6 +25,6 @@ jq '{
   waitingP95Ms: .metrics.http_req_waiting["p(95)"],
   successChecks: .metrics.checks.passes,
   failedChecks: .metrics.checks.fails,
-  p99ThresholdPassed: .metrics.http_req_duration.thresholds["p(99)<50"],
-  errorThresholdPassed: .metrics.http_req_failed.thresholds["rate<0.001"]
+  p99ThresholdBreached: .metrics.http_req_duration.thresholds["p(99)<50"],
+  errorThresholdBreached: .metrics.http_req_failed.thresholds["rate<0.001"]
 }' "$1"

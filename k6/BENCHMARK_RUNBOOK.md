@@ -10,7 +10,7 @@
 
 ## Current Evidence Status
 
-- `T1`: final JSON 3건과 dashboard 캡처 확보
+- `T1`: final JSON 4건과 dashboard 캡처 확보 (Redis 256MB Kafka E2E 포함)
 - `T3`: final JSON 1건과 dashboard 캡처 확보
 - `T4`: final JSON 1건과 dashboard 캡처 확보
 - `T8`: scenario A/B JSON 확보
@@ -20,6 +20,7 @@
 - `T1 / USER_COUNT=300`: `995.67 RPS`, `p99 4.15ms`, `fail 0`
 - `T1 / USER_COUNT=500`: `998.67 RPS`, `p99 27.09ms`, `fail 0`
 - `T1 / USER_COUNT=1000`: `997.93 RPS`, `p99 20.92ms`, `fail 0`
+- `T1 Kafka E2E / Redis 256MB`: `990.44 RPS`, `p99 3.99ms`, `fail 0`, Kafka·PostgreSQL 각 `300,001건`, 최종 적체 `0건`
 - `T3 / USER_COUNT=1000`: `write p99 1.47ms`, `read p99 1.65ms`, `fail 0.0032%`
 - `T4`: `processed_new_total=1`, `processed_replay_total=49`, `processed_error_total=0`
 - `T8 / Scenario A / 30s`: `write p99 1.356ms`, `read p99 1.634ms`, `fail 0.009%`
@@ -32,6 +33,7 @@
 - `Scenario A (30s)`와 `Scenario B (5m)` 모두 안정성 자체는 양호했다.
 - 하지만 `5분 주기`는 freshness를 크게 희생하면서도 write/read p99 이점을 만들지 못했다.
 - 현재 결론과 운영 기본값은 `30초 snapshot 주기 유지`가 타당하다.
+- Redis 256MB 공식 조건의 5분 Kafka E2E는 HTTP SLO와 전체 전달 정합성을 모두 통과했다.
 
 ## 1. 목적
 

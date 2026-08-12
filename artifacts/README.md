@@ -31,6 +31,7 @@ PRD 기준:
 - `k6/final/t1/t1-fixed-300-clean.json`
 - `k6/final/t1/t1-fixed-500.json`
 - `k6/final/t1/t1-fixed-1000.json`
+- `k6/final/t1/t1-kafka-e2e-256mb.json`
 - `k6/final/t3/t3-mixed-1000-clean.json`
 - `k6/final/t4/t4-idempotency-clean.json`
 - `k6/final/t8/t8-30s-1000.json`
@@ -42,15 +43,25 @@ PRD 기준:
 - `screenshots/final/t1/t1-fixed-1000-dashboard-1.png`
 - `screenshots/final/t1/t1-fixed-1000-dashboard-2.png`
 - `screenshots/final/t1/t1-fixed-1000-dashboard-3.png`
+- `screenshots/final/t1/t1-kafka-e2e-256mb.png`
 - `screenshots/final/t3/t3-mixed-1000-clean.png`
 - `screenshots/final/t4/t4-idempotency-clean.png`
 
 ## Current Status
 
-- `T1`: collected
+- `T1`: collected (Redis 256MB Kafka E2E 포함)
 - `T3`: collected
 - `T4`: collected
 - `T8`: collected (JSON)
+
+## Kafka E2E Summary
+
+- 환경: Redis `256MB`, `noeviction`, AOF `appendfsync everysec`, Kafka 단일 브로커
+- 부하: `USER_COUNT=1000`, `WRITE_RPS=1000`, `DURATION=5m`
+- HTTP: `990.44 RPS`, `p99 3.99ms`, 오류율 `0%`, 중단·누락 iteration `0건`
+- 전달 결과: Kafka `300,001건`, PostgreSQL `300,001건`
+- 종료 상태: Redis 미수신 `0건`, Redis 미확인 `0건`, Kafka 미처리 `0건`
+- 판정: `PASS`
 
 ## T8 Summary
 

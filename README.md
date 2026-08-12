@@ -92,6 +92,7 @@ Kafka 컨슈머 다중 인스턴스 실제 구동 검증(2026-08-11):
 | T1 Fixed | `300 users: p99 4.15ms / 995.67 RPS / fail 0` | `artifacts/k6/final/t1/t1-fixed-300-clean.json` |
 | T1 Fixed | `500 users: p99 27.09ms / 998.67 RPS / fail 0` | `artifacts/k6/final/t1/t1-fixed-500.json` |
 | T1 Fixed | `1000 users: p99 20.92ms / 997.93 RPS / fail 0` | `artifacts/k6/final/t1/t1-fixed-1000.json` |
+| T1 Kafka E2E | `Redis 256MB / p99 3.99ms / 990.44 RPS / fail 0 / Kafka=PostgreSQL 300,001건 / 적체 0` | `artifacts/k6/final/t1/t1-kafka-e2e-256mb.json` |
 | T3 Mixed | `write p99 1.47ms / read p99 1.65ms / fail 0.0032%` | `artifacts/k6/final/t3/t3-mixed-1000-clean.json` |
 | T4 Idempotency | `new 1 / replay 49 / error 0` | `artifacts/k6/final/t4/t4-idempotency-clean.json` |
 | T8 Scenario A | `30s snapshot / write p99 1.36ms / read p99 1.63ms / fail 0.009%` | `artifacts/k6/final/t8/t8-30s-1000.json` |
@@ -101,7 +102,7 @@ Kafka 컨슈머 다중 인스턴스 실제 구동 검증(2026-08-11):
 
 - 공식 벤치마크 기준 환경은 Redis `256MB`입니다.
 - 반복 개발 중 테스트 데이터 누적을 고려해 compose 개발 기본값은 `REDIS_MAXMEMORY=1gb`입니다.
-- 공식 측정은 `REDIS_MAXMEMORY=256mb docker compose up ...`로 환경을 명시해 실행합니다.
+- 공식 측정은 `REDIS_MAXMEMORY=256mb`를 명시해 실행했고, Redis 미수신·미확인 및 Kafka 미처리 메시지 0건까지 확인했습니다.
 
 ## Main APIs
 
