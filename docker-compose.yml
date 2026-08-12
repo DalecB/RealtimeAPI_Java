@@ -28,6 +28,9 @@ services:
         "yes",
         "--appendfsync",
         "everysec",
+        # RDB는 변경량 기반으로 저장한다: 저부하 최대 약 1시간, 고부하 시 더 자주 저장.
+        "--save",
+        "3600 1 300 100 60 10000",
         "--maxmemory",
         "${REDIS_MAXMEMORY:-1gb}",
         "--maxmemory-policy",

@@ -498,14 +498,14 @@ CREATE INDEX idx_snapshot_entries_snapshot_rank_user
 
 Redis를 Source of Truth로 사용하는 구조에서 데이터 유실 허용 범위(RPO)는 계층별로 다음과 같이 정의된다.
 
-| 계층                | 설정        | RPO (최대 유실) | 역할                              |
-| ------------------- | ----------- | --------------- | --------------------------------- |
-| AOF                 | everysec    | 최대 1초        | Redis crash 시 1차 복구           |
-| RDB                 | 12시간 주기 | 최대 12시간     | AOF 손상 시 fallback              |
-| PostgreSQL Snapshot | 30초 주기   | 최대 30초       | Redis + AOF 모두 유실 시 fallback |
-| DB Full Backup      | 1시간 주기  | 최대 1시간      | DB 재난 시 최종 복구 수단         |
+| 계층                | 설정                                      | RPO (최대 유실)                  | 역할                                       |
+| ------------------- | ----------------------------------------- | -------------------------------- | ------------------------------------------ |
+| AOF                 | `appendfsync everysec`                    | 최대 약 1초                      | Redis 재시작 시 1차 복구                   |
+| RDB                 | `3600 1 / 300 100 / 60 10000` 변경량 기반 | 성공한 BGSAVE 기준 최대 약 1시간 | AOF 복구 불가 시 운영자가 선택할 복구 후보 |
+| PostgreSQL Snapshot | 30초 주기                                 | Top-1,000 기준 최대 약 30초      | 랭킹 Top-1,000 콜드 스타트 복구            |
+| DB Full Backup      | 현재 미구현                               | 보장하지 않음                    | 현재 프로젝트 범위 밖                      |
 
-> **운영 기준 RPO**: 정상 운영 시 AOF everysec에 의해 최대 1초 유실. Redis + AOF 동시 유실이라는 재난 시나리오에서도 PostgreSQL Snapshot 기준 최대 30초 유실로 제한.
+> **현재 보장 범위**: 정상 재시작은 AOF `everysec` 기준 최대 약 1초 유실을 목표로 한다. RDB는 고정 주기가 아니라 변경량에 따라 생성되며, AOF 손상 시 자동 전환하지 않는다. PostgreSQL Snapshot 복구는 랭킹 Top-1,000만 대상으로 하고 멱등키·Redis Stream 상태는 복구하지 않는다.
 
 ### Cold Start 복구 플로우
 
@@ -515,7 +515,9 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 1. Redis 재시작 → AOF 복구 시도 (everysec 기준, 최대 1초 유실)
    └── AOF 복구 성공 → 정상 운영 재개
 
-2. AOF 손상 시 → RDB fallback (최대 12시간 유실)
+2. AOF 복구 불가 시 → 운영자가 최신 RDB를 선택해 수동 복구
+   └── 성공한 BGSAVE 기준 최대 약 1시간 유실
+   └── 자동 전환과 실패 주입 검증은 현재 범위에서 지원하지 않음
 
 3. RDB도 유실 시 → PostgreSQL 최신 snapshot 기준 복구
    └── 복구 대상: snapshot_batches에서 leaderboard별 최신 snapshot_at 1건을 찾고,
@@ -524,6 +526,7 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
    └── 복구 완료 판단: ZCARD lb:{leaderboardId}:z > 0 확인
    └── 복구 중 Write 처리: Circuit Breaker 수동 OPEN으로 Write 차단 (데이터 오염 방지)
    └── 복구 완료 후 Circuit Breaker 정상화 → Write 재개
+   └── 복구 범위는 랭킹 Top-1,000이며 멱등키·Redis Stream 상태는 제외
 ```
 
 ---
@@ -537,7 +540,7 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 | Redis 일시 응답 지연  | Circuit Breaker (Closed → Half-Open → Open)   | Resilience4j 활용                    |
 | Redis 완전 장애       | Circuit Breaker OPEN → 503 즉시 반환          | Write 요청 차단으로 데이터 오염 방지 |
 | Redis 재시작          | AOF Persistence로 데이터 복구 (최대 1초 유실) | AOF fsync: everysec                  |
-| Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 최대 30초 유실                       |
+| Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 랭킹 Top-1,000만 복구, 최대 약 30초  |
 | Snapshot Worker 실패  | 재시도 3회 후 알림, 다음 주기 재개            | Cold Path 장애는 Hot Path와 독립     |
 
 ### 10.2 Circuit Breaker 설정
@@ -1156,7 +1159,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 - **Hot/Cold Path 분리**: Redis(실시간) / PostgreSQL(기록/운영) 명확한 책임 분리
 - **Competition Ranking**: ZCOUNT 기반 1,2,2,4 방식, 단순 ZREVRANK+1 사용 금지
 - **Idempotency 완전 명세**: TTL 내 중복(200), payload 불일치(409), TTL 이후(신규) 3케이스 모두 정의
-- **계층별 RPO 명시**: AOF 1초 / Snapshot 30초 / DB Backup 1시간, 각 계층 역할 명확
+- **계층별 복구 범위 명시**: AOF 최대 약 1초 / RDB 최대 약 1시간 / PostgreSQL Snapshot은 Top-1,000 기준 최대 약 30초, DB 전체 백업은 현재 미구현
 - **Snapshot Overwrite Guard**: Cold Start 직후 빈 데이터로 덮어쓰기 원천 차단
 - **Lua Script 원자성**: Audit Log(XADD) 포함 4연산 원자적 처리
 - **Kafka 감사 로그 파이프라인**: Redis Streams 아웃박스 → Kafka → PostgreSQL 원본 적재, DB 고유 제약으로 중복 저장 방지
