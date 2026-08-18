@@ -16,6 +16,7 @@ import com.jake.realtimeapi.projects.domain.repository.ProjectRepository;
 import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.users.domain.model.User;
 import com.jake.realtimeapi.users.domain.repository.UserRepository;
+
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -24,8 +25,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.PendingMessagesSummary;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -48,7 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(properties = {
         "events.relay.enabled=true",
         "events.relay.delay-ms=3600000",
-        "events.relay.trim-delay-ms=3600000"
+        "events.relay.trim-delay-ms=3600000",
+        "events.relay.claim-min-idle-ms=0"
 })
 @Import(TestcontainersConfiguration.class)
 class KafkaAuditRoundTripTest {
@@ -130,6 +136,42 @@ class KafkaAuditRoundTripTest {
         assertNotNull(pending);
         assertEquals(0, pending.getTotalPendingMessages());
         assertEquals(0L, auditStreamStatusRepository.getStatus(fixture.leaderboardId()).consumerGroupLag());
+    }
+
+    @Test
+    void stalePendingMessage_isClaimedByReplacementRelay_andStoredOnce() {
+        Fixture fixture = createFixture();
+        EventPayload payload = new EventPayload(
+                fixture.leaderboardId(),
+                fixture.userId(),
+                DELTA,
+                UUID.randomUUID()
+        );
+        eventCommandRepository.process(payload, API_KEY_ID);
+
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+        redisTemplate.opsForStream().createGroup(
+                streamKey,
+                ReadOffset.from("0"),
+                AuditRelayWorker.GROUP
+        );
+
+        List<MapRecord<String, Object, Object>> readByStoppedRelay = redisTemplate.opsForStream().read(
+                Consumer.from(AuditRelayWorker.GROUP, "stopped-relay-" + UUID.randomUUID()),
+                StreamReadOptions.empty().count(1),
+                StreamOffset.create(streamKey, ReadOffset.lastConsumed())
+        );
+
+        assertNotNull(readByStoppedRelay);
+        assertEquals(1, readByStoppedRelay.size());
+        assertEquals(1, pendingCount(streamKey));
+
+        auditRelayWorker.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(1, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(0, pendingCount(streamKey));
+        });
     }
 
     @Test
@@ -243,6 +285,12 @@ class KafkaAuditRoundTripTest {
                 .get()
                 .get(partition);
         return committed == null ? -1L : committed.offset();
+    }
+
+    private long pendingCount(String streamKey) {
+        PendingMessagesSummary pending = redisTemplate.opsForStream().pending(streamKey, AuditRelayWorker.GROUP);
+        assertNotNull(pending);
+        return pending.getTotalPendingMessages();
     }
 
     private record Fixture(long userId, UUID leaderboardId) {

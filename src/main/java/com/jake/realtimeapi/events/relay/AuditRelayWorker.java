@@ -4,16 +4,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import io.lettuce.core.StreamMessage;
+import io.lettuce.core.XAutoClaimArgs;
+import io.lettuce.core.cluster.api.async.RedisClusterAsyncCommands;
+import io.lettuce.core.models.stream.ClaimedMessages;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -21,12 +27,15 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Redis audit stream(outbox)에 쌓인 기록을 Kafka로 옮긴다.
@@ -54,6 +63,8 @@ public class AuditRelayWorker {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final int batchSize;
+    private final Duration claimMinIdle;
+    private final Map<UUID, String> claimCursors = new ConcurrentHashMap<>();
 
     // 컨슈머 이름. compose에서 hostname을 고정했으므로 재생성돼도 같은 이름을 재사용한다.
     // 이름이 바뀌면 이전 이름이 잡고 있던 PEL이 주인 없이 남는다.
@@ -64,13 +75,15 @@ public class AuditRelayWorker {
             StringRedisTemplate redisTemplate,
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
-            @org.springframework.beans.factory.annotation.Value("${events.relay.batch-size:500}") int batchSize
+            @org.springframework.beans.factory.annotation.Value("${events.relay.batch-size:500}") int batchSize,
+            @org.springframework.beans.factory.annotation.Value("${events.relay.claim-min-idle-ms:600000}") long claimMinIdleMs
     ) {
         this.leaderboardRepository = leaderboardRepository;
         this.redisTemplate = redisTemplate;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
+        this.claimMinIdle = Duration.ofMillis(claimMinIdleMs);
         String host = System.getenv("HOSTNAME");
         this.consumerName = (host == null || host.isBlank()) ? "relay-local" : host;
     }
@@ -93,32 +106,107 @@ public class AuditRelayWorker {
 
         // 1) PEL 재처리: 받았지만 XACK 못 한 것(크래시로 멈춘 것)을 먼저 다시 보낸다.
         //    ReadOffset "0" = 이 컨슈머의 PEL을 처음부터 재조회한다(새 기록이 아니라).
-        relayBatch(leaderboardId, streamKey, ReadOffset.from("0"));
+        int recovered = relayBatch(leaderboardId, streamKey, ReadOffset.from("0"), batchSize);
 
-        // 2) 새 기록: 빌 때까지 반복해서 읽는다. 한 번에 가져오는 수를 고정하면
+        // 2) 다른 릴레이가 남긴 오래된 PEL을 현재 릴레이로 인계한다.
+        int remainingRecoveryCapacity = batchSize - recovered;
+        if (remainingRecoveryCapacity > 0) {
+            relayClaimedBatch(leaderboardId, streamKey, remainingRecoveryCapacity);
+        }
+
+        // 3) 새 기록: 빌 때까지 반복해서 읽는다. 한 번에 가져오는 수를 고정하면
         //    유입이 그보다 많을 때 밀린 양이 줄지 않는다.
-        while (relayBatch(leaderboardId, streamKey, ReadOffset.lastConsumed()) > 0) {
+        while (relayBatch(leaderboardId, streamKey, ReadOffset.lastConsumed(), batchSize) > 0) {
             // 계속 드레인
         }
     }
 
     /** 한 배치를 읽어 모두 produce한 뒤, 성공한 것만 XACK 한다. 읽은 건수를 반환한다. */
-    private int relayBatch(UUID leaderboardId, String streamKey, ReadOffset offset) {
+    private int relayBatch(UUID leaderboardId, String streamKey, ReadOffset offset, int count) {
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
                 Consumer.from(GROUP, consumerName),
-                StreamReadOptions.empty().count(batchSize),
+                StreamReadOptions.empty().count(count),
                 StreamOffset.create(streamKey, offset)
         );
         if (records == null || records.isEmpty()) {
             return 0;
         }
 
+        List<AuditStreamRecord> batch = records.stream()
+                .map(record -> new AuditStreamRecord(record.getId().getValue(), record.getValue()))
+                .toList();
+        return publishAndAcknowledge(leaderboardId, streamKey, batch);
+    }
+
+    private int relayClaimedBatch(UUID leaderboardId, String streamKey, int count) {
+        ClaimedMessages<byte[], byte[]> claimed = autoClaim(
+                streamKey,
+                claimCursors.getOrDefault(leaderboardId, "0-0"),
+                count
+        );
+        if (claimed == null) {
+            return 0;
+        }
+
+        if ("0-0".equals(claimed.getId())) {
+            claimCursors.remove(leaderboardId);
+        } else {
+            claimCursors.put(leaderboardId, claimed.getId());
+        }
+
+        List<AuditStreamRecord> batch = claimed.getMessages().stream()
+                .map(this::toAuditStreamRecord)
+                .toList();
+        return publishAndAcknowledge(leaderboardId, streamKey, batch);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ClaimedMessages<byte[], byte[]> autoClaim(String streamKey, String startId, int count) {
+        return redisTemplate.execute((RedisCallback<ClaimedMessages<byte[], byte[]>>) connection -> {
+            RedisClusterAsyncCommands<byte[], byte[]> commands =
+                    (RedisClusterAsyncCommands<byte[], byte[]>) connection.getNativeConnection();
+            XAutoClaimArgs<byte[]> args = new XAutoClaimArgs<byte[]>()
+                    .consumer(io.lettuce.core.Consumer.from(bytes(GROUP), bytes(consumerName)))
+                    .minIdleTime(claimMinIdle)
+                    .startId(startId)
+                    .count(count);
+            try {
+                return commands.xautoclaim(bytes(streamKey), args).get();
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new DataAccessResourceFailureException("XAUTOCLAIM interrupted", exception);
+            } catch (ExecutionException exception) {
+                throw new DataAccessResourceFailureException("XAUTOCLAIM failed", exception.getCause());
+            }
+        });
+    }
+
+    private AuditStreamRecord toAuditStreamRecord(StreamMessage<byte[], byte[]> message) {
+        Map<Object, Object> fields = new LinkedHashMap<>();
+        message.getBody().forEach((key, value) -> fields.put(new String(key, StandardCharsets.UTF_8),
+                new String(value, StandardCharsets.UTF_8)));
+        return new AuditStreamRecord(message.getId(), fields);
+    }
+
+    private byte[] bytes(String value) {
+        return value.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private int publishAndAcknowledge(
+            UUID leaderboardId,
+            String streamKey,
+            List<AuditStreamRecord> records
+    ) {
+        if (records.isEmpty()) {
+            return 0;
+        }
+
         // 먼저 전부 보낸다(응답은 기다리지 않는다). key = leaderboardId → 같은 리더보드는 같은 파티션.
         String partitionKey = leaderboardId.toString();
         List<CompletableFuture<SendResult<String, String>>> futures = new ArrayList<>(records.size());
-        for (MapRecord<String, Object, Object> record : records) {
+        for (AuditStreamRecord record : records) {
             ProducerRecord<String, String> producerRecord = new ProducerRecord<>(
-                    AuditTopicConfig.AUDIT_TOPIC, partitionKey, toJson(record.getId().getValue(), record.getValue()));
+                    AuditTopicConfig.AUDIT_TOPIC, partitionKey, toJson(record.id(), record.fields()));
             producerRecord.headers().add(SCHEMA_VERSION_HEADER, SCHEMA_VERSION);
             futures.add(kafkaTemplate.send(producerRecord));
         }
@@ -129,15 +217,18 @@ public class AuditRelayWorker {
         for (int i = 0; i < records.size(); i++) {
             try {
                 futures.get(i).get();
-                acknowledged.add(records.get(i).getId().getValue());
+                acknowledged.add(records.get(i).id());
             } catch (Exception ex) {
-                log.error("relay produce failed streamKey={} entryId={}", streamKey, records.get(i).getId(), ex);
+                log.error("relay produce failed streamKey={} entryId={}", streamKey, records.get(i).id(), ex);
             }
         }
         if (!acknowledged.isEmpty()) {
             redisTemplate.opsForStream().acknowledge(streamKey, GROUP, acknowledged.toArray(new String[0]));
         }
         return records.size();
+    }
+
+    private record AuditStreamRecord(String id, Map<Object, Object> fields) {
     }
 
     private void ensureGroup(String streamKey) {
