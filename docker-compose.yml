@@ -21,8 +21,7 @@ services:
     container_name: realtime-redis
     # 개발 기본값은 반복 실행 중 데이터 누적을 고려해 1GB.
     # 공식 벤치마크는 REDIS_MAXMEMORY=256mb를 명시.
-    command:
-      [
+    command: [
         "redis-server",
         "--appendonly",
         "yes",
@@ -108,7 +107,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SNAPSHOTS_WORKER_ENABLED: "true"
       EVENTS_RELAY_ENABLED: "true"
-      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx512m"
+      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx512m -Xlog:gc*:stdout:time,uptime,level,tags"
     ports:
       - "8080:8080"
 
