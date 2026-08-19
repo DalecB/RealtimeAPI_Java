@@ -223,7 +223,7 @@ Kafka consumer group: audit-trend
           └── UNIQUE (leaderboard_id, event_id)로 중복 저장 방지
 ```
 
-Phase 2의 릴레이 범위는 단일 인스턴스와 고정 컨슈머 이름이다. 중단된 다른 릴레이가 남긴 미처리 메시지 인계와 처리 불가 메시지 보관은 Phase 3 예정 범위다.
+Phase 2 완료 당시 릴레이 범위는 단일 인스턴스와 고정 컨슈머 이름이었다. 후속 Phase 3에서 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하는 경로를 구현하고 단건 Testcontainers 테스트로 검증했다. 실제 10분 유휴·500건 초과 cursor·종료 주입·동시 다중 릴레이는 미검증이며, 처리 불가 메시지의 DLQ 보관은 정책만 확정하고 구현하지 않았다.
 
 ### 4.3 Read Flow (랭킹 조회)
 
