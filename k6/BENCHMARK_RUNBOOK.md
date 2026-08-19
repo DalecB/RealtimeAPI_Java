@@ -3,7 +3,7 @@
 적용한 PRD 기준:
 - `18. Benchmark & Reliability Test Plan (k6)`
 - Tier 0: `T1`, `T3`, `T4`, `T8`
-- 핵심 SLO: `Write p99 < 50ms`, `Read p99 < 20ms`, `snapshot_lag_seconds < 30s`, `idempotency 오염 0건`
+- 핵심 SLO: `Write p99 < 50ms`, `Read p99 < 20ms`, `snapshot_lag_seconds < 45s`, `idempotency 오염 0건`
 
 이 문서는 성능 지표를 일관된 흐름으로 수집하기 위한 상세 실행 런북이다.
 [README.md](./README.md)는 테스트 종류 요약용이고, 이 문서는 실제 실행 절차를 다룬다.
@@ -31,8 +31,8 @@
 ## Current Conclusion
 
 - `Scenario A (30s)`와 `Scenario B (5m)` 모두 안정성 자체는 양호했다.
-- 하지만 `5분 주기`는 freshness를 크게 희생하면서도 write/read p99 이점을 만들지 못했다.
-- 현재 결론과 운영 기본값은 `30초 snapshot 주기 유지`가 타당하다.
+- 하지만 `5분 주기`는 최신성을 크게 낮추면서도 쓰기와 읽기의 p99 지연 시간을 개선하지 못했다.
+- 따라서 운영 기본값으로 `30초 스냅샷 주기`를 유지하는 것이 타당하다.
 - Redis 256MB 공식 조건의 5분 Kafka E2E는 HTTP SLO와 전체 전달 정합성을 모두 통과했다.
 - 같은 실행에서 Redis 변경량 조건이 충족돼 BGSAVE도 수행됐다.
 
@@ -41,7 +41,7 @@
 이 런북의 목적은 아래 4가지를 같은 흐름으로 수집하는 것이다.
 
 1. `1,000 TPS` 달성 여부
-2. `300 ~ 1000명` 유저 풀에서 랜덤 중복 요청이 발생하는 조건의 재현
+2. 300~1,000명의 유저 중 같은 유저가 무작위로 다시 선택되는 요청 패턴 재현
 3. Grafana/Prometheus 기반 시각자료 확보
 4. 테스트 종료 후 생성한 계정/프로젝트/리더보드 정리
 
@@ -54,7 +54,7 @@
 
 - 유저 수는 실행 시 `USER_COUNT`로 조절 가능
 - 같은 유저가 여러 번 다시 선택될 수 있음
-- 결과적으로 `300 ~ 1000명 사이 유저가 랜덤하게 중복 요청을 보내는` 형태가 됨
+- 따라서 300~1,000명의 유저 중 같은 유저가 무작위로 다시 선택되는 요청 패턴이 만들어진다.
 
 권장 실행 세트:
 
@@ -130,7 +130,7 @@ Grafana 기본 계정:
 - ID: `admin`
 - PW: `admin`
 
-Grafana에서 패널/대시보드 PNG export를 쓰려면 `renderer` 서비스가 떠 있어야 한다.
+Grafana에서 패널과 대시보드를 PNG로 내보내려면 `renderer` 서비스가 실행 중이어야 한다.
 
 ### 3.5 관측 화면 준비
 
@@ -238,7 +238,7 @@ Redis OOM이 한 번이라도 있었던 뒤 재측정할 때는 아래 순서를
 
 ```bash
 docker compose down -v
-docker compose up -d --build postgres redis app prometheus renderer grafana
+docker compose up -d --build postgres redis kafka app prometheus renderer grafana
 
 USER_COUNT=1000 WRITE_RPS=800 READ_RPS=200 DURATION=10m \
 bash scripts/run-k6.sh run \

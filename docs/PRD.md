@@ -1,8 +1,8 @@
 # Realtime Ranking & Event Processing API
 
-랭킹 및 실시간 이벤트 집계에 특화된 REST API 서비스.
+랭킹 및 실시간 이벤트 집계에 특화된 REST API 서비스다.
 
-Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고빈도 Write 트래픽을 안정적으로 처리하는 백엔드 시스템.
+Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고빈도 Write 트래픽을 안정적으로 처리하는 백엔드 시스템이다.
 
 ---
 
@@ -46,14 +46,14 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 - 트래픽은 균등하지 않고 일부 leaderboard/일부 user로 편향 (**Hot Key**)
 - 이벤트는 네트워크 환경에 따라 중복 전송될 수 있음
 - 실시간 랭킹 조회는 **Top-N 중심**으로 발생하며 Write 트래픽과 동시에 발생
-- "모든 이벤트 영구 저장"이 아니라 운영 목적의 **Snapshot/통계 중심 저장**이 현실적인 선택
+- 실시간 랭킹 전체 상태는 매 이벤트마다 관계형 DB에 동기 저장하지 않는다. 랭킹은 **Top-N 스냅샷**으로 복구하고, 원본 감사 이벤트는 별도의 비동기 파이프라인으로 영속화한다.
 
 ### Constraints (명시적 제약/스코프)
 
 - Strong Consistency를 목표로 하지 않고 **Eventually Consistent** 모델 채택
 - 실시간 처리(Hot Path)는 Redis를 **Source of Truth**로 두고, 영속 저장(Cold Path)은 PostgreSQL로 분리
-- 실시간 이벤트 로그 전체를 DB에 적재하지 않고, **Top-N snapshot + 운영 지표 중심**으로 저장
-- 성능은 TPS 자랑이 아니라 **SLO(p99/오류율/회복 시간)** 기반으로 정의
+- Hot Path에서는 PostgreSQL에 직접 쓰지 않는다. 랭킹은 **Top-N 스냅샷**으로 저장하고, 감사 이벤트는 Redis Streams 아웃박스 → Kafka → PostgreSQL 비동기 경로로 저장한다.
+- 성능은 최대 TPS 수치가 아니라 **SLO(p99/오류율/회복 시간)**를 기준으로 평가한다.
 - 배포/재현성: `docker compose up` 이후 **5분 내 실행/테스트 가능**해야 함
 - 메시지 브로커: 1차 스코프에서는 Redis Streams만 사용했으나, ADR-009와 Phase 2에서 **Redis Streams 아웃박스 → Kafka → PostgreSQL** 감사 로그 파이프라인으로 확장
 
@@ -77,7 +77,7 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 
 | 지표                            | 목표값                  | 측정 방법                                |
 | ------------------------------- | ----------------------- | ---------------------------------------- |
-| Snapshot Lag                    | < 30초 (30초 주기 기준) | `snapshot_lag_seconds` Prometheus 메트릭 |
+| Snapshot Lag                    | < 45초 (30초 `fixedDelay` 기준) | `snapshot_lag_seconds` Prometheus 메트릭 |
 | Snapshot 성공률                 | > 99%                   | `snapshot_failure_total` 기준            |
 | Redis 장애 시 Fail Fast 응답    | < 500ms                 | Circuit Breaker OPEN 상태 기준           |
 | Worker 재시작 후 적체 해소 시간 | < 2분                   | Streams 컨슈머 지연 기준                 |
@@ -165,7 +165,7 @@ Redis 기반 **Hot Path**와 PostgreSQL 기반 **Cold Path**를 분리하여 고
 - Redis Streams는 Lua 원자성 안에서 감사 이벤트를 먼저 남기는 아웃박스로 사용
 - Kafka는 감사 이벤트 전달과 컨슈머별 처리 위치를 담당하고, PostgreSQL은 조회 가능한 원본 감사 이벤트를 저장
 - PostgreSQL snapshot은 Redis 콜드 스타트 복구 기준으로 사용
-- Strong Consistency 대신 Eventually Consistent 채택, **Snapshot Lag를 1급 지표로 관리**
+- Strong Consistency 대신 Eventually Consistent 모델을 채택하고, **Snapshot Lag를 핵심 운영 지표로 관리**
 
 ---
 
@@ -212,6 +212,7 @@ API Server
 Redis Stream: lb:{leaderboardId}:events
   │
   ├── AuditRelayWorker가 현재 릴레이의 미확인 메시지를 먼저 재처리
+  ├── 다른 릴레이의 오래된 PEL을 XAUTOCLAIM으로 배치 인계
   ├── 새 메시지를 읽어 Kafka `lb-audit-events`에 발행
   └── 발행 성공을 확인한 메시지만 XACK
           │
@@ -223,7 +224,7 @@ Kafka consumer group: audit-trend
           └── UNIQUE (leaderboard_id, event_id)로 중복 저장 방지
 ```
 
-Phase 2 완료 당시 릴레이 범위는 단일 인스턴스와 고정 컨슈머 이름이었다. 후속 Phase 3에서 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하는 경로를 구현하고 단건 Testcontainers 테스트로 검증했다. 실제 10분 유휴·500건 초과 cursor·종료 주입·동시 다중 릴레이는 미검증이며, 처리 불가 메시지의 DLQ 보관은 정책만 확정하고 구현하지 않았다.
+Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이름만 지원했다. 후속 Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했다. Testcontainers에서는 운영값보다 짧은 유휴 시간과 작은 배치 크기를 사용해 `min-idle-time` 적용, 반환 커서 기반 후속 배치 처리, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했다. 실제 10분 유휴 조건, 500건을 초과하는 PEL, 프로세스 강제 종료, 인계받은 릴레이의 재종료, 여러 릴레이의 동시 실행은 검증하지 않았다. 처리할 수 없는 메시지를 DLQ에 보관하는 정책은 확정했지만 아직 구현하지 않았다.
 
 ### 4.3 Read Flow (랭킹 조회)
 
@@ -505,7 +506,7 @@ Redis를 Source of Truth로 사용하는 구조에서 데이터 유실 허용 �
 | PostgreSQL Snapshot | 30초 주기                                 | Top-1,000 기준 최대 약 30초      | 랭킹 Top-1,000 콜드 스타트 복구            |
 | DB Full Backup      | 현재 미구현                               | 보장하지 않음                    | 현재 프로젝트 범위 밖                      |
 
-> **현재 보장 범위**: 정상 재시작은 AOF `everysec` 기준 최대 약 1초 유실을 목표로 한다. RDB는 고정 주기가 아니라 변경량에 따라 생성되며, AOF 손상 시 자동 전환하지 않는다. PostgreSQL Snapshot 복구는 랭킹 Top-1,000만 대상으로 하고 멱등키·Redis Stream 상태는 복구하지 않는다.
+> **현재 보장 범위**: 정상 재시작은 AOF `everysec` 기준 최대 약 1초 유실을 목표로 한다. RDB는 고정 주기가 아니라 변경량에 따라 생성되며, AOF 손상 시 자동 전환하지 않는다. PostgreSQL 스냅샷 복구는 랭킹 Top-1,000까지만 대상으로 하며, 멱등키와 Redis Stream 상태는 복구하지 않는다.
 
 ### Cold Start 복구 플로우
 
@@ -540,7 +541,7 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 | Redis 일시 응답 지연  | Circuit Breaker (Closed → Half-Open → Open)   | Resilience4j 활용                    |
 | Redis 완전 장애       | Circuit Breaker OPEN → 503 즉시 반환          | Write 요청 차단으로 데이터 오염 방지 |
 | Redis 재시작          | AOF Persistence로 데이터 복구 (최대 1초 유실) | AOF fsync: everysec                  |
-| Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 랭킹 Top-1,000만 복구, 최대 약 30초  |
+| Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 랭킹 Top-1,000까지만 복구, 최대 약 30초 |
 | Snapshot Worker 실패  | 재시도 3회 후 알림, 다음 주기 재개            | Cold Path 장애는 Hot Path와 독립     |
 
 ### 10.2 Circuit Breaker 설정
@@ -580,7 +581,7 @@ Retry 정책 (클라이언트 권고):
 
 선택 이유: Bucket4j 등 라이브러리 사용 시 Redis와의 분리 비용 발생. Rate Limit 자체가 Redis 의존적이므로 Lua Script로 원자적 구현이 더 일관성 있음.
 
-> **Fixed Window vs Sliding Window**: 현 구현은 `rl:{apiKeyId}:{windowStart}` 키에 INCR/EXPIRE를 적용하는 **Fixed Window** 방식이다. 윈도우 경계에서 최대 2배까지 버스트가 발생할 수 있지만, 본 프로젝트 범위에서 구현 복잡도 대비 효과가 충분한 이유로 Fixed Window를 선택한다.
+> **Fixed Window vs Sliding Window**: 현 구현은 `rl:{apiKeyId}:{windowStart}` 키에 INCR/EXPIRE를 적용하는 **Fixed Window** 방식이다. 윈도우 경계에서 최대 2배의 버스트가 발생할 수 있지만, 현재 프로젝트에 필요한 제한 기능을 더 낮은 구현 복잡도로 제공하므로 Fixed Window를 선택한다.
 
 ```lua
 -- Fixed Window Rate Limit Lua Script
@@ -640,9 +641,9 @@ TTL 기본값: **24시간** (일 단위 이벤트 기준)
 - 멱등키 저장 및 중복 요청 방지 (STRING + TTL)
 - Rate Limit 카운터 (STRING + Lua, Fixed Window)
 - Lua Script를 통한 원자성 보장 (Idempotency + ZINCRBY + Key저장 + XADD 4연산 원자적)
-- Redis Streams를 통한 Audit Log 파이프라인 (score 반영과 원자적 기록, 운영 추적용)
-  - XADD MAXLEN ~ 100000 적용: 최근 10만 건만 유지하는 Ring Buffer 방식으로 OOM 방지
-  - Consumer Group은 구현하지 않으며, XLEN/XRANGE로 운영자가 직접 이벤트 흐름을 추적하는 Audit 용도로 사용
+- Redis Streams를 감사 이벤트 아웃박스로 사용 (score 반영과 원자적 기록)
+  - `audit-relay` Consumer Group이 `XREADGROUP`/`XACK`으로 전달 상태를 관리하고, 교체 릴레이는 `XAUTOCLAIM`으로 오래된 PEL을 인계
+  - 평상시에는 Consumer Group 진행 워터마크 기준 `MINID` 트림을 사용하고, `MAXLEN ~ 100000`은 릴레이가 장기간 멈췄을 때 무한 증가를 막는 최후 안전장치
 
 ### 13.2 PostgreSQL (Cold Path – Source of Record)
 
@@ -658,7 +659,7 @@ TTL 기본값: **24시간** (일 단위 이벤트 기준)
 ### 스냅샷 정책
 
 - 실시간 전체 랭킹은 PostgreSQL에 저장하지 않음
-- 스냅샷 범위는 **Top-1,000만** 허용 (전체 스캔 금지)
+- 스냅샷 범위는 **Top-1,000까지만** 허용 (전체 스캔 금지)
 - 기본 주기: 30초 (운영 목표에 따라 조정 가능)
 - Empty Guard 적용: Redis ZSET이 비어 있는 경우 저장 금지
 
@@ -667,7 +668,7 @@ TTL 기본값: **24시간** (일 단위 이벤트 기준)
 | 주기 | 예상 Lag | DB 부하 | 적합한 상황                  |
 | ---- | -------- | ------- | ---------------------------- |
 | 10초 | < 15초   | 높음    | 라이브 이벤트, 실시간성 중요 |
-| 30초 | < 45초   | 중간    | 기본값 (본 프로젝트 기준)    |
+| 30초 | < 45초   | 중간    | 기본값·SLO (`fixedDelay`와 처리 시간 포함) |
 | 5분  | < 6분    | 낮음    | 일반 운영, 비용 절감         |
 
 T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행, lag/latency trade-off를 수치화한다.
@@ -680,8 +681,8 @@ T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행
 
 **HTTP Layer**
 
-- `http_request_duration_seconds` (endpoint, method, status 라벨)
-- `http_requests_total`
+- `http_server_requests_seconds` (uri, method, status 라벨)
+- `http_server_requests_seconds_count`
 
 **Hot Path**
 
@@ -835,7 +836,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 | Strong Consistency 보장      | Eventually Consistent 선택과 트레이드오프 관계                                                                                                   |
 | Redis Sentinel / Cluster     | 본 프로젝트 범위 외, 향후 확장 방향만 문서화                                                                                                     |
 | ~~Kafka 기반 메시지 브로커~~ | ~~Redis Streams로 감사 로그 파이프라인 충분히 증명 가능~~ → **ADR-009에서 대체됨.** 보관 30일·복수 소비자를 가정으로 선언하면서 Kafka를 채택했다 |
-| Streams Replay 복구          | Cold Start 복구는 PostgreSQL Snapshot 기준으로 충분                                                                                              |
+| Redis 데이터 유실 후 Audit Stream 복구 | PostgreSQL 스냅샷은 Top-K 랭킹만 복구하며 Audit Stream 원본은 복구하지 않는다. 현재 Phase 3의 복구 범위는 Redis에 남아 있는 PEL을 교체 릴레이가 인계하는 동작까지다. |
 | Top API Cursor Pagination    | offset 기반 + 상한 제한으로 운영 범위 충분                                                                                                       |
 
 ---
@@ -846,7 +847,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 ### 18.0 목적
 
-이 섹션은 "성능 자랑"이 아니라 아래 3가지를 증명하기 위한 계획이다.
+이 섹션은 최대 성능 수치를 제시하는 것이 아니라 아래 3가지를 증명하기 위한 계획이다.
 
 - 선언한 SLO와 장애 범위를 충족하는가? (지연 시간, 오류율, 복구 가능성)
 - 이 시스템의 핵심 리스크(중복/편향/폭주/스냅샷 지연)를 이해했는가?
@@ -873,7 +874,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 | T1: Hot Path Write Throughput   | 1,000 TPS 목표 달성 여부       | p99 < 50ms, error rate < 0.1%    |
 | T3: Mixed Workload (Write+Read) | Read SLO 보호 여부             | Read p99 < 20ms (Write 부하 중)  |
 | T4: Idempotency Correctness     | 동시 중복 요청 정합성          | 점수 오염 0건, 200 OK 정상 반환  |
-| T8: Snapshot Pipeline Impact    | Snapshot lag/latency trade-off | lag < 30초, Write p99 영향 < 10% |
+| T8: Snapshot Pipeline Impact    | Snapshot lag/latency trade-off | lag < 45초, Write p99 영향 < 10% |
 
 **Tier 1 (Differentiator)**
 
@@ -981,99 +982,99 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 ### ADR-001: Redis를 Hot Path Source of Truth로 선택
 
-**상황:** 고빈도 Write 트래픽 처리 시 PostgreSQL 직접 반영 vs Redis 중간 레이어 선택 필요
+**상황:** 고빈도 Write 트래픽을 처리하기 위해 PostgreSQL에 직접 반영하는 방식과 Redis 중간 계층을 사용하는 방식 중 하나를 선택해야 했다.
 
-**결정:** Redis ZSET을 실시간 랭킹 Source of Truth로 채택
+**결정:** Redis ZSET을 실시간 랭킹의 Source of Truth로 채택했다.
 
-**근거:** PostgreSQL Row Lock 경쟁이 목표 TPS(1,000)에서 병목이 됨. Redis ZSET의 O(log N) 복잡도와 단일 스레드 특성이 고빈도 Write에 최적
+**근거:** PostgreSQL Row Lock 경쟁은 목표 TPS인 1,000에서 병목이 된다. Redis ZSET은 O(log N) 복잡도와 단일 스레드 특성을 바탕으로 고빈도 쓰기 요청을 처리할 수 있다.
 
-**트레이드오프:** Redis 장애 시 Write 기능 전체 중단. AOF + Circuit Breaker + PostgreSQL Snapshot으로 위험 완화
+**트레이드오프:** Redis에 장애가 발생하면 쓰기 기능 전체가 중단된다. AOF, Circuit Breaker와 PostgreSQL 스냅샷으로 이 위험을 완화한다.
 
 ---
 
 ### ADR-002: Lua Script 원자성 범위 결정
 
-**상황:** Idempotency 체크 + ZINCRBY + Key 저장 + 이벤트 기록을 원자적으로 처리 필요
+**상황:** 멱등성 확인, ZINCRBY, 키 저장과 이벤트 기록을 원자적으로 처리해야 했다.
 
-**결정:** 4개 연산 모두 단일 Lua Script에 포함 (Idempotency GET + ZINCRBY + SET EX + XADD)
+**결정:** 네 연산을 모두 단일 Lua Script에 포함했다(Idempotency GET + ZINCRBY + SET EX + XADD).
 
-**근거:** score 반영과 Audit Log 기록이 원자적으로 함께 동작해야 함. score는 반영됐는데 Streams에 누락되는 경우를 제거. XADD는 O(1) 상수 시간 연산으로 Lua 블로킹 리스크 없음
+**근거:** 점수 반영과 Audit Log 기록이 원자적으로 함께 동작해야 한다. 이 구조는 점수만 반영되고 Streams 기록이 누락되는 경우를 제거한다. XADD는 O(1) 상수 시간 연산이므로 추가되는 Lua 블로킹 위험도 제한적이다.
 
-**트레이드오프:** Lua Script에 KEYS 3개 필요. Redis Cluster 환경에서 `{leaderboardId}` hash tag 통일이 선행 조건
+**트레이드오프:** Lua Script에서 세 개의 KEYS를 사용한다. Redis Cluster 환경에서는 모든 키에 `{leaderboardId}` 해시 태그를 적용해야 한다.
 
-**후속 (2026-07-29):** ADR-009가 Kafka를 채택하면서 이 결정의 유지 여부가 쟁점이 됐다. Kafka producer는 Lua 블록 안에 들어갈 수 없기 때문이다. 검토 결과 **본 결정은 유지된다** — Lua의 4연산 원자성은 그대로 두고, 스트림의 역할만 최종 저장소에서 **outbox**로 바뀐다. 별도 relay가 스트림을 읽어 Kafka로 옮긴다. 선택 근거는 [SPIKE-001](SPIKE-001-kafka-migration-path.md)의 선결 쟁점 항목에 있다.
+**후속 (2026-07-29):** ADR-009가 Kafka를 채택하면서 이 결정의 유지 여부가 쟁점이 됐다. Kafka producer는 Lua 블록 안에 들어갈 수 없기 때문이다. 검토 결과 **본 결정은 유지된다.** Lua의 4연산 원자성은 그대로 두고, 스트림의 역할만 최종 저장소에서 **outbox**로 바뀐다. 별도 relay가 스트림을 읽어 Kafka로 옮긴다. 선택 근거는 [SPIKE-001](SPIKE-001-kafka-migration-path.md)의 선결 쟁점 항목에 있다.
 
 ---
 
 ### ADR-003: Snapshot Worker 분산 락 구현 방식
 
-**상황:** 다중 인스턴스 배포 시 Snapshot Worker 중복 실행 방지 필요. Redis 기반 SET NX EX vs PostgreSQL Advisory Lock 선택 필요
+**상황:** 다중 인스턴스 배포에서 Snapshot Worker가 중복으로 실행되지 않도록 Redis 기반 SET NX EX와 PostgreSQL Advisory Lock 중 하나를 선택해야 했다.
 
-**결정:** PostgreSQL pg_try_advisory_lock 기반 분산 락 구현
+**결정:** PostgreSQL `pg_try_advisory_lock` 기반 분산 락을 구현했다.
 
-**근거:** Cold Path(Snapshot Worker)는 Redis 장애와 독립적으로 동작해야 한다. Redis SET NX EX 방식은 Hot Path 장애 시 Lock 획득 자체가 불가능해 Cold Path까지 연쇄 중단되는 리스크 존재. PostgreSQL Advisory Lock은 세션 종료 시 자동 해제되므로 Worker 크래시 시에도 Lock 해제 보장. TTL/clock skew 리스크 없음
+**근거:** Cold Path의 Snapshot Worker는 Redis 장애와 독립적으로 동작해야 한다. Redis SET NX EX 방식은 Hot Path 장애 시 락을 획득할 수 없어 Cold Path까지 연쇄적으로 중단될 수 있다. PostgreSQL Advisory Lock은 세션이 종료되면 자동으로 해제되므로 워커가 비정상 종료돼도 락이 남지 않으며, TTL이나 시계 오차도 고려할 필요가 없다.
 
-**트레이드오프:** PostgreSQL 커넥션 소비. 단, Snapshot Worker는 주기 실행(30초 1회)이므로 커넥션 점유 시간 미미. Lock 키는 leaderboardId UUID의 상·하위 64비트를 XOR한 long 값을 사용
+**트레이드오프:** PostgreSQL 커넥션을 사용한다. 다만 Snapshot Worker는 30초마다 한 번 실행되므로 커넥션 점유 시간은 짧다. 락 키는 `leaderboardId` UUID의 상·하위 64비트를 XOR한 `long` 값을 사용한다.
 
 ---
 
 ### ADR-004: Rate Limit 구현 방식
 
-**상황:** API Key 기반 Rate Limit 구현 시 Redis Lua vs Bucket4j, Fixed Window vs Sliding Window 선택
+**상황:** API Key 기반 Rate Limit을 구현하기 위해 Redis Lua와 Bucket4j, Fixed Window와 Sliding Window를 비교해야 했다.
 
-**결정:** Redis Lua Script 기반 Fixed Window Counter 직접 구현
+**결정:** Redis Lua Script 기반 Fixed Window Counter를 직접 구현했다.
 
-**근거:** Redis는 이미 Hot Path에서 필수 의존 컴포넌트. Bucket4j 등 외부 라이브러리 도입 시 Redis와의 분리 비용 발생. Sliding Window는 시간대별 레코드가 필요해 구현 복잡도 상승. Fixed Window(INCR/EXPIRE)은 Lua 원자성으로 단순하게 구현 가능하며 본 프로젝트 범위에서 운영 비용 대비 효과가 충분함
+**근거:** Redis는 이미 Hot Path의 필수 의존 구성 요소다. Bucket4j 같은 외부 라이브러리를 도입하면 Redis 연동 계층을 별도로 관리해야 한다. Sliding Window는 시간 구간별 레코드가 필요해 구현 복잡도가 증가한다. Fixed Window는 INCR/EXPIRE와 Lua 원자성을 사용해 단순하게 구현할 수 있으며, 현재 프로젝트 범위에서 요구하는 제한 기능을 충족한다.
 
-**트레이드오프:** 윈도우 경계에서 최대 2배 버스트 발생 가능(앞 50% + 뒤 50% 포함). Redis 장애 시 Rate Limit도 동시 중단되지만 Circuit Breaker가 이미 Redis 장애를 처리하므로 허용
+**트레이드오프:** 윈도우 경계에서는 최대 두 배의 버스트가 발생할 수 있다. Redis 장애 시 Rate Limit도 함께 중단되지만 Circuit Breaker가 Redis 장애를 처리하므로 현재 범위에서는 허용한다.
 
 ---
 
 ### ADR-005: Redis SPOF 위험 완화 수준
 
-**상황:** Redis 단일 노드 장애가 서비스 전체에 영향
+**상황:** Redis 단일 노드 장애가 서비스 전체에 영향을 준다.
 
-**결정:** Redis Sentinel/Cluster는 본 프로젝트 범위 외. Circuit Breaker + AOF + PostgreSQL Snapshot으로 완화
+**결정:** Redis Sentinel과 Cluster는 프로젝트 범위에서 제외하고, Circuit Breaker, AOF와 PostgreSQL 스냅샷으로 위험을 완화한다.
 
-**근거:** 본 프로젝트 목적상 HA 인프라 설정보다 장애 시 거동과 회복 패턴 증명이 우선
+**근거:** 이 프로젝트에서는 HA 인프라 구성보다 장애 시 동작과 복구 방식을 검증하는 작업을 우선한다.
 
-**트레이드오프:** Redis 장애 시 Write 기능 중단 피할 수 없음. 향후 Sentinel 추가로 해결 가능
+**트레이드오프:** Redis 장애 시 쓰기 기능의 중단을 피할 수 없다. 고가용성이 필요해지면 Sentinel 도입을 검토한다.
 
 ---
 
 ### ADR-006: Competition Ranking 방식 선택
 
-**상황:** ZREVRANK+1 단순 방식 vs Competition Ranking(1,2,2,4) 방식 선택 필요
+**상황:** ZREVRANK+1을 사용하는 단순 순위와 Competition Ranking(1,2,2,4) 중 하나를 선택해야 했다.
 
-**결정:** `rank = ZCOUNT(key, ({myScore}, +inf]) + 1` 방식 채택
+**결정:** `rank = ZCOUNT(key, ({myScore}, +inf]) + 1` 방식을 채택했다.
 
-**근거:** ZREVRANK+1은 동점자를 서로 다른 순위로 반환하여 "같은 점수면 같은 순위"라는 사용자 기대를 위반한다. 게임/랭킹 도메인에서 Competition Ranking이 표준이며, ZCOUNT는 O(log N) 연산으로 성능 허용 범위 내
+**근거:** ZREVRANK+1은 동점자를 서로 다른 순위로 반환하여 "같은 점수면 같은 순위"라는 사용자 기대를 위반한다. 게임과 랭킹 도메인에서는 Competition Ranking이 일반적으로 사용되며, ZCOUNT의 O(log N) 연산 비용은 현재 성능 목표 안에서 허용할 수 있다.
 
-**트레이드오프:** 조회 시 ZSCORE + ZCOUNT 2회 연산 필요 (2 RTT). 단, GET /users/{userId}는 실시간 조회이므로 현재 SLO(p99 < 20ms) 범위 내에서 허용. Top API는 ZREVRANGE 결과에 순위를 순차 부여(별도 ZCOUNT 불필요). Read TPS가 임계점을 초과할 경우 두 연산을 단일 Lua Script 또는 Redis Pipeline으로 묶어 1 RTT로 개선 가능.
+**트레이드오프:** 조회할 때 ZSCORE와 ZCOUNT를 각각 실행하므로 두 번의 RTT가 필요하다. 다만 `GET /users/{userId}`는 현재 SLO인 p99 20ms 안에서 동작한다. Top API는 ZREVRANGE 결과에 순위를 순차적으로 부여하므로 별도의 ZCOUNT가 필요하지 않다. 읽기 TPS가 임계점을 넘으면 두 연산을 단일 Lua Script나 Redis Pipeline으로 묶어 한 번의 RTT로 줄일 수 있다.
 
 ---
 
 ### ADR-007: GET /users/{userId} 미참여 유저 응답 정책
 
-**상황:** 리더보드에 참여 이력이 없는 유저 조회 시 404 vs 200 선택 필요
+**상황:** 리더보드에 참여한 적이 없는 유저를 조회할 때 404와 200 중 어떤 상태 코드를 반환할지 결정해야 했다.
 
-**결정:** 200 OK + `{ "rank": null, "score": 0 }` 반환
+**결정:** 200 OK와 `{ "rank": null, "score": 0 }`을 반환한다.
 
-**근거:** 랭킹 도메인에서 "참여 이력 없음"은 에러 상태가 아니라 비즈니스 상태다. 404는 리소스 자체가 존재하지 않음을 의미하지만 유저 자체는 존재할 수 있다. 클라이언트가 null 체크로 미참여 여부를 처리할 수 있어 에러 핸들링 분기가 줄어든다
+**근거:** 랭킹 도메인에서 "참여 이력 없음"은 오류가 아니라 비즈니스 상태다. 404는 리소스 자체가 존재하지 않음을 의미하지만 유저는 존재할 수 있다. 클라이언트는 `rank=null` 여부로 미참여 상태를 판단할 수 있으므로 오류 처리 분기가 줄어든다.
 
-**트레이드오프:** score=0이 실제 점수 0점과 구분되지 않을 수 있음. rank=null로 미참여를 명확히 구분하여 해결
+**트레이드오프:** `score=0`만으로는 실제 점수가 0점인 유저와 미참여 유저를 구분할 수 없다. `rank=null`을 함께 반환해 미참여 상태를 구분한다.
 
 ---
 
 ### ADR-008: POST /events 응답 스키마
 
-**상황:** POST 응답에 rank/score 포함 여부 결정 필요
+**상황:** POST 응답에 순위와 점수를 포함할지 결정해야 했다.
 
-**결정:** 처리 확인 중심 응답만 반환 (`idempotencyKey`, `replayed`, `processedAt`)
+**결정:** 처리 결과를 확인하는 데 필요한 `idempotencyKey`, `replayed`, `processedAt`만 반환한다.
 
 **근거:** POST는 "이벤트 처리 확인" 책임만 가져야 한다. 이는 CQRS 패턴의 약식 적용이다. Write(Hot Path)는 처리량(Throughput) 극대화와 멱등성 보장에만 집중하고, 데이터 조회(Read)는 별도 API로 분리하여 각자의 목적에 맞게 캐싱 및 스케일링이 가능하도록 설계했다. rank/score를 POST 응답에 포함하면 replay 응답 시 최초 처리 시점의 과거 값을 반환하게 되어 클라이언트 혼란을 야기한다.
 
-**트레이드오프:** 클라이언트가 처리 후 즉시 순위를 확인하려면 추가 GET 요청 필요. 단, 랭킹 조회와 이벤트 처리는 서로 다른 주기로 발생하므로 실용적 문제 없음
+**트레이드오프:** 클라이언트가 처리 직후 순위를 확인하려면 GET 요청을 추가로 보내야 한다. 다만 랭킹 조회와 이벤트 처리는 서로 다른 주기로 발생하므로 현재 사용 시나리오에서는 문제가 되지 않는다.
 
 ---
 
@@ -1081,7 +1082,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **상태:** 확정 (2026-07-27 착수, 2026-07-28 결정)
 
-**재검토 대상:** `17. Non-goals`의 "Kafka 기반 메시지 브로커 — Redis Streams로 감사 로그 파이프라인 충분히 증명 가능" 한 줄. 당시 판단의 근거와 **뒤집힘 조건이 문서에 남아 있지 않았다.** 본 ADR은 그 결정을 수치와 함께 정식화하고 재검토한다.
+**재검토 대상:** `17. Non-goals`에 있던 "Kafka 기반 메시지 브로커: Redis Streams만으로 감사 로그 파이프라인을 충분히 증명할 수 있음"이라는 항목이다. 당시 판단의 근거와 **결정을 재검토할 조건이 문서에 남아 있지 않았다.** 본 ADR은 그 결정을 수치와 함께 정식화하고 재검토한다.
 
 **상황 (결정 시점 = 2026-07-27 기준):** audit stream(`lb:{leaderboardId}:events`)은 XADD로 append만 되고 **읽는 코드가 없었다.** 이 사실이 두 곳에 흔적으로 남아 있었다. 아래는 당시 관찰이며, 두 지점 모두 relay 도입 후 해소됐다(`pendingEntries`는 실제 XPENDING 건수, `lastDeliveredId`는 제거).
 
@@ -1098,25 +1099,25 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 | -------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | audit 유입 (평균)          | 약 3.5/s            | `0. Scenario` 30만 건/일 ÷ 86,400                                                                                                               |
 | audit 유입 (피크)          | 1,000/s             | `0. Scenario` 목표 TPS (시스템 전체값, 리더보드별 아님)                                                                                         |
-| 현재 보존 창               | 약 8시간            | `MAXLEN ~ 100000` ÷ 30만 건/일                                                                                                                  |
+| Stream 길이 안전 상한      | 약 8시간 유입량     | `MAXLEN ~ 100000` ÷ 30만 건/일. 평상시 보존 기간은 Consumer Group 워터마크 기반 트림에 따라 더 짧다                                            |
 | 한 달 보존 시 Redis 메모리 | 약 900MB / 리더보드 | 30일 × 30만 × ~100B                                                                                                                             |
 | 메모리 초과 시 거동        | **write 실패**      | `maxmemory-policy noeviction`                                                                                                                   |
 | Redis 버전                 | 7.x                 | `docker-compose.yml` `redis:7`. `lag`/`entries-read`/`entries-added`는 7.0+ 필드이므로, Streams 쪽 관측 가능 범위는 이 버전 조건에서만 성립한다 |
 
 **검토한 대안:** 도입 안 함 / 인프로세스 큐 / Redis Streams 컨슈머 그룹 / PostgreSQL 적재 / Kafka
 
-**대안 간 구조적 차이:** 단일 writer(PG primary) vs 파티션 분산(Kafka), MAXLEN 링 버퍼 vs 시간 기반 리텐션. 내구성은 저장 매체가 아니라 복제 구성에서 갈린다 — 단일 브로커 Kafka의 유실 창은 Redis AOF everysec과 같은 성격이다.
+**대안 간 구조적 차이:** 단일 writer(PG primary)와 파티션 분산(Kafka), MAXLEN 링 버퍼와 시간 기반 리텐션을 비교했다. 내구성은 저장 매체보다 복제 구성에 좌우된다. 단일 브로커 Kafka의 유실 가능 구간은 Redis AOF `everysec`과 같은 성격이다.
 
 **선언한 가정:** 본 결정은 아래 두 가정 위에 선다. `0. Scenario`가 DAU 50만을 선언하고 거기서 목표 TPS를 역산한 것과 같은 방식이며, 실측이 아니라 **설계 기준**이다.
 
-- **가정 1 — 보관 요구 30일.** 유저 단위 점수 추이를 30일 범위에서 조회할 수 있어야 한다.
-- **가정 2 — 소비자가 하나로 끝나지 않는다.** 최소 두 종류를 예정한다: **추이 집계**(과거 지향, 지연 허용), **이상 탐지**(현재 지향, 지연 시 의미 소멸). 둘은 같은 로그를 서로 다른 위치에서 서로 다른 속도로 읽으며, 탐지 규칙 변경 시 **한쪽만 과거 구간을 되감아 재평가**해야 한다.
+- **가정 1: 보관 요구는 30일이다.** 유저 단위 점수 추이를 30일 범위에서 조회할 수 있어야 한다.
+- **가정 2: 소비자는 하나로 끝나지 않는다.** 최소 두 종류를 예정한다. **추이 집계**는 과거 데이터를 대상으로 하며 지연을 허용한다. **이상 탐지**는 현재 데이터를 대상으로 하므로 지연되면 효용이 줄어든다. 둘은 같은 로그를 서로 다른 위치에서 서로 다른 속도로 읽으며, 탐지 규칙을 변경하면 **한쪽만 과거 구간을 되감아 재평가**해야 한다.
 
 **각 가정이 탈락시키는 것:**
 
 | 대안                      | 탈락 사유                                                                                                                                                                                                                                    |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 인프로세스 큐             | 회수 메커니즘 부재. 처리 중 프로세스가 죽으면 해당 일감이 소멸한다                                                                                                                                                                           |
+| 인프로세스 큐             | 회수 메커니즘이 없다. 처리 중 프로세스가 종료되면 해당 일감이 소멸한다.                                                                                                                                                                     |
 | Redis Streams 컨슈머 그룹 | **가정 1.** 보관 정책을 기간과 용량 양쪽으로 고정할 수 없다. `MAXLEN`(건수)은 보관 기간이 유입률에 반비례해 정책으로 선언할 수 없고, `MINID`(시간)로 30일을 걸면 리더보드당 약 900MB가 필요해 `noeviction` 정책과 만나 write 실패로 이어진다 |
 | PostgreSQL 적재           | **가정 2.** 30일 900만 행 자체는 파티셔닝으로 일상적 규모이나, 복수 소비자의 오프셋·체크포인트·재처리 되감기를 애플리케이션이 직접 구현해야 한다                                                                                             |
 | 도입 안 함                | 가정 1과 2를 모두 충족하지 못한다                                                                                                                                                                                                            |
@@ -1140,7 +1141,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 ## 20. 핵심 설계 요약
 
 - **TPS 목표 1,000**: 비즈니스 시나리오(DAU 50만, 이벤트 집중 2시간)에서 역산한 수치 기반
-- **SLO 명시**: Write p99 < 50ms, Snapshot Lag < 30s, 중복 처리 오염 0건
+- **SLO 명시**: Write p99 < 50ms, Snapshot Lag < 45s, 중복 처리 오염 0건
 - **Hot/Cold Path 분리**: Redis(실시간) / PostgreSQL(기록/운영) 명확한 책임 분리
 - **Competition Ranking**: ZCOUNT 기반 1,2,2,4 방식, 단순 ZREVRANK+1 사용 금지
 - **Idempotency 완전 명세**: TTL 내 중복(200), payload 불일치(409), TTL 이후(신규) 3케이스 모두 정의
@@ -1158,4 +1159,4 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 고빈도 이벤트 처리 환경에서 Redis 기반 실시간 처리, Kafka 기반 감사 이벤트 전달, PostgreSQL 기반 영속 저장을 분리해 성능, 정합성, 운영 안정성을 함께 설계한 백엔드 시스템이다.
 
-비즈니스 시나리오(DAU 50만)에서 역산한 **목표 TPS 1,000**과 **명시적 SLO(p99 < 50ms, Snapshot Lag < 30s)**를 기준으로 k6 부하 테스트 결과를 수치로 검증한다. Competition Ranking 계산식, 계층별 RPO, Idempotency 3케이스 명세, Snapshot Overwrite Guard, POST 응답 스키마 설계 근거를 문서에 함께 정리한다.
+비즈니스 시나리오(DAU 50만)에서 역산한 **목표 TPS 1,000**과 **명시적 SLO(p99 < 50ms, Snapshot Lag < 45s)**를 기준으로 k6 부하 테스트 결과를 수치로 검증한다. Competition Ranking 계산식, 계층별 RPO, Idempotency 3케이스 명세, Snapshot Overwrite Guard, POST 응답 스키마 설계 근거를 문서에 함께 정리한다.

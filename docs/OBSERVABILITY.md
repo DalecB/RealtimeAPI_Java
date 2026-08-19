@@ -10,7 +10,7 @@
 ## 1. 로컬 스택 실행
 
 ```bash
-docker compose up -d postgres redis app prometheus grafana
+docker compose up -d postgres redis kafka app prometheus grafana
 ```
 
 접속 주소:
@@ -85,5 +85,5 @@ docker compose up -d postgres redis app prometheus grafana
 - `stream_pending_entries`는 릴레이가 읽었지만 XACK하지 않은 PEL 건수입니다.
 - 릴레이 상태는 두 값을 함께 봅니다. 읽기 전에 멈추면 `stream_pending_entries`는 증가하지 않습니다.
 - `stream_length`는 이미 처리했지만 아직 트림하지 않은 항목도 포함하므로 미처리 건수로 사용하지 않습니다.
-- `snapshot status`는 메모리 tracker 기반이라 앱 재시작 시 마지막 성공 시각은 초기화됩니다.
-- recovery 검증 스크립트는 compose의 `app` 컨테이너를 재시작하는 방식이라, `bootRun` 로컬 프로세스가 아니라 compose app 기준으로 사용해야 합니다.
+- 스냅샷 상태 API는 인메모리 상태 추적기를 사용하므로 애플리케이션을 재시작하면 마지막 성공 시각이 초기화됩니다.
+- 복구 검증 스크립트는 Docker Compose의 `app` 컨테이너를 재시작합니다. 따라서 로컬 `bootRun` 프로세스가 아니라 Docker Compose로 실행한 애플리케이션을 기준으로 사용해야 합니다.

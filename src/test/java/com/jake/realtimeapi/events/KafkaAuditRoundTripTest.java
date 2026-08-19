@@ -150,26 +150,131 @@ class KafkaAuditRoundTripTest {
         eventCommandRepository.process(payload, API_KEY_ID);
 
         String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
-        redisTemplate.opsForStream().createGroup(
-                streamKey,
-                ReadOffset.from("0"),
-                AuditRelayWorker.GROUP
-        );
-
-        List<MapRecord<String, Object, Object>> readByStoppedRelay = redisTemplate.opsForStream().read(
-                Consumer.from(AuditRelayWorker.GROUP, "stopped-relay-" + UUID.randomUUID()),
-                StreamReadOptions.empty().count(1),
-                StreamOffset.create(streamKey, ReadOffset.lastConsumed())
-        );
-
-        assertNotNull(readByStoppedRelay);
-        assertEquals(1, readByStoppedRelay.size());
+        readAsStoppedRelay(streamKey, 1);
         assertEquals(1, pendingCount(streamKey));
 
         auditRelayWorker.relayAll();
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             assertEquals(1, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(0, pendingCount(streamKey));
+        });
+    }
+
+    @Test
+    void pendingMessage_isClaimedOnlyAfterMinIdle() {
+        Fixture fixture = createFixture();
+        eventCommandRepository.process(new EventPayload(
+                fixture.leaderboardId(),
+                fixture.userId(),
+                DELTA,
+                UUID.randomUUID()
+        ), API_KEY_ID);
+
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+        readAsStoppedRelay(streamKey, 1);
+
+        AuditRelayWorker delayedClaimRelay = new AuditRelayWorker(
+                leaderboardRepository,
+                redisTemplate,
+                kafkaTemplate,
+                objectMapper,
+                1,
+                1_000
+        );
+
+        delayedClaimRelay.relayAll();
+
+        assertEquals(0, findAuditRows(fixture.leaderboardId()).size());
+        assertEquals(1, pendingCount(streamKey));
+
+        await().pollDelay(Duration.ofMillis(1_100)).atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            delayedClaimRelay.relayAll();
+            assertEquals(1, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(0, pendingCount(streamKey));
+        });
+    }
+
+    @Test
+    void stalePendingMessages_areClaimedAcrossRecoveryBatches() {
+        Fixture fixture = createFixture();
+        for (int i = 0; i < 3; i++) {
+            eventCommandRepository.process(new EventPayload(
+                    fixture.leaderboardId(),
+                    fixture.userId(),
+                    DELTA,
+                    UUID.randomUUID()
+            ), API_KEY_ID);
+        }
+
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+        readAsStoppedRelay(streamKey, 3);
+        assertEquals(3, pendingCount(streamKey));
+
+        AuditRelayWorker twoAtATimeRelay = new AuditRelayWorker(
+                leaderboardRepository,
+                redisTemplate,
+                kafkaTemplate,
+                objectMapper,
+                2,
+                0
+        );
+
+        twoAtATimeRelay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(2, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(1, pendingCount(streamKey));
+        });
+
+        twoAtATimeRelay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(3, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(0, pendingCount(streamKey));
+        });
+    }
+
+    @Test
+    void kafkaPublishedBeforeCrash_isDeduplicatedWhenPendingMessageIsRelayedAgain() throws Exception {
+        Fixture fixture = createFixture();
+        UUID idempotencyKey = UUID.randomUUID();
+        eventCommandRepository.process(new EventPayload(
+                fixture.leaderboardId(),
+                fixture.userId(),
+                DELTA,
+                idempotencyKey
+        ), API_KEY_ID);
+
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+        List<MapRecord<String, Object, Object>> readByStoppedRelay = readAsStoppedRelay(streamKey, 1);
+        assertEquals(1, pendingCount(streamKey));
+
+        String eventId = readByStoppedRelay.get(0).getId().getValue();
+        String key = fixture.leaderboardId().toString();
+        kafkaTemplate.send(
+                AuditTopicConfig.AUDIT_TOPIC,
+                key,
+                eventJson(fixture, eventId, idempotencyKey)
+        ).get();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertEquals(1, findAuditRows(fixture.leaderboardId()).size()));
+
+        auditRelayWorker.relayAll();
+
+        String sentinelEventId = Instant.now().toEpochMilli() + "-0";
+        kafkaTemplate.send(
+                AuditTopicConfig.AUDIT_TOPIC,
+                key,
+                eventJson(fixture, sentinelEventId, UUID.randomUUID())
+        ).get();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            List<AuditEventQueryRepository.RecentAuditEvent> rows = findAuditRows(fixture.leaderboardId());
+            assertEquals(2, rows.size());
+            assertEquals(1, rows.stream().filter(row -> row.eventId().equals(eventId)).count());
+            assertEquals(1, rows.stream().filter(row -> row.eventId().equals(sentinelEventId)).count());
             assertEquals(0, pendingCount(streamKey));
         });
     }
@@ -291,6 +396,18 @@ class KafkaAuditRoundTripTest {
         PendingMessagesSummary pending = redisTemplate.opsForStream().pending(streamKey, AuditRelayWorker.GROUP);
         assertNotNull(pending);
         return pending.getTotalPendingMessages();
+    }
+
+    private List<MapRecord<String, Object, Object>> readAsStoppedRelay(String streamKey, int count) {
+        redisTemplate.opsForStream().createGroup(streamKey, ReadOffset.from("0"), AuditRelayWorker.GROUP);
+        List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
+                Consumer.from(AuditRelayWorker.GROUP, "stopped-relay-" + UUID.randomUUID()),
+                StreamReadOptions.empty().count(count),
+                StreamOffset.create(streamKey, ReadOffset.lastConsumed())
+        );
+        assertNotNull(records);
+        assertEquals(count, records.size());
+        return records;
     }
 
     private record Fixture(long userId, UUID leaderboardId) {

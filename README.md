@@ -5,7 +5,7 @@ Redis 핫패스와 PostgreSQL 콜드패스를 분리하고, 감사 이벤트를 
 적용한 PRD 기준:
 - [docs/PRD.md](docs/PRD.md)
 - 목표 처리량: `Write 1,000 TPS`
-- 핵심 SLO: `POST /events p99 < 50ms`, `Read p99 < 20ms`, `snapshot_lag_seconds < 30s`, `idempotency 오염 0건`
+- 핵심 SLO: `POST /events p99 < 50ms`, `Read p99 < 20ms`, `snapshot_lag_seconds < 45s`, `idempotency 오염 0건`
 
 ## What This Project Shows
 
@@ -27,6 +27,7 @@ Redis 핫패스와 PostgreSQL 콜드패스를 분리하고, 감사 이벤트를 
 ## 현재 구현 범위
 
 - Phase 2는 **단일 릴레이 + 고정 컨슈머 이름**, Kafka 단일 브로커, PostgreSQL 멱등 저장, Kafka 컨슈머 재시작·2인스턴스 재할당 검증까지 완료했습니다.
+- Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했습니다. 자동화 테스트에서는 운영값보다 짧은 유휴 시간과 작은 배치 크기를 사용해 `min-idle-time` 적용, 반환 커서 기반 후속 배치 처리, Kafka 발행 후 XACK 전 중복 처리를 검증했습니다.
 - Snapshot worker 기본 주기는 `30초`입니다. T8 비교를 위해 `5분` 주기로도 재기동해 측정했습니다.
 - 관리용 JWT 로그인은 현재 범위에서 `users.externalId` 기반 demo auth를 사용합니다.
 - `/internal/streams/status`의 `consumerGroupLag`는 릴레이가 아직 읽지 않은 건수, `pendingEntries`는 읽었지만 XACK하지 않은 건수(XPENDING)입니다. `streamLength`는 이미 처리된 항목까지 포함한 감사 스트림의 전체 길이(XLEN)입니다.
@@ -67,11 +68,14 @@ Testcontainers 통합 테스트:
 | --- | --- | --- |
 | 동시 멱등 처리 | 동일 Idempotency Key·동일 payload로 50건을 동시에 요청한다. Lua가 check-and-act를 한 번에 처리해 신규 1건/replay 49건, 점수 반영 1회(ZSCORE), audit 기록 1건(XLEN)을 보장하는지 검증 | `ProcessEventConcurrencyTest` |
 | 멱등키 재사용 충돌 | 동일 키의 payload 해시(`userId:delta`)가 다르면 replay가 아닌 요청 내용 변경으로 판단한다. `IdempotencyKeyReuseMismatchException`을 던지고 점수를 반영하지 않는지 검증하며, HTTP 409 매핑은 `EventCommandControllerWebMvcTest`에서 확인 | `ProcessEventConcurrencyTest` |
-| Redis 장애 fail-fast | 성공 10건으로 sliding window를 채운 상태에서 Redis 컨테이너를 중단 — 임계(50%) 도달인 5번째 실패에서 브레이커가 OPEN 되고, 이후 요청은 커넥션 타임아웃을 기다리지 않고 즉시 실패하는지 검증 | `RedisOutageCircuitBreakerTest` |
+| Redis 장애 fail-fast | 성공 10건으로 sliding window를 채운 상태에서 Redis 컨테이너를 중단합니다. 실패율이 임계값인 50%에 도달하는 5번째 실패에서 브레이커가 OPEN 상태로 전환되고, 이후 요청이 커넥션 타임아웃을 기다리지 않고 즉시 실패하는지 검증합니다. | `RedisOutageCircuitBreakerTest` |
 | Snapshot 왕복 복구 | Redis ZSET 3건을 PostgreSQL snapshot으로 저장한 뒤 랭킹 키를 삭제하고 복구한다. `recovered=true` / `RECOVERED` / 복구 행 수 3을 먼저 확인해 `REDIS_ALREADY_WARM`으로 건너뛴 경우를 제외하고, 유저별 ZSCORE와 ZCARD가 원본과 일치하는지 검증 | `SnapshotRoundTripTest` |
 | Kafka 감사 로그 왕복 | 이벤트 처리의 Lua XADD → 릴레이 1회 → Kafka 컨슈머 → PostgreSQL `audit_events` 적재를 실제 컨테이너로 연결하고, `eventId`·`userId`·`delta`·`apiKeyId` 등 원본 필드와 릴레이 처리 후 Redis 미확인 메시지 0건(XPENDING)을 검증 | `KafkaAuditRoundTripTest` |
 | Kafka 중복 전달 멱등 | 동일 `eventId`의 Kafka 메시지를 2회 전달해도 `(leaderboard_id, event_id)` UNIQUE와 `ON CONFLICT DO NOTHING`으로 `audit_events`가 1행인지 검증. 컨슈머 저장 멱등성의 검증이며 릴레이 장애 복구 검증은 아님 | `KafkaAuditRoundTripTest` |
 | Kafka 컨슈머 재시작 | 첫 메시지의 DB 적재와 오프셋 커밋을 확인한 뒤 리스너를 중지한다. 중지 중 같은 파티션에 두 번째 메시지를 넣고 재시작해, 커밋된 오프셋 이후부터 소비하고 두 메시지를 각각 1행 저장하는지 검증 | `KafkaAuditRoundTripTest` |
+| 교체 릴레이의 `min-idle-time` 적용 | 임시 컨슈머가 남긴 PEL은 메시지의 유휴 시간이 1초에 도달하기 전까지 유지되고, 1초가 지난 뒤에만 교체 릴레이가 인계하는지 검증합니다. 인계한 메시지는 PostgreSQL에 저장한 뒤 XACK합니다. | `KafkaAuditRoundTripTest` |
+| PEL 인계 커서 연속 처리 | PEL 3건과 복구 배치 크기 2건을 사용해 첫 주기에 2건을 처리하고, 다음 주기에 반환 커서부터 나머지 1건을 처리하는지 검증합니다. | `KafkaAuditRoundTripTest` |
+| Kafka 발행 후 XACK 전 중복 | PEL 메시지를 Kafka에 먼저 발행해 PostgreSQL에 저장한 뒤 같은 PEL을 릴레이가 다시 발행합니다. 이때 `(leaderboard_id, event_id)` 고유 제약으로 기존 이벤트가 1행만 유지되고 PEL이 XACK되는지 검증합니다. | `KafkaAuditRoundTripTest` |
 
 Kafka 컨슈머 다중 인스턴스 실제 구동 검증(2026-08-11):
 
@@ -81,9 +85,9 @@ Kafka 컨슈머 다중 인스턴스 실제 구동 검증(2026-08-11):
 | app-2 추가 | app-1 = `0, 1`, app-2 = `2` | app-2가 파티션 2의 이벤트를 소비해 PostgreSQL에 1행 저장 |
 | app-2 강제 종료 | 45초 뒤 app-1 = `0, 1, 2` | app-1이 파티션 2를 다시 할당받아 다음 이벤트를 저장했고 모든 파티션의 컨슈머 지연이 0으로 복귀 |
 
-두 인스턴스는 같은 애플리케이션 이미지와 `audit-trend` 컨슈머 그룹을 사용했다. 릴레이는 app-1에서만 활성화하고 app-2에서는 비활성화했다. 이 결과는 Kafka 컨슈머의 파티션 재할당을 검증한 것이며, API 요청 분산이나 릴레이 다중화·처리량을 검증한 것은 아니다.
+두 인스턴스는 같은 애플리케이션 이미지와 `audit-trend` 컨슈머 그룹을 사용했습니다. 릴레이는 app-1에서만 활성화하고 app-2에서는 비활성화했습니다. 이 결과는 Kafka 컨슈머의 파티션 재할당을 검증한 것이며, API 요청 분산이나 릴레이 다중화 및 처리량을 검증한 것은 아닙니다.
 
-현재 릴레이 운용 범위는 **단일 인스턴스**입니다. 같은 컨슈머 이름으로 재시작하면 자기 PEL을 즉시 재처리하고, 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하는 경로는 단건 Testcontainers 테스트까지 검증했습니다. 실제 10분 유휴·500건 초과 cursor·종료 주입·동시 다중 릴레이는 아직 검증하지 않았습니다. 상세 범위는 [SPIKE-001](docs/SPIKE-001-kafka-migration-path.md#현재-운용-경계와-phase-3-정책)에 있습니다.
+현재 릴레이 운용 범위는 **단일 인스턴스**입니다. 같은 컨슈머 이름으로 재시작하면 자기 PEL을 즉시 재처리하고, 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계합니다. Testcontainers에서는 운영값보다 짧은 유휴 시간과 작은 배치 크기를 사용해 `min-idle-time` 적용, 반환 커서 기반 후속 배치 처리, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했습니다. 실제 10분 유휴 조건, 500건을 초과하는 PEL, 프로세스 강제 종료, 인계받은 릴레이의 재종료, 여러 릴레이의 동시 실행은 아직 검증하지 않았습니다. 상세 범위는 [SPIKE-001](docs/SPIKE-001-kafka-migration-path.md#현재-운용-경계와-phase-3-정책)에 있습니다.
 
 수집된 벤치마크 결과:
 

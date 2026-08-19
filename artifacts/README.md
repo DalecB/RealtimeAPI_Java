@@ -49,10 +49,10 @@ PRD 기준:
 
 ## Current Status
 
-- `T1`: collected (Redis 256MB Kafka E2E 포함)
-- `T3`: collected
-- `T4`: collected
-- `T8`: collected (JSON)
+- `T1`: 수집 완료(Redis 256MB Kafka E2E 포함)
+- `T3`: 수집 완료
+- `T4`: 수집 완료
+- `T8`: JSON 수집 완료
 
 ## Kafka E2E Summary
 
@@ -74,5 +74,5 @@ PRD 기준:
   - `read p99 1.994ms`
   - `fail 0.0077%`
 - 결론
-  - `5분 주기`는 freshness를 크게 희생하지만 latency 이점을 주지 못했다.
+  - `5분 주기`는 최신성을 크게 낮추지만 지연 시간을 개선하지 못했다.
   - 운영 기본값은 `30초 주기`가 더 타당하다.

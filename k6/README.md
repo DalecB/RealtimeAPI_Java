@@ -9,11 +9,11 @@
 
 ## 전제
 
-- 앱과 인프라가 떠 있어야 합니다.
-- 권장: compose 전체 실행
+- 애플리케이션과 인프라가 실행 중이어야 합니다.
+- Docker Compose 전체 스택을 실행하는 방식을 권장합니다.
 - 로컬에 `k6`가 없으면 `bash scripts/run-k6.sh ...`를 사용하면 됩니다.
 - 이전 k6 테스트 데이터를 비우려면 `bash scripts/cleanup-k6-data.sh`를 먼저 실행하면 됩니다.
-- Grafana에서 패널/대시보드 PNG export를 쓰려면 `renderer` 서비스도 함께 떠 있어야 합니다.
+- Grafana에서 패널과 대시보드를 PNG로 내보내려면 `renderer` 서비스도 함께 실행해야 합니다.
 - Redis는 named volume을 쓰므로, `docker compose down`만으로는 benchmark 데이터가 남을 수 있습니다.
 - `T3/T4`를 다시 깨끗하게 측정할 때는 `docker compose down -v`로 Redis volume까지 비우는 편이 안전합니다.
 
@@ -39,8 +39,8 @@ bash scripts/cleanup-k6-data.sh
 - `REDIS_MAXMEMORY` 개발 기본값: `1gb` (`docker-compose.yml`)
 
 주의:
-- 공식 벤치마크 환경은 PRD 기준인 `Redis maxmemory 256MB`다.
-- 최종 측정 명령에는 `REDIS_MAXMEMORY=256mb`를 명시한다. 1GB 기본값은 반복 개발 실행용이며 공식 결과 환경이 아니다.
+- 공식 벤치마크 환경은 PRD 기준인 `Redis maxmemory 256MB`입니다.
+- 최종 측정 명령에는 `REDIS_MAXMEMORY=256mb`를 명시합니다. 1GB 기본값은 반복 개발용이며 공식 결과 환경이 아닙니다.
 
 기본 동작:
 
@@ -185,7 +185,7 @@ WRITE_RPS=800 READ_RPS=200 DURATION=10m bash scripts/run-k6.sh run k6/t8-snapsho
 
 ## 결과 기록 포인트
 
-README나 별도 리포트에 최소한 아래를 남기는 게 좋습니다.
+README나 별도 보고서에 최소한 다음 정보를 기록해야 합니다.
 
 1. 테스트 환경
 - 머신 스펙

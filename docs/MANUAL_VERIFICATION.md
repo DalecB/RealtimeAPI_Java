@@ -2,7 +2,7 @@
 
 적용한 PRD 기준:
 - `POST /events`는 API key 인증 + rate limit/quota를 통과해야 한다.
-- 관리 API는 JWT 인증을 통과해야 한다. 이 구현에서는 기존 `users.externalId` 기반 login으로 JWT를 발급한다. (가정)
+- 관리 API는 JWT 인증을 통과해야 한다. 현재 데모 인증에서는 별도의 신원 확인 없이 기존 `users.externalId`를 받아 JWT를 발급한다.
 - `POST /projects`로 프로젝트를 만들면 현재 로그인한 유저 id가 `adminId`로 저장되고, 바로 사용할 기본 API key가 함께 발급된다.
 - 랭킹 읽기는 Hot Path(Redis), 스냅샷은 Cold Path(PostgreSQL)로 검증한다.
 
@@ -29,20 +29,21 @@ LEADERBOARD_ID=your-leaderboard-id bash scripts/verify-cold-start-recovery.sh
 ```
 
 전제:
-- 앱이 이미 떠 있어야 한다.
+- 애플리케이션이 이미 실행 중이어야 한다.
 - `jq`, `curl`, `uuidgen`이 필요하다.
 - 기본 대기 시간은 35초라 snapshot worker 결과까지 같이 본다.
 
 ## 1. 앱 실행
 
 ```bash
-docker compose up -d postgres redis
+docker compose up -d postgres redis kafka
 SPRING_PROFILES_ACTIVE=local SPRING_DATA_REDIS_PORT=6370 ./gradlew bootRun
 ```
 
 기대 결과:
 - PostgreSQL: `localhost:5432`
 - Redis: `localhost:6370`
+- Kafka: `localhost:29092`
 - local profile 기준으로 snapshot worker가 활성화된다.
 
 ## 2. 유저 생성
@@ -217,7 +218,7 @@ curl -s http://localhost:8080/internal/snapshot/status
 
 기대 결과:
 - `lastSuccessfulSnapshotAt`가 `null`이 아니다.
-- `snapshotLagSeconds`가 너무 크게 누적되지 않는다.
+- `snapshotLagSeconds`가 PRD에서 정한 Snapshot Lag SLO 이내인지 확인한다.
 
 ### Cold Path snapshot 조회
 
@@ -236,11 +237,11 @@ curl -s http://localhost:8080/internal/streams/status
 ```
 
 기대 결과:
-- `pendingEntries`는 relay 컨슈머 그룹(`audit-relay`)의 미처리(PEL) 건수. relay가 따라잡고 있으면 대개 `0`이고, 밀리면 자란다
-- `streamLength`는 audit stream에 남아 있는 엔트리 수(XLEN). 트림의 결과이지 밀린 양이 아니다
+- `pendingEntries`는 릴레이가 읽었지만 아직 XACK하지 않은 PEL 항목 수다. 릴레이가 처리를 마치면 대개 `0`이고, 읽은 메시지를 확인하지 못하면 증가한다.
+- `streamLength`는 감사 스트림에 남아 있는 엔트리 수(XLEN)다. 이 값은 트림 결과를 나타내며 미처리 메시지 수를 의미하지 않는다.
 
 주의:
-- relay가 꺼져 있으면(`events.relay.enabled=false`) 그룹이 없어 `pendingEntries`는 `0`으로 나온다. 이때 `streamLength`만 계속 자란다.
+- 릴레이가 꺼져 있으면(`events.relay.enabled=false`) 컨슈머 그룹이 없으므로 `pendingEntries`는 `0`으로 나온다. 이때 `streamLength`만 계속 증가한다.
 
 ## 10. Cold Start Recovery 검증
 
@@ -264,10 +265,10 @@ LEADERBOARD_ID=<LEADERBOARD_ID> bash scripts/verify-cold-start-recovery.sh
 
 ## 11. Observability / Grafana
 
-Prometheus + Grafana를 같이 띄우려면:
+Prometheus와 Grafana를 함께 실행하려면:
 
 ```bash
-docker compose up -d postgres redis app prometheus grafana
+docker compose up -d postgres redis kafka app prometheus grafana
 ```
 
 접속:
