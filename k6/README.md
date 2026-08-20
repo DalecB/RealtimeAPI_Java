@@ -52,6 +52,8 @@ bash scripts/cleanup-k6-data.sh
 PRD 요구:
 - 성공 기준: `1,000 TPS`에서 `p99 < 50ms`, `error rate < 0.1%`
 
+threshold는 전체 실행의 p99로 판정한다. 단일 `max`가 50ms를 넘더라도 p99가 50ms 미만이면 통과하며, summary JSON만으로 최대 지연을 콜드 스타트에 귀속하지 않는다.
+
 ```bash
 USER_COUNT=300 DURATION=5m bash scripts/run-k6.sh run --summary-export artifacts/k6/t1-fixed-300.json k6/t1-fixed-1000-write.js
 bash scripts/report-k6-t1.sh artifacts/k6/t1-fixed-300.json

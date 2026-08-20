@@ -19,7 +19,7 @@
 
 - `T1 / USER_COUNT=300`: `995.67 RPS`, `p99 4.15ms`, `fail 0`
 - `T1 / USER_COUNT=500`: `998.67 RPS`, `p99 27.09ms`, `fail 0`
-- `T1 / USER_COUNT=1000`: `997.93 RPS`, `p99 20.92ms`, `fail 0`
+- `T1 / USER_COUNT=1000`: `997.93 RPS`, `p99 20.92ms`, `max 232.33ms`, `fail 0`, `p99 threshold PASS`
 - `T1 Kafka E2E / Redis 256MB`: `990.44 RPS`, `p99 3.99ms`, `fail 0`, Kafka·PostgreSQL 각 `300,001건`, 최종 적체 `0건`
 - `T3 / USER_COUNT=1000`: `write p99 1.47ms`, `read p99 1.65ms`, `fail 0.0032%`
 - `T4`: `processed_new_total=1`, `processed_replay_total=49`, `processed_error_total=0`
@@ -35,6 +35,8 @@
 - 따라서 운영 기본값으로 `30초 스냅샷 주기`를 유지하는 것이 타당하다.
 - Redis 256MB 공식 조건의 5분 Kafka E2E는 HTTP SLO와 전체 전달 정합성을 모두 통과했다.
 - 같은 실행에서 Redis 변경량 조건이 충족돼 BGSAVE도 수행됐다.
+
+T1/1000의 `max 232.33ms`는 단일 최대 지연이며 `p99 < 50ms` threshold 실패를 의미하지 않는다. 전체 실행 p99는 `20.92ms`로 threshold를 통과했다. 현재 summary JSON은 요청별 시점과 setup·본 부하 구분을 보존하지 않으므로 최대 지연을 콜드 스타트에 귀속하지 않는다.
 
 ## 1. 목적
 
@@ -204,6 +206,8 @@ bash scripts/report-k6-t1.sh artifacts/k6/t1-fixed-1000.json
 - `requestRate`가 `1000`에 근접
 - `httpFailedRate < 0.001`
 - `p99 < 50ms`
+
+`max`는 tail 관찰용 참고값이며 이 threshold의 판정 기준이 아니다. 최대 지연의 원인을 분석하려면 요청별 시점과 실행 단계를 별도로 수집해야 한다.
 
 즉 램프 평균값이 아니라, `1000 TPS 고정 부하에서 SLO를 만족했는가`를 바로 보여주는 결과가 된다.
 

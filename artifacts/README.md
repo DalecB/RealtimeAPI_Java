@@ -54,6 +54,13 @@ PRD 기준:
 - `T4`: 수집 완료
 - `T8`: JSON 수집 완료
 
+## T1 Fixed 1000 Summary
+
+- 부하: `USER_COUNT=1000`, `WRITE_RPS=1000`, `DURATION=5m`
+- 결과: `997.93 RPS`, `p99 20.92ms`, `max 232.33ms`, 오류율 `0%`
+- 판정: `p99 < 50ms` threshold 통과
+- 해석 제한: `max 232.33ms`는 단일 최대 지연이다. summary JSON에는 해당 요청의 시점과 실행 단계가 없으므로 콜드 스타트나 특정 원인으로 해석하지 않는다.
+
 ## Kafka E2E Summary
 
 - 환경: Redis `256MB`, `noeviction`, AOF `appendfsync everysec`, Kafka 단일 브로커
