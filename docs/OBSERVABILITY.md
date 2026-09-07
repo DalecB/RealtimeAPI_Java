@@ -61,6 +61,8 @@ docker compose up -d postgres redis kafka app prometheus grafana
 - Snapshot lag / duration / counters
 - Streams pending / lag
 
+Ops Console의 `Kafka Delivery`는 원본 토픽 누적 발행량, PostgreSQL 저장량, DLT 누적·보관 건수를 함께 표시한다. 고유 이벤트를 사용하는 k6 E2E 완료 조건은 `Kafka 증가량 = PostgreSQL 증가량 + DLT 증가량`이다.
+
 ## 4. 추천 확인 순서
 
 1. `bash scripts/smoke-manual-flow.sh`

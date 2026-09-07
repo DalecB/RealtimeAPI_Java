@@ -800,7 +800,8 @@ GET /internal/streams/status
   → { "pendingEntries": number, "streamLength": number, "consumerGroupLag": number }
 
 GET /internal/kafka/audit-topic/status
-  → { "totalMessages": number, "retained": number, "consumerLag": number }
+  → { "totalMessages": number, "retained": number, "consumerLag": number,
+      "dltTotalMessages": number, "dltRetained": number }
 
 GET /internal/audit-events/count
   → { "count": number }

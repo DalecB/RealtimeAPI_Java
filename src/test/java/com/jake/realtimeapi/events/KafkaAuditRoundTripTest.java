@@ -357,6 +357,11 @@ class KafkaAuditRoundTripTest {
                             StandardCharsets.UTF_8
                     )
             );
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                AuditTopicStatusReader.AuditTopicStatus status = auditTopicStatusReader.read();
+                assertTrue(status.dltTotalMessages() >= 1L);
+                assertTrue(status.dltRetained() >= 1L);
+            });
         } finally {
             if (!listener.isRunning()) {
                 listener.start();

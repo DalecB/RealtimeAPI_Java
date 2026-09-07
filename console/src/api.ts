@@ -34,6 +34,8 @@ export interface AuditTopicStatus {
   totalMessages: number
   retained: number
   consumerLag: number
+  dltTotalMessages: number
+  dltRetained: number
 }
 
 export interface AuditEventItem {

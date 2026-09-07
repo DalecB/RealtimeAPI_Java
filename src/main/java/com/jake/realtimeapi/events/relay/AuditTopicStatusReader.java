@@ -26,6 +26,7 @@ public class AuditTopicStatusReader {
 
     private static final Logger log = LoggerFactory.getLogger(AuditTopicStatusReader.class);
     private static final String TOPIC = AuditTopicConfig.AUDIT_TOPIC;
+    private static final String DLT_TOPIC = AuditTopicConfig.AUDIT_DLT_TOPIC;
 
     private final AdminClient adminClient;
 
@@ -33,31 +34,36 @@ public class AuditTopicStatusReader {
         this.adminClient = adminClient;
     }
 
-    /**
-     * @return 지금까지 produce된 총 건수(end offset 합)와 현재 토픽에 남아 있는 건수(end-begin 합).
-     *         조회 실패 시 둘 다 -1.
-     */
+    /** 원본 토픽의 발행량·보관량·consumer lag과 DLT의 발행량·보관량을 읽는다. */
     public AuditTopicStatus read() {
         try {
-            TopicDescription description = adminClient.describeTopics(List.of(TOPIC))
-                    .allTopicNames().get().get(TOPIC);
+            Map<String, TopicDescription> descriptions = adminClient.describeTopics(List.of(TOPIC, DLT_TOPIC))
+                    .allTopicNames().get();
 
             Map<TopicPartition, OffsetSpec> latest = new HashMap<>();
             Map<TopicPartition, OffsetSpec> earliest = new HashMap<>();
-            description.partitions().forEach(p -> {
-                TopicPartition tp = new TopicPartition(TOPIC, p.partition());
-                latest.put(tp, OffsetSpec.latest());
-                earliest.put(tp, OffsetSpec.earliest());
+            descriptions.forEach((topic, description) -> {
+                description.partitions().forEach(p -> {
+                    TopicPartition tp = new TopicPartition(topic, p.partition());
+                    latest.put(tp, OffsetSpec.latest());
+                    earliest.put(tp, OffsetSpec.earliest());
+                });
             });
 
             Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = adminClient.listOffsets(latest).all().get();
             Map<TopicPartition, ListOffsetsResultInfo> earliestOffsets = adminClient.listOffsets(earliest).all().get();
-            long produced = sumOffsets(latestOffsets);
-            long retained = produced - sumOffsets(earliestOffsets);
-            return new AuditTopicStatus(produced, retained, consumerLag(latestOffsets, earliestOffsets));
+            long produced = sumOffsets(latestOffsets, TOPIC);
+            long dltProduced = sumOffsets(latestOffsets, DLT_TOPIC);
+            return new AuditTopicStatus(
+                    produced,
+                    produced - sumOffsets(earliestOffsets, TOPIC),
+                    consumerLag(latestOffsets, earliestOffsets),
+                    dltProduced,
+                    dltProduced - sumOffsets(earliestOffsets, DLT_TOPIC)
+            );
         } catch (Exception ex) {
             log.warn("audit topic status read failed", ex);
-            return new AuditTopicStatus(-1L, -1L, -1L);
+            return new AuditTopicStatus(-1L, -1L, -1L, -1L, -1L);
         }
     }
 
@@ -72,6 +78,9 @@ public class AuditTopicStatusReader {
 
         long lag = 0L;
         for (var entry : latestOffsets.entrySet()) {
+            if (!TOPIC.equals(entry.getKey().topic())) {
+                continue;
+            }
             OffsetAndMetadata offset = committed.get(entry.getKey());
             long consumed = offset == null ? earliestOffsets.get(entry.getKey()).offset() : offset.offset();
             lag += Math.max(0L, entry.getValue().offset() - consumed);
@@ -79,10 +88,19 @@ public class AuditTopicStatusReader {
         return lag;
     }
 
-    private long sumOffsets(Map<TopicPartition, ListOffsetsResultInfo> offsets) {
-        return offsets.values().stream().mapToLong(ListOffsetsResultInfo::offset).sum();
+    private long sumOffsets(Map<TopicPartition, ListOffsetsResultInfo> offsets, String topic) {
+        return offsets.entrySet().stream()
+                .filter(entry -> topic.equals(entry.getKey().topic()))
+                .mapToLong(entry -> entry.getValue().offset())
+                .sum();
     }
 
-    public record AuditTopicStatus(long totalMessages, long retained, long consumerLag) {
+    public record AuditTopicStatus(
+            long totalMessages,
+            long retained,
+            long consumerLag,
+            long dltTotalMessages,
+            long dltRetained
+    ) {
     }
 }

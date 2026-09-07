@@ -34,6 +34,7 @@ interface E2eBaseline {
   startedAt: number
   kafkaMessages: number
   storedRows: number
+  dltMessages: number
 }
 
 const K6_E2E_COMMAND =
@@ -124,16 +125,20 @@ export default function App() {
       auditTopic &&
       stored &&
       auditTopic.totalMessages >= 0 &&
+      auditTopic.dltTotalMessages >= 0 &&
       auditTopic.consumerLag === 0 &&
       streams.consumerGroupLag === 0 &&
       streams.pendingEntries === 0,
   )
   const e2eKafkaDelta = e2eBaseline && auditTopic ? Math.max(0, auditTopic.totalMessages - e2eBaseline.kafkaMessages) : 0
   const e2eStoredDelta = e2eBaseline && stored ? Math.max(0, stored.count - e2eBaseline.storedRows) : 0
+  const e2eDltDelta = e2eBaseline && auditTopic
+    ? Math.max(0, auditTopic.dltTotalMessages - e2eBaseline.dltMessages)
+    : 0
   const e2eCaughtUp = Boolean(
     e2eBaseline &&
       e2eKafkaDelta > 0 &&
-      e2eKafkaDelta === e2eStoredDelta &&
+      e2eKafkaDelta === e2eStoredDelta + e2eDltDelta &&
       streams?.consumerGroupLag === 0 &&
       streams.pendingEntries === 0 &&
       auditTopic?.consumerLag === 0,
@@ -322,17 +327,22 @@ export default function App() {
             <div className="metric-card">
               <div className="metric-head">
                 <span className="title">Kafka Delivery</span>
-                <span className="value plain">consumer lag {auditTopic?.consumerLag ?? '—'}</span>
+                <span className="value plain">
+                  consumer lag {auditTopic?.consumerLag ?? '—'} · DLT retained {auditTopic?.dltRetained ?? '—'}
+                </span>
               </div>
               <Sparkline values={producedSeries} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
               <div className="metric-flow">
-                <span>Kafka produced</span>
+                <span>Kafka</span>
                 <b>{auditTopic?.totalMessages ?? '—'}</b>
                 <span className="arrow">→</span>
-                <span>PG stored</span>
+                <span>PG</span>
                 <b className="stored">{stored?.count ?? '—'}</b>
+                <span className="arrow">+</span>
+                <span>DLT</span>
+                <b>{auditTopic?.dltTotalMessages ?? '—'}</b>
               </div>
-              <div className="metric-note">누적 발행량과 PostgreSQL 저장량 · lag = 아직 처리하지 않은 Kafka 메시지</div>
+              <div className="metric-note">누적 발행량 = PostgreSQL 저장량 + DLT 격리량 · lag = 아직 처리하지 않은 Kafka 메시지</div>
             </div>
             <div className="metric-card">
               <div className="metric-head">
@@ -381,6 +391,7 @@ export default function App() {
                         startedAt: Date.now(),
                         kafkaMessages: auditTopic!.totalMessages,
                         storedRows: stored!.count,
+                        dltMessages: auditTopic!.dltTotalMessages,
                       })
                 }
               >
@@ -402,6 +413,11 @@ export default function App() {
                 <small>since baseline</small>
               </div>
               <div className="e2e-stat">
+                <span>DLT quarantined</span>
+                <b>{e2eDltDelta.toLocaleString()}</b>
+                <small>since baseline</small>
+              </div>
+              <div className="e2e-stat">
                 <span>Redis unread</span>
                 <b>{streams?.consumerGroupLag ?? '—'}</b>
                 <small>group lag</small>
@@ -418,7 +434,7 @@ export default function App() {
               </div>
             </div>
             <div className="metric-note">
-              콘솔은 부하를 만들지 않습니다. 기준점을 시작한 뒤 위 명령을 터미널에서 실행하고, k6 종료 후 모든 lag이 0이며 Kafka와 PostgreSQL 증가량이 같은지 확인합니다.
+              콘솔은 부하를 만들지 않습니다. 기준점을 시작한 뒤 위 명령을 실행하고, k6 종료 후 모든 lag이 0이며 Kafka 증가량이 PostgreSQL과 DLT 증가량의 합과 같은지 확인합니다.
             </div>
           </div>
         </section>
