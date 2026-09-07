@@ -2,10 +2,13 @@ package com.jake.realtimeapi.infra.config;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.common.config.TopicConfig;
+import org.apache.kafka.common.TopicPartition;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaAdmin;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 
 /**
  * 감사 로그 토픽을 애플리케이션 기동 시 생성한다.
@@ -17,6 +20,7 @@ public class AuditTopicConfig {
 
     /** relay가 produce할 때, 컨슈머가 subscribe할 때 참조하는 토픽 이름. */
     public static final String AUDIT_TOPIC = "lb-audit-events";
+    public static final String AUDIT_DLT_TOPIC = AUDIT_TOPIC + ".DLT";
     public static final String AUDIT_CONSUMER_GROUP = "audit-trend";
 
     // 파티션 3: 처리량이 아니라 한 컨슈머 그룹에서 병렬로 돌릴 인스턴스 수의 상한이다.
@@ -37,8 +41,27 @@ public class AuditTopicConfig {
                         .config(TopicConfig.RETENTION_BYTES_CONFIG, RETENTION_BYTES)
                         // compact는 key당 마지막 값만 남겨 감사 로그를 파괴한다. delete 유지.
                         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_DELETE)
+                        .build(),
+                TopicBuilder.name(AUDIT_DLT_TOPIC)
+                        .partitions(PARTITIONS)
+                        .replicas(REPLICATION)
+                        .config(TopicConfig.RETENTION_MS_CONFIG, RETENTION_MS)
+                        .config(TopicConfig.RETENTION_BYTES_CONFIG, RETENTION_BYTES)
+                        .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_DELETE)
                         .build()
         );
+    }
+
+    @Bean
+    public DeadLetterPublishingRecoverer auditDeadLetterPublishingRecoverer(
+            KafkaTemplate<String, String> kafkaTemplate
+    ) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+                kafkaTemplate,
+                (record, exception) -> new TopicPartition(AUDIT_DLT_TOPIC, record.partition())
+        );
+        recoverer.setFailIfSendResultIsError(true);
+        return recoverer;
     }
 
     /** 토픽 offset 조회용. KafkaAdmin의 접속 설정을 재사용해 하나만 만들어 공유한다(스레드 안전). */

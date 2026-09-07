@@ -224,7 +224,7 @@ Kafka consumer group: audit-trend
           └── UNIQUE (leaderboard_id, event_id)로 중복 저장 방지
 ```
 
-Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이름만 지원했다. 후속 Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했다. Testcontainers에서는 운영값보다 짧은 유휴 시간과 작은 배치 크기를 사용해 `min-idle-time` 적용, 반환 커서 기반 후속 배치 처리, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했다. 실제 10분 유휴 조건, 500건을 초과하는 PEL, 프로세스 강제 종료, 인계받은 릴레이의 재종료, 여러 릴레이의 동시 실행은 검증하지 않았다. 처리할 수 없는 메시지를 DLQ에 보관하는 정책은 확정했지만 아직 구현하지 않았다.
+Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이름만 지원했다. 후속 Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했다. Testcontainers에서는 운영값보다 짧은 유휴 시간과 작은 배치 크기를 사용해 `min-idle-time` 적용, 반환 커서 기반 후속 배치 처리, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했다. 실제 10분 유휴 조건, 500건을 초과하는 PEL, 프로세스 강제 종료, 인계받은 릴레이의 재종료, 여러 릴레이의 동시 실행은 검증하지 않았다. 처리할 수 없는 메시지는 총 3회 처리한 뒤 `lb-audit-events.DLT`에 격리하도록 구현·검증했다.
 
 ### 4.3 Read Flow (랭킹 조회)
 

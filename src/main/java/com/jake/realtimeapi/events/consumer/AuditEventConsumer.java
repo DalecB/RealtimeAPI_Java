@@ -6,7 +6,9 @@ import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -24,13 +26,23 @@ import java.util.UUID;
 public class AuditEventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(AuditEventConsumer.class);
+    private static final int PARSE_ATTEMPTS = 3;
 
     private final AuditEventRepository auditEventRepository;
     private final ObjectMapper objectMapper;
+    private final DeadLetterPublishingRecoverer deadLetterPublishingRecoverer;
+    private final long parseRetryDelayMs;
 
-    public AuditEventConsumer(AuditEventRepository auditEventRepository, ObjectMapper objectMapper) {
+    public AuditEventConsumer(
+            AuditEventRepository auditEventRepository,
+            ObjectMapper objectMapper,
+            DeadLetterPublishingRecoverer deadLetterPublishingRecoverer,
+            @Value("${events.consumer.parse-retry-delay-ms:3000}") long parseRetryDelayMs
+    ) {
         this.auditEventRepository = auditEventRepository;
         this.objectMapper = objectMapper;
+        this.deadLetterPublishingRecoverer = deadLetterPublishingRecoverer;
+        this.parseRetryDelayMs = parseRetryDelayMs;
     }
 
     @KafkaListener(
@@ -40,16 +52,59 @@ public class AuditEventConsumer {
     )
     public void consume(List<ConsumerRecord<String, String>> records) {
         List<AuditEventRepository.AuditEventRow> rows = new ArrayList<>(records.size());
+        List<FailedRecord> failures = parse(records, rows);
+        for (int attempt = 1; attempt < PARSE_ATTEMPTS && !failures.isEmpty(); attempt++) {
+            waitBeforeRetry();
+            failures = retry(failures, rows);
+        }
+
+        if (!rows.isEmpty()) {
+            auditEventRepository.insertIgnoringDuplicates(rows);
+        }
+
+        for (FailedRecord failure : failures) {
+            deadLetterPublishingRecoverer.accept(failure.record(), failure.exception());
+            log.error(
+                    "audit event sent to DLT topic={} partition={} offset={}",
+                    failure.record().topic(),
+                    failure.record().partition(),
+                    failure.record().offset(),
+                    failure.exception()
+            );
+        }
+    }
+
+    private List<FailedRecord> parse(
+            List<ConsumerRecord<String, String>> records,
+            List<AuditEventRepository.AuditEventRow> rows
+    ) {
+        List<FailedRecord> failures = new ArrayList<>();
         for (ConsumerRecord<String, String> record : records) {
             try {
                 rows.add(toRow(record.key(), record.value()));
             } catch (RuntimeException ex) {
-                // 파싱 불가한 한 건이 배치 전체를 막지 않게 건너뛴다(로그만). 스키마 드리프트 조기 발견용.
-                log.error("audit event parse failed key={} value={}", record.key(), record.value(), ex);
+                failures.add(new FailedRecord(record, ex));
             }
         }
-        if (!rows.isEmpty()) {
-            auditEventRepository.insertIgnoringDuplicates(rows);
+        return failures;
+    }
+
+    private List<FailedRecord> retry(
+            List<FailedRecord> failures,
+            List<AuditEventRepository.AuditEventRow> rows
+    ) {
+        List<ConsumerRecord<String, String>> records = failures.stream()
+                .map(FailedRecord::record)
+                .toList();
+        return parse(records, rows);
+    }
+
+    private void waitBeforeRetry() {
+        try {
+            Thread.sleep(parseRetryDelayMs);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("audit event parse retry interrupted", ex);
         }
     }
 
@@ -60,16 +115,20 @@ public class AuditEventConsumer {
         } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
             throw new IllegalStateException("malformed audit event json", ex);
         }
-        String eventId = node.get("eventId").asText();
+        String eventId = node.required("eventId").asText();
+        String eventType = node.required("type").asText();
+        if (!eventType.equals("new") && !eventType.equals("conflict")) {
+            throw new IllegalArgumentException("unsupported audit event type: " + eventType);
+        }
         return new AuditEventRepository.AuditEventRow(
                 UUID.fromString(leaderboardId),
                 eventId,
                 eventTimeFromEntryId(eventId),
-                node.get("type").asText(),
-                node.get("userId").asLong(),
-                node.get("delta").asLong(),
-                node.get("apiKeyId").asLong(),
-                node.get("idempotencyKey").asText()
+                eventType,
+                Long.parseLong(node.required("userId").asText()),
+                Long.parseLong(node.required("delta").asText()),
+                Long.parseLong(node.required("apiKeyId").asText()),
+                UUID.fromString(node.required("idempotencyKey").asText()).toString()
         );
     }
 
@@ -78,5 +137,8 @@ public class AuditEventConsumer {
         int dash = eventId.indexOf('-');
         long epochMillis = Long.parseLong(dash < 0 ? eventId : eventId.substring(0, dash));
         return Instant.ofEpochMilli(epochMillis);
+    }
+
+    private record FailedRecord(ConsumerRecord<String, String> record, RuntimeException exception) {
     }
 }

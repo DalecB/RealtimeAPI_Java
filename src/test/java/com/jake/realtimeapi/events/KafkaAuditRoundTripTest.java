@@ -18,6 +18,7 @@ import com.jake.realtimeapi.users.domain.model.User;
 import com.jake.realtimeapi.users.domain.repository.UserRepository;
 
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
@@ -33,10 +34,13 @@ import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.SendResult;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -54,7 +58,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "events.relay.enabled=true",
         "events.relay.delay-ms=3600000",
         "events.relay.trim-delay-ms=3600000",
-        "events.relay.claim-min-idle-ms=0"
+        "events.relay.claim-min-idle-ms=0",
+        "events.consumer.parse-retry-delay-ms=10"
 })
 @Import(TestcontainersConfiguration.class)
 class KafkaAuditRoundTripTest {
@@ -82,6 +87,9 @@ class KafkaAuditRoundTripTest {
 
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
+
+    @Autowired
+    private ConsumerFactory<String, String> consumerFactory;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -304,6 +312,59 @@ class KafkaAuditRoundTripTest {
     }
 
     @Test
+    void malformedRecord_isSentToDlt_withoutBlockingValidRecord() throws Exception {
+        Fixture fixture = createFixture();
+        String key = fixture.leaderboardId().toString();
+        String eventId = Instant.now().toEpochMilli() + "-0";
+        MessageListenerContainer listener = kafkaListenerEndpointRegistry
+                .getListenerContainer("audit-trend-consumer");
+        assertNotNull(listener);
+        listener.stop();
+
+        try {
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
+
+            SendResult<String, String> malformed = kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC, key, "not-json"
+            ).get();
+            SendResult<String, String> valid = kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    key,
+                    eventJson(fixture, eventId, UUID.randomUUID())
+            ).get();
+            listener.start();
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                assertEquals(1, findAuditRows(fixture.leaderboardId()).size());
+                assertTrue(committedOffset(new TopicPartition(
+                        AuditTopicConfig.AUDIT_TOPIC,
+                        valid.getRecordMetadata().partition()
+                )) >= valid.getRecordMetadata().offset() + 1);
+            });
+
+            ConsumerRecord<String, String> dlt = receive(
+                    AuditTopicConfig.AUDIT_DLT_TOPIC,
+                    malformed.getRecordMetadata().partition(),
+                    0
+            );
+            assertNotNull(dlt);
+            assertEquals(key, dlt.key());
+            assertEquals("not-json", dlt.value());
+            assertEquals(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    new String(
+                            dlt.headers().lastHeader(KafkaHeaders.DLT_ORIGINAL_TOPIC).value(),
+                            StandardCharsets.UTF_8
+                    )
+            );
+        } finally {
+            if (!listener.isRunning()) {
+                listener.start();
+            }
+        }
+    }
+
+    @Test
     void listenerRestart_resumesFromCommittedOffset() throws Exception {
         Fixture fixture = createFixture();
         String key = fixture.leaderboardId().toString();
@@ -390,6 +451,23 @@ class KafkaAuditRoundTripTest {
                 .get()
                 .get(partition);
         return committed == null ? -1L : committed.offset();
+    }
+
+    private ConsumerRecord<String, String> receive(String topic, int partition, long offset) {
+        try (org.apache.kafka.clients.consumer.Consumer<String, String> consumer =
+                     consumerFactory.createConsumer("dlt-test-" + UUID.randomUUID())) {
+            TopicPartition topicPartition = new TopicPartition(topic, partition);
+            consumer.assign(List.of(topicPartition));
+            consumer.seek(topicPartition, offset);
+            long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+            while (System.nanoTime() < deadline) {
+                var records = consumer.poll(Duration.ofMillis(500)).records(topicPartition);
+                if (!records.isEmpty()) {
+                    return records.iterator().next();
+                }
+            }
+            throw new AssertionError("record not found: " + topicPartition + " offset=" + offset);
+        }
     }
 
     private long pendingCount(String streamKey) {
