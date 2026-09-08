@@ -332,9 +332,9 @@ Redis Stream에서 아직 읽지 않은 항목은 `XINFO GROUPS`의 `lag`, 읽�
 | 3   | Phase 2 완료      | 순서 보장 범위       | 리더보드 단위로 보장하고 서로 다른 리더보드 간 순서는 보장하지 않는다                                                                                                   |
 | 4   | Phase 2 완료      | 컨슈머 그룹 재할당   | 컨슈머 `1 → 2 → 1`에서 파티션 재할당과 컨슈머 지연 0 복귀를 확인했다                                                                                                    |
 | 5   | Phase 3 소규모 조건 검증 | 최소 한 번 전달 중복 | 다른 컨슈머의 PEL 인계, `min-idle-time` 적용, 반환 커서 기반 후속 배치 처리, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 자동화 테스트로 검증했다. 실제 10분 유휴 조건, 500건을 초과하는 PEL과 프로세스 강제 종료는 검증하지 않았다. |
-| 6   | Phase 2 완료      | 오프셋 커밋          | auto-commit을 끄고 `ack-mode=batch`를 사용한다. 리스너 정상 반환 후 오프셋이 커밋되는 흐름을 재시작 테스트로 확인했다                                                   |
+| 6   | Phase 2 완료      | 오프셋 커밋          | auto-commit을 끄고 `ack-mode=batch`를 사용한다. 리스너 정상 반환 후 오프셋이 커밋되는 흐름과 `max-poll-records=500`에서 같은 파티션의 1,001건 적체가 여러 poll을 거쳐 PostgreSQL에 전부 저장되고 lag 0으로 복귀하는 것을 검증했다 |
 | 7   | Phase 2 완료      | 리텐션               | `retention.ms=30일`, `retention.bytes=파티션당 1GB`를 함께 설정했다. 어느 제한이 먼저 적용되는지는 파티션별 유입 편중에 따라 달라진다                                   |
-| 8   | Phase 2 범위 확정 | 내구성               | 로컬은 단일 브로커·복제 계수 1이다. 다중 브로커 실측은 하지 않았고, 운영 구성 기준만 `acks=all`, 복제 계수 3 이상, `min.insync.replicas=2`로 문서화했다                 |
+| 8   | Phase 2 범위 확정 | 내구성               | 로컬은 단일 브로커·복제 계수 1이다. `KAFKA_LOG_DIRS=/var/lib/kafka/data`로 named volume과 실제 로그 경로를 일치시켰고, 컨테이너 강제 재생성 후에도 토픽 오프셋과 메시지가 유지되는 것을 확인했다. 다중 브로커 실측은 하지 않았다 |
 | 9   | Phase 3 DLT 구현·검증 | 처리 불가 메시지     | 파싱·검증 실패는 배치 단위로 3초 간격, 총 3회 처리한 뒤 해당 레코드만 `lb-audit-events.DLT`로 보낸다. 정상 레코드의 DB 저장, 원본 key/value와 원본 topic 헤더, 배치 오프셋 커밋을 Testcontainers로 검증했다. PostgreSQL 일시 장애 재시도는 남아 있다. |
 | 10  | Phase 2 완료      | 스키마 관리          | JSON 본문과 Kafka 헤더 버전을 사용한다. Schema Registry는 현재 범위에서 도입하지 않으며 실제 필드 확장 시 호환성 테스트를 추가한다                                      |
 | 11  | Phase 2 완료      | 처리 지연 관측       | Redis 미수신·미확인 건수는 내부 API와 Prometheus에서, Kafka 컨슈머 지연은 내부 API와 Ops Console에서 확인한다. 별도 exporter는 도입하지 않았다                          |

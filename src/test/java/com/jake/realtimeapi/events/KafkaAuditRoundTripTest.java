@@ -426,6 +426,45 @@ class KafkaAuditRoundTripTest {
         }
     }
 
+    @Test
+    void backlogLargerThanTwoPollBatches_isFullyDrained() throws Exception {
+        Fixture fixture = createFixture();
+        String key = fixture.leaderboardId().toString();
+        long before = auditEventQueryRepository.count();
+        long now = Instant.now().toEpochMilli();
+        MessageListenerContainer listener = kafkaListenerEndpointRegistry
+                .getListenerContainer("audit-trend-consumer");
+        assertNotNull(listener);
+        listener.stop();
+
+        try {
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
+
+            for (int i = 0; i < 1_001; i++) {
+                kafkaTemplate.send(
+                        AuditTopicConfig.AUDIT_TOPIC,
+                        key,
+                        eventJson(fixture, now + "-" + i, UUID.randomUUID())
+                );
+            }
+            kafkaTemplate.flush();
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                    assertTrue(auditTopicStatusReader.read().consumerLag() >= 1_001L));
+
+            listener.start();
+
+            await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+                assertEquals(before + 1_001L, auditEventQueryRepository.count());
+                assertEquals(0L, auditTopicStatusReader.read().consumerLag());
+            });
+        } finally {
+            if (!listener.isRunning()) {
+                listener.start();
+            }
+        }
+    }
+
     private String eventJson(Fixture fixture, String eventId, UUID idempotencyKey) throws Exception {
         Map<String, String> event = new LinkedHashMap<>();
         event.put("eventId", eventId);
