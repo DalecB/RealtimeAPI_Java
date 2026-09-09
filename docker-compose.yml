@@ -87,8 +87,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: realtime-api
-    # relay 컨슈머 이름이 HOSTNAME이다. 명시하지 않으면 컨테이너 ID가 들어가고,
-    # 컨테이너를 재생성할 때마다 이름이 바뀌어 이전 이름이 잡고 있던 미처리 항목이 주인 없이 남는다.
+    # 기본 재시작은 같은 릴레이 이름을 쓰고, 교체 인계 검증 시 환경변수로 A/B/C 이름을 명시한다.
     hostname: realtime-api
     depends_on:
       postgres:
@@ -108,6 +107,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SNAPSHOTS_WORKER_ENABLED: "true"
       EVENTS_RELAY_ENABLED: "true"
+      EVENTS_RELAY_CONSUMER_NAME: ${EVENTS_RELAY_CONSUMER_NAME:-realtime-api}
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx512m -Xlog:gc*:stdout:time,uptime,level,tags"
     ports:
       - "8080:8080"

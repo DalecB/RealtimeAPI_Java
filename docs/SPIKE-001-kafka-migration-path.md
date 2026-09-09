@@ -134,7 +134,7 @@ PRD `7.2 Lua 제약 조건`의 반복문 금지를 지키기 위해, 구분자 �
 | ----------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 릴레이 주기 | 5초                          | 한 주기 안에서 **스트림이 빌 때까지 반복해서** 읽는다. 한 번에 가져오는 건수를 고정하면 유입이 그보다 많을 때 밀린 양이 줄지 않는다 (피크 1,000/s면 5초에 5,000건)                                                                                                           |
 | 트림 주기   | 40초                         | 이미 옮긴 엔트리를 정리해 메모리 사용량을 줄이는 주기다. `MAXLEN`은 오래된 항목부터 지우므로 이미 전달한 항목이 먼저 삭제된다.                                                                                                                                                 |
-| 컨슈머 이름 | `HOSTNAME`                   | 현재 운용 범위는 단일 릴레이이며 `docker-compose.yml`에서 `hostname`을 고정한다. 같은 이름으로 재시작하면 자기 PEL을 즉시 재처리한다. 다른 이름의 교체 릴레이는 10분 이상 idle인 PEL을 `XAUTOCLAIM`으로 인계하지만, 실제 배포 교체와 10분 유휴 조건은 아직 검증하지 않았다 |
+| 컨슈머 이름 | `EVENTS_RELAY_CONSUMER_NAME` → `HOSTNAME` → `relay-local` | 기본 재시작은 같은 이름을 사용하고, 교체 검증에서는 환경변수로 A/B/C 이름을 명시한다. 다른 이름의 교체 릴레이는 10분 이상 idle인 PEL을 `XAUTOCLAIM`으로 인계하지만 실제 프로세스 교체와 10분 유휴 조건은 아직 검증하지 않았다 |
 | 스트림 순회 | 리더보드별 반복              | `XREADGROUP`에 여러 스트림을 한 번에 넘기면 왕복이 줄지만, Redis Cluster에서 키가 다른 슬롯이면 `CROSSSLOT`으로 실패한다. `{leaderboardId}` 해시 태그를 붙인 이유(ADR-002)가 Cluster 대비이므로 그 준비를 무효화하지 않는다. `SnapshotCaptureWorker`가 이미 같은 순회 형태다 |
 | 그룹 생성   | 매 틱 시도, `BUSYGROUP` 무시 | 새 리더보드의 스트림에는 그룹이 없다. 여러 인스턴스가 동시에 만들어도 하나만 성공하므로 별도 잠금이 필요 없다                                                                                                                                                                |
 
@@ -217,9 +217,13 @@ Testcontainers 통합 테스트는 다음 경계를 검증한다.
 - `stalePendingMessage_isClaimedByReplacementRelay_andStoredOnce`: 임시 컨슈머가 XACK하지 않은 PEL을 교체 릴레이가 인계해 PostgreSQL에 1행 저장하고 PEL을 0으로 만든다.
 - `pendingMessage_isClaimedOnlyAfterMinIdle`: 메시지의 유휴 시간이 1초에 도달하기 전에는 PEL을 인계하지 않고, 1초가 지난 뒤에만 인계한다.
 - `stalePendingMessages_areClaimedAcrossRecoveryBatches`: PEL 3건과 복구 배치 크기 2건을 사용해 다음 주기에 반환 커서부터 처리를 이어 간다.
+- `stalePendingMessages_over500_areClaimedAcrossRecoveryCycles`: PEL 1,001건을 복구 한도 500건으로 세 주기에 걸쳐 `501 → 1 → 0`까지 해소한다. 로컬 Testcontainers 3회 측정에서 첫 500건 발행·XACK은 41~59ms였다.
+- `replacementRelay_isClaimedAgainAfterItStopsBeforeAck`: A가 읽은 항목을 B가 인계한 뒤 B도 XACK하지 않은 상태에서 C가 다시 인계해 PostgreSQL에 1행만 저장한다.
 - `kafkaPublishedBeforeCrash_isDeduplicatedWhenPendingMessageIsRelayedAgain`: Kafka 발행 후 XACK 전 상태를 만들고 같은 이벤트가 재발행돼도 PostgreSQL에는 1행만 남으며 PEL이 해소되는지 확인한다.
 
-전체 `./gradlew test`도 통과했다. 실제 10분 유휴 조건, 500건을 초과하는 PEL, 프로세스 강제 종료, 인계받은 릴레이의 재종료는 아직 검증하지 않았다. `docker-compose.yml`은 고정 `hostname`을 유지하므로 실제 배포에서 서로 다른 컨슈머 이름으로 교체되는 구성과 여러 릴레이를 동시에 실행하는 구성도 별도로 검증해야 한다.
+500건을 초과하는 PEL과 A → B → C 연속 인계는 Testcontainers로 검증했다. 실제 10분 유휴 조건과 프로세스 강제 종료는 아직 검증하지 않았다. `docker-compose.yml`은 `EVENTS_RELAY_CONSUMER_NAME`으로 교체 릴레이 이름을 주입할 수 있지만 실제 프로세스 교체와 여러 릴레이의 동시 실행은 별도로 검증해야 한다.
+
+500건 발행·XACK의 로컬 측정값 41~59ms는 초당 약 8,500건 이상으로 현재 목표 1,000/s보다 높다. 따라서 새 메시지의 주기당 처리 상한은 추가하지 않고 스트림이 빌 때까지 드레인하는 현재 방식을 유지한다. 실제 Compose 반복 측정에서 처리량이 목표 이하로 내려가거나 다른 리더보드가 굶으면 상한을 재검토한다.
 
 #### Kafka 컨슈머 실패 처리
 
@@ -251,7 +255,7 @@ DB 장애 중에도 릴레이는 Redis Stream의 메시지를 Kafka로 계속 �
 
 #### 남은 리스크
 
-- 릴레이 배치 처리시간을 측정하지 않았다. 측정 결과에 따라 `min-idle-time` 10분을 조정한다.
+- Testcontainers에서 500건 발행·XACK을 3회 측정한 값은 41~59ms다. 실제 Compose 환경 반복 측정 결과에 따라 `min-idle-time` 10분을 조정한다.
 - 새 메시지 유입량이 릴레이 처리량을 계속 넘으면 다음 복구 주기가 지연될 수 있다.
 - Kafka 컨슈머를 여러 개 실행하면 DB 재시도 시점이 겹칠 수 있다. 지연 시간 분산 여부는 구현 전에 결정한다.
 - SQL 오류와 스키마 불일치처럼 DB 복구로 해결되지 않는 오류의 중지·알림 정책은 정하지 않았다.
@@ -331,7 +335,7 @@ Redis Stream에서 아직 읽지 않은 항목은 `XINFO GROUPS`의 `lag`, 읽�
 | 2   | Phase 2 완료      | 파티션 키            | `leaderboardId`로 결정했다. 현 목표 1,000/s에서는 단일 파티션 처리도 허용 범위이며, 편중이 실제 병목이 될 때만 복합 키를 재검토한다                                     |
 | 3   | Phase 2 완료      | 순서 보장 범위       | 리더보드 단위로 보장하고 서로 다른 리더보드 간 순서는 보장하지 않는다                                                                                                   |
 | 4   | Phase 2 완료      | 컨슈머 그룹 재할당   | 컨슈머 `1 → 2 → 1`에서 파티션 재할당과 컨슈머 지연 0 복귀를 확인했다                                                                                                    |
-| 5   | Phase 3 소규모 조건 검증 | 최소 한 번 전달 중복 | 다른 컨슈머의 PEL 인계, `min-idle-time` 적용, 반환 커서 기반 후속 배치 처리, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 자동화 테스트로 검증했다. 실제 10분 유휴 조건, 500건을 초과하는 PEL과 프로세스 강제 종료는 검증하지 않았다. |
+| 5   | Phase 3 조건 검증 | 최소 한 번 전달 중복 | 다른 컨슈머의 PEL 인계, 1,001건 PEL의 500건 단위 후속 처리, A → B → C 연속 인계, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 자동화 테스트로 검증했다. 실제 10분 유휴 조건과 프로세스 강제 종료는 검증하지 않았다. |
 | 6   | Phase 2 완료      | 오프셋 커밋          | auto-commit을 끄고 `ack-mode=batch`를 사용한다. 리스너 정상 반환 후 오프셋이 커밋되는 흐름과 `max-poll-records=500`에서 같은 파티션의 1,001건 적체가 여러 poll을 거쳐 PostgreSQL에 전부 저장되고 lag 0으로 복귀하는 것을 검증했다 |
 | 7   | Phase 2 완료      | 리텐션               | `retention.ms=30일`, `retention.bytes=파티션당 1GB`를 함께 설정했다. 어느 제한이 먼저 적용되는지는 파티션별 유입 편중에 따라 달라진다                                   |
 | 8   | Phase 2 범위 확정 | 내구성               | 로컬은 단일 브로커·복제 계수 1이다. `KAFKA_LOG_DIRS=/var/lib/kafka/data`로 named volume과 실제 로그 경로를 일치시켰고, 컨테이너 강제 재생성 후에도 토픽 오프셋과 메시지가 유지되는 것을 확인했다. 다중 브로커 실측은 하지 않았다 |

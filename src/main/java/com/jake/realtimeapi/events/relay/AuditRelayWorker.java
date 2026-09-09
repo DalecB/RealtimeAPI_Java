@@ -66,8 +66,7 @@ public class AuditRelayWorker {
     private final Duration claimMinIdle;
     private final Map<UUID, String> claimCursors = new ConcurrentHashMap<>();
 
-    // 컨슈머 이름. compose에서 hostname을 고정했으므로 재생성돼도 같은 이름을 재사용한다.
-    // 이름이 바뀌면 이전 이름이 잡고 있던 PEL이 주인 없이 남는다.
+    // 기본 재시작은 같은 이름을 쓰고, 교체 인계 검증은 설정으로 A/B/C 이름을 명시한다.
     private final String consumerName;
 
     public AuditRelayWorker(
@@ -76,7 +75,8 @@ public class AuditRelayWorker {
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
             @org.springframework.beans.factory.annotation.Value("${events.relay.batch-size:500}") int batchSize,
-            @org.springframework.beans.factory.annotation.Value("${events.relay.claim-min-idle-ms:600000}") long claimMinIdleMs
+            @org.springframework.beans.factory.annotation.Value("${events.relay.claim-min-idle-ms:600000}") long claimMinIdleMs,
+            @org.springframework.beans.factory.annotation.Value("${events.relay.consumer-name}") String consumerName
     ) {
         this.leaderboardRepository = leaderboardRepository;
         this.redisTemplate = redisTemplate;
@@ -84,8 +84,7 @@ public class AuditRelayWorker {
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
         this.claimMinIdle = Duration.ofMillis(claimMinIdleMs);
-        String host = System.getenv("HOSTNAME");
-        this.consumerName = (host == null || host.isBlank()) ? "relay-local" : host;
+        this.consumerName = consumerName;
     }
 
     @Scheduled(fixedDelayString = "${events.relay.delay-ms:5000}")
