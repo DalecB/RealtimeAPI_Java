@@ -263,7 +263,15 @@ LEADERBOARD_ID=<LEADERBOARD_ID> bash scripts/verify-cold-start-recovery.sh
 - recovery 완료 후 `/leaderboards/{leaderboardId}/tops`에서 데이터가 다시 보여야 한다.
 - 복구된 데이터는 최신 `snapshot_entries`와 동일해야 한다.
 
-## 11. Observability / Grafana
+## 11. Relay 실제 10분 인계 검증
+
+```bash
+bash scripts/verify-relay-handoff-10m.sh
+```
+
+스크립트는 Kafka를 중단해 Relay A가 PEL을 소유하게 만들고 A를 `SIGKILL`한다. Kafka 복구 후 Relay B를 기동하여 약 590초 시점까지 소유권이 유지되고, 운영값 600초 이후에는 PEL 0건과 PostgreSQL 1행이 되는지 검증한다. 종료 시 Kafka와 기존 Relay 설정을 복구한다.
+
+## 12. Observability / Grafana
 
 Prometheus와 Grafana를 함께 실행하려면:
 
@@ -277,7 +285,7 @@ docker compose up -d postgres redis kafka app prometheus grafana
 
 자세한 계측 항목과 대시보드 설명은 [OBSERVABILITY.md](OBSERVABILITY.md) 참고.
 
-## 12. usage_stats 적재 검증
+## 13. usage_stats 적재 검증
 
 `POST /events`를 몇 번 호출한 뒤, 발급된 `apiKeyId`로 아래 SQL을 본다.
 
@@ -305,7 +313,7 @@ order by bucket_start desc, bucket_type asc;
 
 `smoke-manual-flow.sh` summary는 이제 `apiKeyId`도 함께 출력한다.
 
-## 13. 실패 케이스 검증
+## 14. 실패 케이스 검증
 
 ### 관리 API를 JWT 없이 호출
 
@@ -375,7 +383,7 @@ bash scripts/verify-circuit-breaker-open.sh
 - `Retry-After`
 - `X-RateLimit-Remaining: 0`
 
-## 14. Snapshot 전용 시드가 필요할 때
+## 15. Snapshot 전용 시드가 필요할 때
 
 고정 leaderboard와 tie/empty 시나리오까지 빠르게 검증하려면 아래 스크립트를 사용한다.
 
