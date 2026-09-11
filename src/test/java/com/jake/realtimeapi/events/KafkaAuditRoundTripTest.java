@@ -5,6 +5,7 @@ import com.jake.realtimeapi.TestcontainersConfiguration;
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
+import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
 import com.jake.realtimeapi.events.relay.AuditRelayWorker;
 import com.jake.realtimeapi.events.relay.AuditTopicStatusReader;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
@@ -40,6 +41,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.SendResult;
+import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -60,7 +62,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "events.relay.delay-ms=3600000",
         "events.relay.trim-delay-ms=3600000",
         "events.relay.claim-min-idle-ms=0",
-        "events.consumer.parse-retry-delay-ms=10"
+        "events.consumer.parse-retry-delay-ms=10",
+        "events.consumer.db-retry-initial-delay=100ms",
+        "events.consumer.db-retry-max-delay=200ms",
+        "events.consumer.db-retry-unhealthy-after=200ms",
+        "spring.datasource.hikari.connection-timeout=250",
+        "spring.datasource.hikari.data-source-properties.socketTimeout=1"
 })
 @Import(TestcontainersConfiguration.class)
 class KafkaAuditRoundTripTest {
@@ -109,6 +116,12 @@ class KafkaAuditRoundTripTest {
 
     @Autowired
     private AuditStreamStatusRepository auditStreamStatusRepository;
+
+    @Autowired
+    private AuditConsumerStatus auditConsumerStatus;
+
+    @Autowired
+    private PostgreSQLContainer<?> postgresContainer;
 
     @Test
     void processedEvent_isRelayedThroughKafka_andStoredInAuditEvents() {
@@ -383,7 +396,6 @@ class KafkaAuditRoundTripTest {
                 .getListenerContainer("audit-trend-consumer");
         assertNotNull(listener);
         listener.stop();
-
         try {
             await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
 
@@ -407,6 +419,63 @@ class KafkaAuditRoundTripTest {
                 assertEquals(0L, auditTopicStatusReader.read().consumerLag());
             });
         } finally {
+            if (!listener.isRunning()) {
+                listener.start();
+            }
+        }
+    }
+
+    @Test
+    void postgresOutage_keepsAssignmentAndOffset_thenStoresSameBatchAfterRecovery() throws Exception {
+        Fixture fixture = createFixture();
+        String key = fixture.leaderboardId().toString();
+        String eventId = Instant.now().toEpochMilli() + "-0";
+        boolean postgresPaused = false;
+        MessageListenerContainer listener = kafkaListenerEndpointRegistry
+                .getListenerContainer("audit-trend-consumer");
+        assertNotNull(listener);
+        listener.stop();
+
+        try {
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
+            SendResult<String, String> sent = kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    key,
+                    eventJson(fixture, eventId, UUID.randomUUID())
+            ).get();
+            TopicPartition partition = new TopicPartition(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    sent.getRecordMetadata().partition()
+            );
+
+            postgresContainer.getDockerClient()
+                    .pauseContainerCmd(postgresContainer.getContainerId())
+                    .exec();
+            postgresPaused = true;
+            listener.start();
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                assertTrue(listener.getAssignedPartitions().contains(partition));
+                assertTrue(committedOffset(partition) < sent.getRecordMetadata().offset() + 1);
+                assertEquals("DOWN", auditConsumerStatus.health().getStatus().getCode());
+            });
+
+            postgresContainer.getDockerClient()
+                    .unpauseContainerCmd(postgresContainer.getContainerId())
+                    .exec();
+            postgresPaused = false;
+
+            await().ignoreExceptions().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+                assertEquals(1, findAuditRows(fixture.leaderboardId()).size());
+                assertTrue(committedOffset(partition) >= sent.getRecordMetadata().offset() + 1);
+                assertEquals("UP", auditConsumerStatus.health().getStatus().getCode());
+            });
+        } finally {
+            if (postgresPaused) {
+                postgresContainer.getDockerClient()
+                        .unpauseContainerCmd(postgresContainer.getContainerId())
+                        .exec();
+            }
             if (!listener.isRunning()) {
                 listener.start();
             }

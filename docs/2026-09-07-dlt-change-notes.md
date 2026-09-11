@@ -80,7 +80,14 @@ DLT 레코드에는 원본 key/value와 원본 topic 등 Spring Kafka의 원본 
 
 ### PostgreSQL 저장 실패
 
-DB 저장에서 예외가 발생하면 DLT 발행 단계까지 가지 못하고 리스너가 실패한다. 이번 변경에는 PostgreSQL 장애용 장기 재시도 정책이 포함되지 않았다.
+2026-09-11 후속 변경에서 DB 오류를 메시지 오류와 분리했다.
+
+- 연결·자원·일시 오류는 `10 → 20 → 40 → 80 → 160 → 300초` 간격으로 같은 배치를 무기한 재시도한다.
+- 재시도 중에도 Kafka poll을 유지하고 원본 오프셋은 커밋하지 않는다.
+- 그 밖의 영구 DB 오류는 DLT로 보내지 않고 컨슈머를 중단한다.
+- 재시도가 10분을 넘거나 영구 오류로 중단되면 readiness가 `DOWN`이다.
+
+무기한 재시도는 자동 복구 보장이 아니라 데이터 보존 정책이다. DB가 복구되면 멱등 저장 후 같은 배치의 처리를 완료하고 오프셋을 커밋한다.
 
 ### DLT 발행 실패
 
@@ -94,14 +101,15 @@ DB 저장에서 예외가 발생하면 DLT 발행 단계까지 가지 못하고 
 
 - `AuditEventConsumer`: 검증, 실패 레코드 재처리, 정상 행 저장, DLT 전달
 - `AuditTopicConfig`: DLT 토픽과 `DeadLetterPublishingRecoverer` 생성
-- `application.properties`: 재시도 간격 3초 설정
+- `AuditConsumerErrorConfig`: 일시 DB 오류 재시도와 영구 DB 오류 중단 분기
+- `AuditConsumerStatus`: DB 재시도 로그·메트릭·readiness 상태
+- `application.properties`: 파싱 재시도 3초, DB backoff와 10분 비정상 임계치 설정
 - `AuditEventConsumerTest`: 총 3회 처리와 DLT 실패 예외 전파 검증
 - `KafkaAuditRoundTripTest`: 실제 Kafka/PostgreSQL에서 정상 저장, DLT 발행, 오프셋 커밋 검증
 - `README.md`, `PRD.md`, `SPIKE-001-kafka-migration-path.md`: 구현 완료 상태와 남은 범위 반영
 
 ## 아직 하지 않은 것
 
-- PostgreSQL 일시 장애에 대한 장기 backoff
 - DLT 중복 방지
 - DLT 재처리 도구 또는 운영 API
 - DLT 적재량 알림과 최근 실패 원문 조회

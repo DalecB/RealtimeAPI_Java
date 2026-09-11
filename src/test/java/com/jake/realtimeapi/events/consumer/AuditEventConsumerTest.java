@@ -24,7 +24,8 @@ class AuditEventConsumerTest {
     private final AuditEventRepository repository = mock(AuditEventRepository.class);
     private final ObjectMapper objectMapper = org.mockito.Mockito.spy(new ObjectMapper());
     private final DeadLetterPublishingRecoverer recoverer = mock(DeadLetterPublishingRecoverer.class);
-    private final AuditEventConsumer consumer = new AuditEventConsumer(repository, objectMapper, recoverer, 0);
+    private final AuditConsumerStatus status = mock(AuditConsumerStatus.class);
+    private final AuditEventConsumer consumer = new AuditEventConsumer(repository, objectMapper, recoverer, status, 0);
 
     @Test
     void invalidRecord_isRetriedThreeTimes_andOnlyItIsSentToDlt() throws Exception {
@@ -43,6 +44,7 @@ class AuditEventConsumerTest {
         verify(repository).insertIgnoringDuplicates(rows.capture());
         assertEquals(1, rows.getValue().size());
         verify(recoverer).accept(eq(invalid), any(RuntimeException.class));
+        verify(status).recordSuccess();
     }
 
     @Test

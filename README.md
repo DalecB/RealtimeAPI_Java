@@ -27,7 +27,7 @@ Redis 핫패스와 PostgreSQL 콜드패스를 분리하고, 감사 이벤트를 
 ## 현재 구현 범위
 
 - Phase 2는 **단일 릴레이 + 고정 컨슈머 이름**, Kafka 단일 브로커, PostgreSQL 멱등 저장, Kafka 컨슈머 재시작·2인스턴스 재할당 검증까지 완료했습니다.
-- Phase 3에서는 교체 릴레이의 오래된 PEL 인계와 처리 불가 Kafka 레코드의 DLT 격리를 구현했습니다. 자동화 테스트에서는 `XAUTOCLAIM` 경계, Kafka 발행 후 XACK 전 중복, 정상 레코드의 DB 저장을 막지 않는 DLT 발행과 배치 오프셋 커밋을 검증했습니다.
+- Phase 3에서는 교체 릴레이의 오래된 PEL 인계, 처리 불가 Kafka 레코드의 DLT 격리, PostgreSQL 장애 처리를 구현했습니다. 일시 DB 오류는 poll을 유지하며 같은 배치를 무기한 재시도하고, 영구 DB 오류는 오프셋을 커밋하지 않은 채 컨슈머를 중단합니다.
 - Snapshot worker 기본 주기는 `30초`입니다. T8 비교를 위해 `5분` 주기로도 재기동해 측정했습니다.
 - 관리용 JWT 로그인은 현재 범위에서 `users.externalId` 기반 demo auth를 사용합니다.
 - `/internal/streams/status`의 `consumerGroupLag`는 릴레이가 아직 읽지 않은 건수, `pendingEntries`는 읽었지만 XACK하지 않은 건수(XPENDING)입니다. `streamLength`는 이미 처리된 항목까지 포함한 감사 스트림의 전체 길이(XLEN)입니다.
@@ -73,6 +73,7 @@ Testcontainers 통합 테스트:
 | Kafka 감사 로그 왕복 | 이벤트 처리의 Lua XADD → 릴레이 1회 → Kafka 컨슈머 → PostgreSQL `audit_events` 적재를 실제 컨테이너로 연결하고, `eventId`·`userId`·`delta`·`apiKeyId` 등 원본 필드와 릴레이 처리 후 Redis 미확인 메시지 0건(XPENDING)을 검증 | `KafkaAuditRoundTripTest` |
 | Kafka 중복 전달 멱등 | 동일 `eventId`의 Kafka 메시지를 2회 전달해도 `(leaderboard_id, event_id)` UNIQUE와 `ON CONFLICT DO NOTHING`으로 `audit_events`가 1행인지 검증. 컨슈머 저장 멱등성의 검증이며 릴레이 장애 복구 검증은 아님 | `KafkaAuditRoundTripTest` |
 | Kafka 처리 불가 레코드 격리 | 파싱 실패 레코드는 총 3회 처리 후 `lb-audit-events.DLT`로 보내고, 정상 레코드는 PostgreSQL에 저장하며 원본 배치 오프셋이 커밋되는지 검증 | `KafkaAuditRoundTripTest` |
+| Kafka DB 장애 복구 | PostgreSQL을 pause한 동안 파티션 할당과 미커밋 오프셋을 유지하고, 복구 후 같은 이벤트를 저장한 뒤 오프셋을 커밋하며 readiness가 `UP`으로 돌아오는지 검증 | `KafkaAuditRoundTripTest` |
 | Kafka 컨슈머 재시작 | 첫 메시지의 DB 적재와 오프셋 커밋을 확인한 뒤 리스너를 중지한다. 중지 중 같은 파티션에 두 번째 메시지를 넣고 재시작해, 커밋된 오프셋 이후부터 소비하고 두 메시지를 각각 1행 저장하는지 검증 | `KafkaAuditRoundTripTest` |
 | 교체 릴레이의 `min-idle-time` 적용 | 임시 컨슈머가 남긴 PEL은 메시지의 유휴 시간이 1초에 도달하기 전까지 유지되고, 1초가 지난 뒤에만 교체 릴레이가 인계하는지 검증합니다. 인계한 메시지는 PostgreSQL에 저장한 뒤 XACK합니다. | `KafkaAuditRoundTripTest` |
 | PEL 인계 커서 연속 처리 | PEL 3건과 복구 배치 크기 2건을 사용해 첫 주기에 2건을 처리하고, 다음 주기에 반환 커서부터 나머지 1건을 처리하는지 검증합니다. | `KafkaAuditRoundTripTest` |

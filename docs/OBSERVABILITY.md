@@ -48,6 +48,12 @@ docker compose up -d postgres redis kafka app prometheus grafana
 - `stream_consumer_group_lag`
 - `stream_length`
 
+### Kafka Audit Consumer
+- `audit_consumer_db_retry_total`: 일시 DB 오류로 동일 배치를 다시 처리한 횟수
+- `audit_consumer_db_retry_duration_seconds`: 현재 DB 재시도 지속 시간, 정상 처리 후 0
+- `audit_consumer_db_permanent_failure_total`: 영구 DB 오류로 컨슈머를 중단한 횟수
+- `/actuator/health/readiness`: DB 재시도가 10분을 넘거나 영구 DB 오류가 발생하면 `DOWN`, 정상 배치 처리 후 `UP`
+
 ## 3. Grafana 대시보드
 
 기본 대시보드는 compose 시작 시 자동 프로비저닝됩니다.
@@ -89,3 +95,4 @@ Ops Console의 `Kafka Delivery`는 원본 토픽 누적 발행량, PostgreSQL �
 - `stream_length`는 이미 처리했지만 아직 트림하지 않은 항목도 포함하므로 미처리 건수로 사용하지 않습니다.
 - 스냅샷 상태 API는 인메모리 상태 추적기를 사용하므로 애플리케이션을 재시작하면 마지막 성공 시각이 초기화됩니다.
 - 복구 검증 스크립트는 Docker Compose의 `app` 컨테이너를 재시작합니다. 따라서 로컬 `bootRun` 프로세스가 아니라 Docker Compose로 실행한 애플리케이션을 기준으로 사용해야 합니다.
+- DB 재시도는 복구를 보장하지 않습니다. `audit_consumer_db_retry_duration_seconds`가 계속 증가하면 방화벽·DNS·자격 증명·DB 상태를 확인해야 합니다.

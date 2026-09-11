@@ -224,7 +224,7 @@ Kafka consumer group: audit-trend
           └── UNIQUE (leaderboard_id, event_id)로 중복 저장 방지
 ```
 
-Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이름만 지원했다. 후속 Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했다. Testcontainers에서는 1,001건 PEL의 500건 단위 후속 처리, A → B → C 연속 인계, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했다. Compose에서는 Relay A를 실제 `SIGKILL`한 뒤 운영값 10분이 지나 Relay B가 PEL을 인계해 PostgreSQL에 1행을 저장하는 흐름을 검증했다. 여러 릴레이의 동시 실행은 지원 범위가 아니다. 처리할 수 없는 메시지는 총 3회 처리한 뒤 `lb-audit-events.DLT`에 격리하도록 구현·검증했다.
+Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이름만 지원했다. 후속 Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했다. Testcontainers에서는 1,001건 PEL의 500건 단위 후속 처리, A → B → C 연속 인계, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했다. Compose에서는 Relay A를 실제 `SIGKILL`한 뒤 운영값 10분이 지나 Relay B가 PEL을 인계해 PostgreSQL에 1행을 저장하는 흐름을 검증했다. 여러 릴레이의 동시 실행은 지원 범위가 아니다. 처리할 수 없는 메시지는 총 3회 처리한 뒤 `lb-audit-events.DLT`에 격리한다. PostgreSQL 연결·자원·일시 오류는 poll을 유지하면서 `10 → 20 → 40 → 80 → 160 → 300초` 간격으로 같은 배치를 무기한 재시도하고, 그 밖의 DB 오류는 미커밋 상태로 컨슈머를 중단한다.
 
 ### 4.3 Read Flow (랭킹 조회)
 
@@ -543,6 +543,8 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 | Redis 재시작          | AOF Persistence로 데이터 복구 (최대 1초 유실) | AOF fsync: everysec                  |
 | Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 랭킹 Top-1,000까지만 복구, 최대 약 30초 |
 | Snapshot Worker 실패  | 재시도 3회 후 알림, 다음 주기 재개            | Cold Path 장애는 Hot Path와 독립     |
+| Audit DB 일시 장애    | poll 유지 + 동일 Kafka 배치 무기한 재시도     | 오프셋 보존, 최대 backoff 5분        |
+| Audit DB 영구 오류    | 컨슈머 중단 + 오프셋 미커밋                   | 코드·스키마 수정 후 같은 배치 재처리 |
 
 ### 10.2 Circuit Breaker 설정
 
@@ -709,6 +711,13 @@ T8 테스트에서 주기 2종(30초 vs 5분) 각각에서 Mixed Workload 실행
 - `stream_consumer_group_lag`: 릴레이 컨슈머 그룹(`audit-relay`)이 아직 읽지 않은 메시지 건수
 - `stream_pending_entries`: 릴레이가 읽었지만 아직 XACK하지 않은 메시지 건수(XPENDING)
 - `stream_length`: audit stream 길이(XLEN). 리텐션의 결과이지 밀린 양이 아니다
+
+**Kafka Audit Consumer**
+
+- `audit_consumer_db_retry_total`: 일시 DB 오류 재시도 횟수
+- `audit_consumer_db_retry_duration_seconds`: 현재 DB 재시도 지속 시간
+- `audit_consumer_db_permanent_failure_total`: 영구 DB 오류로 컨슈머를 중단한 횟수
+- `/actuator/health/readiness`: 재시도 10분 초과 또는 영구 DB 오류 시 `DOWN`
 
 ### Logs
 

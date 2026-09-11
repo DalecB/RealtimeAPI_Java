@@ -31,17 +31,20 @@ public class AuditEventConsumer {
     private final AuditEventRepository auditEventRepository;
     private final ObjectMapper objectMapper;
     private final DeadLetterPublishingRecoverer deadLetterPublishingRecoverer;
+    private final AuditConsumerStatus auditConsumerStatus;
     private final long parseRetryDelayMs;
 
     public AuditEventConsumer(
             AuditEventRepository auditEventRepository,
             ObjectMapper objectMapper,
             DeadLetterPublishingRecoverer deadLetterPublishingRecoverer,
+            AuditConsumerStatus auditConsumerStatus,
             @Value("${events.consumer.parse-retry-delay-ms:3000}") long parseRetryDelayMs
     ) {
         this.auditEventRepository = auditEventRepository;
         this.objectMapper = objectMapper;
         this.deadLetterPublishingRecoverer = deadLetterPublishingRecoverer;
+        this.auditConsumerStatus = auditConsumerStatus;
         this.parseRetryDelayMs = parseRetryDelayMs;
     }
 
@@ -72,6 +75,7 @@ public class AuditEventConsumer {
                     failure.exception()
             );
         }
+        auditConsumerStatus.recordSuccess();
     }
 
     private List<FailedRecord> parse(
