@@ -36,6 +36,10 @@ export interface AuditTopicStatus {
   consumerLag: number
   dltTotalMessages: number
   dltRetained: number
+  consumerState: 'RUNNING' | 'DB_RETRYING' | 'STOPPED'
+  retryDurationSeconds: number
+  retryAttempts: number
+  consumerReady: boolean
 }
 
 export interface AuditEventItem {

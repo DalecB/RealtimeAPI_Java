@@ -1,5 +1,6 @@
 package com.jake.realtimeapi.events.relay;
 
+import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
 import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
@@ -29,13 +30,16 @@ public class AuditTopicStatusReader {
     private static final String DLT_TOPIC = AuditTopicConfig.AUDIT_DLT_TOPIC;
 
     private final AdminClient adminClient;
+    private final AuditConsumerStatus consumerStatus;
 
-    public AuditTopicStatusReader(AdminClient adminClient) {
+    public AuditTopicStatusReader(AdminClient adminClient, AuditConsumerStatus consumerStatus) {
         this.adminClient = adminClient;
+        this.consumerStatus = consumerStatus;
     }
 
     /** 원본 토픽의 발행량·보관량·consumer lag과 DLT의 발행량·보관량을 읽는다. */
     public AuditTopicStatus read() {
+        AuditConsumerStatus.Snapshot consumer = consumerStatus.snapshot();
         try {
             Map<String, TopicDescription> descriptions = adminClient.describeTopics(List.of(TOPIC, DLT_TOPIC))
                     .allTopicNames().get();
@@ -59,11 +63,18 @@ public class AuditTopicStatusReader {
                     produced - sumOffsets(earliestOffsets, TOPIC),
                     consumerLag(latestOffsets, earliestOffsets),
                     dltProduced,
-                    dltProduced - sumOffsets(earliestOffsets, DLT_TOPIC)
+                    dltProduced - sumOffsets(earliestOffsets, DLT_TOPIC),
+                    consumer.state(),
+                    consumer.retryDurationSeconds(),
+                    consumer.retryAttempts(),
+                    consumer.ready()
             );
         } catch (Exception ex) {
             log.warn("audit topic status read failed", ex);
-            return new AuditTopicStatus(-1L, -1L, -1L, -1L, -1L);
+            return new AuditTopicStatus(
+                    -1L, -1L, -1L, -1L, -1L,
+                    consumer.state(), consumer.retryDurationSeconds(), consumer.retryAttempts(), consumer.ready()
+            );
         }
     }
 
@@ -100,7 +111,11 @@ public class AuditTopicStatusReader {
             long retained,
             long consumerLag,
             long dltTotalMessages,
-            long dltRetained
+            long dltRetained,
+            String consumerState,
+            long retryDurationSeconds,
+            long retryAttempts,
+            boolean consumerReady
     ) {
     }
 }

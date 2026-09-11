@@ -118,6 +118,14 @@ export default function App() {
     1000,
   )
 
+  const auditConsumerClass = !auditTopic?.consumerReady
+    ? 'open'
+    : auditTopic.consumerState === 'DB_RETRYING'
+      ? 'half_open'
+      : 'closed'
+  const auditRetryDuration = auditTopic?.retryDurationSeconds
+    ? `${Math.floor(auditTopic.retryDurationSeconds / 60)}m ${auditTopic.retryDurationSeconds % 60}s`
+    : null
   const latencies = results.slice(-120).map((r) => r.latencyMs)
   const lastBlocked = [...results].reverse().find((r) => r.outcome === 'BLOCKED_503')
   const e2eReady = Boolean(
@@ -327,8 +335,10 @@ export default function App() {
             <div className="metric-card">
               <div className="metric-head">
                 <span className="title">Kafka Delivery</span>
-                <span className="value plain">
-                  consumer lag {auditTopic?.consumerLag ?? '—'} · DLT retained {auditTopic?.dltRetained ?? '—'}
+                <span className={`value ${auditConsumerClass}`}>
+                  {auditTopic?.consumerState ?? '—'}
+                  {auditRetryDuration ? ` · ${auditRetryDuration}` : ''}
+                  {auditTopic ? ` · retries ${auditTopic.retryAttempts}` : ''}
                 </span>
               </div>
               <Sparkline values={producedSeries} stroke="var(--color-green)" fill="rgba(48,209,88,.12)" />
@@ -342,7 +352,9 @@ export default function App() {
                 <span>DLT</span>
                 <b>{auditTopic?.dltTotalMessages ?? '—'}</b>
               </div>
-              <div className="metric-note">누적 발행량 = PostgreSQL 저장량 + DLT 격리량 · lag = 아직 처리하지 않은 Kafka 메시지</div>
+              <div className="metric-note">
+                consumer lag {auditTopic?.consumerLag ?? '—'} · DLT retained {auditTopic?.dltRetained ?? '—'} · 누적 발행량 = PostgreSQL 저장량 + DLT 격리량
+              </div>
             </div>
             <div className="metric-card">
               <div className="metric-head">
