@@ -14,11 +14,14 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.backoff.BackOff;
+import org.springframework.util.backoff.BackOffExecution;
 import org.springframework.util.backoff.ExponentialBackOff;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Configuration
 public class AuditConsumerErrorConfig {
@@ -29,10 +32,9 @@ public class AuditConsumerErrorConfig {
             @Value("${events.consumer.db-retry-initial-delay:10s}") Duration initialDelay,
             @Value("${events.consumer.db-retry-max-delay:5m}") Duration maxDelay
     ) {
-        ExponentialBackOff backOff = new ExponentialBackOff(initialDelay.toMillis(), 2);
-        backOff.setMaxInterval(maxDelay.toMillis());
-
-        DefaultErrorHandler retryTransientDatabaseFailure = new DefaultErrorHandler(backOff);
+        DefaultErrorHandler retryTransientDatabaseFailure = new DefaultErrorHandler(
+                databaseRetryBackOff(initialDelay, maxDelay)
+        );
         retryTransientDatabaseFailure.setRetryListeners(status);
 
         CommonContainerStoppingErrorHandler stopOnPermanentDatabaseFailure =
@@ -59,5 +61,20 @@ public class AuditConsumerErrorConfig {
         errorHandler.setErrorHandlers(delegates);
         errorHandler.setCauseChainTraversing(true);
         return errorHandler;
+    }
+
+    static BackOff databaseRetryBackOff(Duration initialDelay, Duration maxDelay) {
+        ExponentialBackOff exponential = new ExponentialBackOff(initialDelay.toMillis(), 2);
+        exponential.setMaxInterval(maxDelay.toMillis());
+        return () -> {
+            BackOffExecution execution = exponential.start();
+            return () -> {
+                long interval = execution.nextBackOff();
+                if (interval == BackOffExecution.STOP) {
+                    return interval;
+                }
+                return ThreadLocalRandom.current().nextLong((interval + 1) / 2, interval + 1);
+            };
+        };
     }
 }

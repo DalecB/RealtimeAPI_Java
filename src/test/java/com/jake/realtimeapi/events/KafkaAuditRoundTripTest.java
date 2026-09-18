@@ -6,9 +6,11 @@ import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
 import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
+import com.jake.realtimeapi.events.consumer.AuditEventRepository;
 import com.jake.realtimeapi.events.relay.AuditRelayWorker;
 import com.jake.realtimeapi.events.relay.AuditTopicStatusReader;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
+import com.jake.realtimeapi.infra.config.AuditConsumerErrorConfig;
 import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import com.jake.realtimeapi.leaderboards.domain.model.Leaderboard;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
@@ -35,26 +37,37 @@ import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.SendResult;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.util.backoff.ExponentialBackOff;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doAnswer;
 
 /** 실제 Redis·Kafka·PostgreSQL을 사용하는 audit event 왕복 통합 테스트. */
 @SpringBootTest(properties = {
@@ -119,6 +132,12 @@ class KafkaAuditRoundTripTest {
 
     @Autowired
     private AuditConsumerStatus auditConsumerStatus;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @MockitoSpyBean
+    private AuditEventRepository auditEventRepository;
 
     @Autowired
     private PostgreSQLContainer<?> postgresContainer;
@@ -483,6 +502,68 @@ class KafkaAuditRoundTripTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void twoConsumers_spreadActualDatabaseRetriesWithJitter() throws Exception {
+        ConcurrentMessageListenerContainer<String, String> listener =
+                (ConcurrentMessageListenerContainer<String, String>) kafkaListenerEndpointRegistry
+                        .getListenerContainer("audit-trend-consumer");
+        assertNotNull(listener);
+        listener.stop();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
+
+        int originalConcurrency = listener.getConcurrency();
+        CommonErrorHandler originalErrorHandler = listener.getCommonErrorHandler();
+        Map<UUID, List<DatabaseAttempt>> attempts = new ConcurrentHashMap<>();
+        doAnswer(invocation -> {
+            List<AuditEventRepository.AuditEventRow> rows = invocation.getArgument(0);
+            long startedAt = System.nanoTime();
+            String thread = Thread.currentThread().getName();
+            for (AuditEventRepository.AuditEventRow row : rows) {
+                attempts.computeIfAbsent(row.leaderboardId(), ignored -> new CopyOnWriteArrayList<>())
+                        .add(new DatabaseAttempt(thread, startedAt));
+            }
+            return invocation.callRealMethod();
+        }).when(auditEventRepository).insertIgnoringDuplicates(anyList());
+
+        try {
+            listener.setConcurrency(2);
+
+            ExponentialBackOff deterministic = new ExponentialBackOff(400, 2);
+            deterministic.setMaxInterval(800);
+            RetryMeasurement fixed = measureDatabaseRetryTiming(
+                    listener,
+                    new DefaultErrorHandler(deterministic),
+                    attempts
+            );
+            RetryMeasurement jittered = measureDatabaseRetryTiming(
+                    listener,
+                    new AuditConsumerErrorConfig().auditConsumerErrorHandler(
+                            auditConsumerStatus,
+                            Duration.ofMillis(400),
+                            Duration.ofMillis(800)
+                    ),
+                    attempts
+            );
+
+            assertEquals(2, fixed.consumerThreads());
+            assertEquals(2, jittered.consumerThreads());
+            assertTrue(fixed.maxRetrySkewMs() < 150, fixed.toString());
+            assertTrue(jittered.maxRetrySkewMs() > 50, jittered.toString());
+            assertTrue(jittered.maxRetrySkewMs() > fixed.maxRetrySkewMs(),
+                    "fixed=" + fixed + ", jittered=" + jittered);
+            System.out.println("DB retry timing fixed=" + fixed + ", jittered=" + jittered);
+        } finally {
+            if (listener.isRunning()) {
+                listener.stop();
+                await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
+            }
+            listener.setConcurrency(originalConcurrency);
+            listener.setCommonErrorHandler(originalErrorHandler);
+            listener.start();
+        }
+    }
+
+    @Test
     void backlogLargerThanTwoPollBatches_isFullyDrained() throws Exception {
         Fixture fixture = createFixture();
         String key = fixture.leaderboardId().toString();
@@ -605,6 +686,81 @@ class KafkaAuditRoundTripTest {
         return auditEventQueryRepository.recent(leaderboardId, 100);
     }
 
+    private RetryMeasurement measureDatabaseRetryTiming(
+            ConcurrentMessageListenerContainer<String, String> listener,
+            CommonErrorHandler errorHandler,
+            Map<UUID, List<DatabaseAttempt>> attempts
+    ) throws Exception {
+        attempts.clear();
+        Fixture first = createFixture();
+        Fixture second = createFixture();
+        long now = Instant.now().toEpochMilli();
+        listener.setCommonErrorHandler(errorHandler);
+        kafkaTemplate.send(
+                AuditTopicConfig.AUDIT_TOPIC,
+                0,
+                first.leaderboardId().toString(),
+                eventJson(first, now + "-0", UUID.randomUUID())
+        ).get();
+        kafkaTemplate.send(
+                AuditTopicConfig.AUDIT_TOPIC,
+                2,
+                second.leaderboardId().toString(),
+                eventJson(second, now + "-1", UUID.randomUUID())
+        ).get();
+
+        setAuditDatabaseOutage(true);
+        listener.start();
+
+        try {
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                    assertEquals(2, listener.getAssignmentsByClientId().values().stream()
+                            .filter(partitions -> !partitions.isEmpty())
+                            .count()));
+            await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+                assertTrue(attempts.getOrDefault(first.leaderboardId(), List.of()).size() >= 6);
+                assertTrue(attempts.getOrDefault(second.leaderboardId(), List.of()).size() >= 6);
+            });
+
+            RetryMeasurement measurement = RetryMeasurement.from(
+                    attempts.get(first.leaderboardId()),
+                    attempts.get(second.leaderboardId())
+            );
+            setAuditDatabaseOutage(false);
+            await().ignoreExceptions().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+                assertEquals(1, findAuditRows(first.leaderboardId()).size());
+                assertEquals(1, findAuditRows(second.leaderboardId()).size());
+            });
+            return measurement;
+        } finally {
+            setAuditDatabaseOutage(false);
+            if (listener.isRunning()) {
+                listener.stop();
+                await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertTrue(!listener.isRunning()));
+            }
+        }
+    }
+
+    private void setAuditDatabaseOutage(boolean enabled) {
+        jdbcTemplate.execute("DROP TRIGGER IF EXISTS audit_events_outage ON audit_events");
+        jdbcTemplate.execute("DROP FUNCTION IF EXISTS fail_audit_insert()");
+        if (enabled) {
+            jdbcTemplate.execute("""
+                    CREATE FUNCTION fail_audit_insert() RETURNS trigger AS $$
+                    BEGIN
+                        RAISE EXCEPTION 'simulated database outage' USING ERRCODE = '08006';
+                        RETURN NULL;
+                    END;
+                    $$ LANGUAGE plpgsql
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE TRIGGER audit_events_outage
+                    BEFORE INSERT ON audit_events
+                    FOR EACH STATEMENT EXECUTE FUNCTION fail_audit_insert()
+                    """);
+        }
+    }
+
     private long committedOffset(TopicPartition partition) throws Exception {
         OffsetAndMetadata committed = adminClient.listConsumerGroupOffsets("audit-trend")
                 .partitionsToOffsetAndMetadata()
@@ -669,6 +825,28 @@ class KafkaAuditRoundTripTest {
     }
 
     private record Fixture(long userId, UUID leaderboardId) {
+    }
+
+    private record DatabaseAttempt(String thread, long startedAtNanos) {
+    }
+
+    private record RetryMeasurement(int consumerThreads, List<Long> retrySkewsMs, long maxRetrySkewMs) {
+
+        private static RetryMeasurement from(List<DatabaseAttempt> first, List<DatabaseAttempt> second) {
+            int size = Math.min(first.size(), second.size());
+            List<Long> skews = new ArrayList<>(size - 1);
+            for (int i = 1; i < size; i++) {
+                long firstOffset = first.get(i).startedAtNanos() - first.get(0).startedAtNanos();
+                long secondOffset = second.get(i).startedAtNanos() - second.get(0).startedAtNanos();
+                skews.add(Duration.ofNanos(Math.abs(firstOffset - secondOffset)).toMillis());
+            }
+            int threads = (int) java.util.stream.Stream.concat(first.stream(), second.stream())
+                    .map(DatabaseAttempt::thread)
+                    .distinct()
+                    .count();
+            long maxSkew = skews.stream().mapToLong(Long::longValue).max().orElse(0);
+            return new RetryMeasurement(threads, List.copyOf(skews), maxSkew);
+        }
     }
 
 }

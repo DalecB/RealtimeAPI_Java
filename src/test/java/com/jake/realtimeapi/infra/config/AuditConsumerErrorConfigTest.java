@@ -13,16 +13,20 @@ import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.MessageListenerContainer;
+import org.springframework.util.backoff.BackOff;
+import org.springframework.util.backoff.ExponentialBackOff;
 
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -35,6 +39,26 @@ class AuditConsumerErrorConfigTest {
     private final AuditConsumerStatus status = new AuditConsumerStatus(meterRegistry, Duration.ofHours(1));
     private final CommonErrorHandler errorHandler = new AuditConsumerErrorConfig()
             .auditConsumerErrorHandler(status, Duration.ofMillis(1), Duration.ofMillis(2));
+
+    @Test
+    void databaseRetryBackOff_spreadsIndependentConsumersWithinEqualJitterWindow() {
+        ExponentialBackOff deterministic = new ExponentialBackOff(10_000, 2);
+        Set<Long> deterministicFirstRetryDelays = IntStream.range(0, 100)
+                .mapToObj(ignored -> deterministic.start().nextBackOff())
+                .collect(java.util.stream.Collectors.toSet());
+        BackOff backOff = AuditConsumerErrorConfig.databaseRetryBackOff(
+                Duration.ofSeconds(10),
+                Duration.ofMinutes(5)
+        );
+
+        Set<Long> firstRetryDelays = IntStream.range(0, 100)
+                .mapToObj(ignored -> backOff.start().nextBackOff())
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertEquals(Set.of(10_000L), deterministicFirstRetryDelays);
+        assertTrue(firstRetryDelays.size() > 1);
+        assertTrue(firstRetryDelays.stream().allMatch(delay -> delay >= 5_000 && delay <= 10_000));
+    }
 
     @Test
     void transientDatabaseFailure_retriesSameBatch_andRecovers() {
