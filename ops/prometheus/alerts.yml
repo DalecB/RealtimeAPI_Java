@@ -1,0 +1,98 @@
+# Prometheus 알림 규칙. Alertmanager는 연결하지 않았으므로 Prometheus Alerts 화면에서만 확인한다.
+# 메트릭 이름은 /actuator/prometheus 실제 출력 기준이다.
+groups:
+  - name: realtime-api-pipeline
+    rules:
+      # 근거: PRD `1.2 운영 SLO` 적체 해소 < 2분.
+      # 릴레이는 주기(5초)마다 새 메시지를 끝까지 읽으므로 정상이면 미수신 건수가 스크랩 사이에 줄어든다.
+      # 1분 동안 한 번도 줄지 않은 상태가 1분 더 이어지면(총 2분) 릴레이가 읽지 않는 것으로 본다.
+      # 조회 실패 시 게이지는 -1이므로 > 0 조건에서 빠진다.
+      - alert: RelayOutboxNotDraining
+        expr: stream_consumer_group_lag > 0 and resets(stream_consumer_group_lag[1m]) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "릴레이가 Redis 아웃박스를 읽지 않음"
+          description: "릴레이 미수신 건수 {{ $value }}건이 2분 동안 줄지 않았다. 릴레이 프로세스와 events.relay.enabled 설정을 확인한다."
+
+      # 근거: PRD `1.2 운영 SLO` 적체 해소 < 2분.
+      # 정상이면 릴레이가 같은 주기 안에 발행 후 XACK하므로 미확인 건수는 스크랩 시점에 대부분 0이다.
+      # 2분 넘게 남아 있으면 Kafka 발행 실패 또는 릴레이 종료 후 인계(SPIKE-001 min-idle-time 10분) 대기 상태다.
+      - alert: RelayPendingNotAcked
+        expr: stream_pending_entries > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "릴레이 미확인(PEL) 메시지가 해소되지 않음"
+          description: "XACK되지 않은 메시지 {{ $value }}건이 2분 넘게 남아 있다. Kafka 발행 오류 로그와 릴레이 생존 여부를 확인한다. 교체 릴레이는 10분 후 인계한다."
+
+      # 임시값: Kafka 컨슈머 지연에는 PRD·SPIKE-001 SLO가 없다.
+      # 5,000건 = 피크 1,000/s(SPIKE-001 파티션 결정 근거) 기준 5초 분량. for 2m은 PRD `1.2 운영 SLO` 적체 해소 < 2분을 빌렸다.
+      # Spring Boot가 자동 등록한 Kafka 클라이언트 지표라 컨슈머가 fetch할 때만 갱신된다.
+      # DB 재시도 중(파티션 pause)에는 값이 멈출 수 있고, 영구 오류로 컨슈머가 멈추면 시계열이 사라진다.
+      # 그 두 경우는 AuditConsumerDbRetryTooLong과 readiness가 담당한다.
+      - alert: AuditConsumerLagHigh
+        expr: sum by (topic) (kafka_consumer_fetch_manager_records_lag{topic="lb-audit-events"}) > 5000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka 감사 컨슈머 지연 증가"
+          description: "{{ $labels.topic }} 컨슈머 지연이 {{ $value }}건으로 2분 넘게 5,000건을 넘었다. PostgreSQL 상태와 컨슈머 처리 속도를 확인한다."
+
+      # 근거: SPIKE-001 Kafka 컨슈머 실패 처리, 재시도 시작부터 10분이 지나면 readiness DOWN
+      # (events.consumer.db-retry-unhealthy-after=10m). 설정을 바꾸면 600도 함께 바꾼다.
+      # 게이지 값 자체가 재시도 지속 시간이라 for를 더하면 임계가 10분 뒤로 밀리므로 0으로 둔다.
+      - alert: AuditConsumerDbRetryTooLong
+        expr: audit_consumer_db_retry_duration_seconds >= 600
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "감사 컨슈머 DB 재시도 10분 초과"
+          description: "PostgreSQL 일시 오류 재시도가 {{ $value | humanizeDuration }} 동안 이어져 readiness가 DOWN이다. 방화벽·DNS·자격 증명·DB 상태를 확인한다."
+
+      # 근거: PRD `10.2 Circuit Breaker 설정` waitDurationInOpenState 10초.
+      # Redis가 계속 죽어 있으면 OPEN 10초 → HALF_OPEN 짧게 → OPEN을 반복하므로 30초 창(3주기)의 최댓값으로 본다.
+      # 10초짜리 단발 OPEN은 창에서 40초만 잡혀 for 1m을 넘지 못한다. cold start 복구의 수동 OPEN도 같은 게이지에 잡힌다.
+      - alert: RedisCircuitBreakerOpen
+        expr: max_over_time(circuit_breaker_state{state="open"}[30s]) == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis 핫패스 서킷 브레이커 OPEN 지속"
+          description: "서킷 브레이커가 1분 넘게 반복해서 OPEN이다. 쓰기 API가 503으로 fail fast 중이므로 Redis 상태를 확인한다."
+
+      # 근거: PRD `1.2 운영 SLO`·`14. Snapshot & Data Retention Policy` Snapshot Lag < 45초(30초 fixedDelay 기준).
+      # 게이지 값 자체가 마지막 성공 이후 경과 시간이라 for를 더하면 임계가 45초 뒤로 밀리므로 0으로 둔다.
+      # 한 번도 성공하지 않았으면 -1이라 이 규칙에 걸리지 않는다.
+      - alert: SnapshotLagOverSlo
+        expr: snapshot_lag_seconds > 45
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "스냅샷 lag SLO(45초) 초과"
+          description: "마지막 성공 스냅샷 이후 {{ $value }}초가 지났다. snapshot_failure_total과 워커 로그를 확인한다."
+
+      # 근거: SPIKE-001 Kafka 컨슈머 실패 처리, 파싱·검증 3회 실패 레코드만 DLT로 보낸다. 정상이면 0건이므로 1건부터 알린다.
+      # DLT 발행 카운터는 프로세스 기동 후 첫 DLT 발행 때 처음 생긴다. increase()는 시계열의 첫 샘플을 증가로 세지 않으므로
+      # 5분 안에 새로 생긴 시계열(unless offset 5m)도 함께 잡는다.
+      - alert: AuditDltInflow
+        expr: |
+          increase(kafka_producer_topic_record_send_total{topic="lb-audit-events.DLT"}[5m]) > 0
+          or
+          (
+            kafka_producer_topic_record_send_total{topic="lb-audit-events.DLT"}
+            unless
+            kafka_producer_topic_record_send_total{topic="lb-audit-events.DLT"} offset 5m
+          )
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "감사 이벤트가 DLT로 이동"
+          description: "최근 5분 사이 lb-audit-events.DLT로 레코드가 발행됐다. 'audit event sent to DLT' 로그와 Ops Console Kafka Delivery의 DLT 건수를 확인한다."

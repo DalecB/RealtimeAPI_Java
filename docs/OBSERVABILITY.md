@@ -18,6 +18,7 @@ docker compose up -d postgres redis kafka app prometheus grafana
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (`admin` / `admin`)
 - Prometheus scrape endpoint: `http://localhost:8080/actuator/prometheus`
+- 알림 규칙: `ops/prometheus/alerts.yml`, 상태는 `http://localhost:9090/alerts`에서 본다. Alertmanager는 연결하지 않았다.
 
 ## 2. 현재 계측된 핵심 메트릭
 

@@ -1,0 +1,42 @@
+# promtool test rules ops/prometheus/alerts.test.yml
+# DLT 카운터는 첫 DLT 발행 때 처음 생기므로, 새로 생긴 시계열도 알림이 뜨는지 고정한다.
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 5s
+
+tests:
+  - interval: 5s
+    input_series:
+      # 0~1분: 시계열 없음, 1분: 첫 DLT 발행으로 1, 9분: 두 번째 발행으로 2.
+      - series: 'kafka_producer_topic_record_send_total{job="realtime-api",instance="app:8080",topic="lb-audit-events.DLT"}'
+        values: '_x11 1x95 2x60'
+    alert_rule_test:
+      # 첫 샘플만 있는 새 시계열: increase()는 0이지만 unless offset 5m 분기로 알림이 뜬다.
+      - eval_time: 2m
+        alertname: AuditDltInflow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: realtime-api
+              instance: app:8080
+              topic: lb-audit-events.DLT
+            exp_annotations:
+              summary: "감사 이벤트가 DLT로 이동"
+              description: "최근 5분 사이 lb-audit-events.DLT로 레코드가 발행됐다. 'audit event sent to DLT' 로그와 Ops Console Kafka Delivery의 DLT 건수를 확인한다."
+      # 5분 넘게 값이 그대로면 해소된다.
+      - eval_time: 8m
+        alertname: AuditDltInflow
+        exp_alerts: []
+      # 이미 있던 시계열이 증가하면 increase() 분기로 다시 뜬다.
+      - eval_time: 10m
+        alertname: AuditDltInflow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: realtime-api
+              instance: app:8080
+              topic: lb-audit-events.DLT
+            exp_annotations:
+              summary: "감사 이벤트가 DLT로 이동"
+              description: "최근 5분 사이 lb-audit-events.DLT로 레코드가 발행됐다. 'audit event sent to DLT' 로그와 Ops Console Kafka Delivery의 DLT 건수를 확인한다."
