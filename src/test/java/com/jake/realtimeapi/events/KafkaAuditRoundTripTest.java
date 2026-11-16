@@ -7,6 +7,7 @@ import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
 import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
 import com.jake.realtimeapi.events.consumer.AuditEventRepository;
+import com.jake.realtimeapi.events.relay.AuditRelayLeaderLock;
 import com.jake.realtimeapi.events.relay.AuditRelayWorker;
 import com.jake.realtimeapi.events.relay.AuditTopicStatusReader;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
@@ -25,7 +26,9 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Test;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.jdbc.JdbcConnectionDetails;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Range;
@@ -102,6 +105,12 @@ class KafkaAuditRoundTripTest {
 
     @Autowired
     private AuditRelayWorker auditRelayWorker;
+
+    @Autowired
+    private AuditRelayLeaderLock auditRelayLeaderLock;
+
+    @Autowired
+    private JdbcConnectionDetails jdbcConnectionDetails;
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -662,6 +671,89 @@ class KafkaAuditRoundTripTest {
         });
     }
 
+    @Test
+    void twoRelayInstances_onlyLockHolderRelays_andStoresOnce() {
+        Fixture fixture = createFixture();
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+        // 컨텍스트의 릴레이가 기동 틱에서 쥔 락을 놓아 두 인스턴스가 처음부터 경쟁하게 한다.
+        auditRelayLeaderLock.release();
+        AuditRelayLeaderLock lockA = newInstanceLock();
+        AuditRelayLeaderLock lockB = newInstanceLock();
+        try {
+            AuditRelayWorker relayA = relay("relay-a", lockA);
+            AuditRelayWorker relayB = relay("relay-b", lockB);
+            relayA.relayAll();
+            assertTrue(lockA.isLeader());
+            assertTrue(!lockB.isLeader());
+
+            processEvents(fixture, 3);
+            relayB.relayAll();
+            assertEquals(0, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(3L, auditStreamStatusRepository.getStatus(fixture.leaderboardId()).consumerGroupLag());
+
+            relayA.relayAll();
+            relayB.relayAll();
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                assertEquals(3, findAuditRows(fixture.leaderboardId()).size());
+                assertEquals(3, distinctEventIds(fixture.leaderboardId()));
+                assertEquals(0, pendingCount(streamKey));
+            });
+            assertEquals(0L, auditStreamStatusRepository.getStatus(fixture.leaderboardId()).consumerGroupLag());
+        } finally {
+            lockA.release();
+            lockB.release();
+        }
+    }
+
+    @Test
+    void leaderConnectionDies_otherInstanceTakesOverRelay() {
+        Fixture fixture = createFixture();
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+        auditRelayLeaderLock.release();
+        AuditRelayLeaderLock lockA = newInstanceLock();
+        AuditRelayLeaderLock lockB = newInstanceLock();
+        try {
+            AuditRelayWorker relayA = relay("relay-a", lockA);
+            AuditRelayWorker relayB = relay("relay-b", lockB);
+            processEvents(fixture, 1);
+            relayA.relayAll();
+            relayB.relayAll();
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                    assertEquals(1, findAuditRows(fixture.leaderboardId()).size()));
+
+            // 프로세스 크래시처럼 A의 세션을 서버에서 끊는다. 두 int 키라 objsubid=2로 잡힌다.
+            Integer terminated = jdbcTemplate.queryForObject("""
+                    SELECT count(pg_terminate_backend(pid))::int FROM pg_locks
+                    WHERE locktype = 'advisory' AND classid = 1 AND objid = 1 AND objsubid = 2 AND granted
+                    """, Integer.class);
+            assertEquals(1, terminated);
+
+            processEvents(fixture, 2);
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                relayB.relayAll();
+                assertEquals(3, findAuditRows(fixture.leaderboardId()).size());
+            });
+            assertTrue(lockB.isLeader());
+
+            // 다시 연결한 A는 B가 쥔 락을 얻지 못해 옮기지 않는다.
+            processEvents(fixture, 1);
+            relayA.relayAll();
+            assertTrue(!lockA.isLeader());
+            assertEquals(1L, auditStreamStatusRepository.getStatus(fixture.leaderboardId()).consumerGroupLag());
+
+            relayB.relayAll();
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                assertEquals(4, findAuditRows(fixture.leaderboardId()).size());
+                assertEquals(4, distinctEventIds(fixture.leaderboardId()));
+                assertEquals(0, pendingCount(streamKey));
+            });
+        } finally {
+            lockA.release();
+            lockB.release();
+        }
+    }
+
     private String eventJson(Fixture fixture, String eventId, UUID idempotencyKey) throws Exception {
         Map<String, String> event = new LinkedHashMap<>();
         event.put("eventId", eventId);
@@ -820,8 +912,44 @@ class KafkaAuditRoundTripTest {
                 objectMapper,
                 batchSize,
                 claimMinIdleMs,
-                consumerName
+                consumerName,
+                auditRelayLeaderLock
         );
+    }
+
+    private AuditRelayWorker relay(String consumerName, AuditRelayLeaderLock leaderLock) {
+        return new AuditRelayWorker(
+                leaderboardRepository,
+                redisTemplate,
+                kafkaTemplate,
+                objectMapper,
+                500,
+                600_000,
+                consumerName,
+                leaderLock
+        );
+    }
+
+    private AuditRelayLeaderLock newInstanceLock() {
+        return new AuditRelayLeaderLock(jdbcConnectionDetails, new SimpleMeterRegistry());
+    }
+
+    private void processEvents(Fixture fixture, int count) {
+        for (int i = 0; i < count; i++) {
+            eventCommandRepository.process(new EventPayload(
+                    fixture.leaderboardId(),
+                    fixture.userId(),
+                    DELTA,
+                    UUID.randomUUID()
+            ), API_KEY_ID);
+        }
+    }
+
+    private long distinctEventIds(UUID leaderboardId) {
+        return findAuditRows(leaderboardId).stream()
+                .map(AuditEventQueryRepository.RecentAuditEvent::eventId)
+                .distinct()
+                .count();
     }
 
     private record Fixture(long userId, UUID leaderboardId) {

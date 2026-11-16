@@ -65,6 +65,7 @@ public class AuditRelayWorker {
     private final int batchSize;
     private final Duration claimMinIdle;
     private final Map<UUID, String> claimCursors = new ConcurrentHashMap<>();
+    private final AuditRelayLeaderLock leaderLock;
 
     // 기본 재시작은 같은 이름을 쓰고, 교체 인계 검증은 설정으로 A/B/C 이름을 명시한다.
     private final String consumerName;
@@ -76,7 +77,8 @@ public class AuditRelayWorker {
             ObjectMapper objectMapper,
             @org.springframework.beans.factory.annotation.Value("${events.relay.batch-size:500}") int batchSize,
             @org.springframework.beans.factory.annotation.Value("${events.relay.claim-min-idle-ms:600000}") long claimMinIdleMs,
-            @org.springframework.beans.factory.annotation.Value("${events.relay.consumer-name}") String consumerName
+            @org.springframework.beans.factory.annotation.Value("${events.relay.consumer-name}") String consumerName,
+            AuditRelayLeaderLock leaderLock
     ) {
         this.leaderboardRepository = leaderboardRepository;
         this.redisTemplate = redisTemplate;
@@ -85,10 +87,16 @@ public class AuditRelayWorker {
         this.batchSize = batchSize;
         this.claimMinIdle = Duration.ofMillis(claimMinIdleMs);
         this.consumerName = consumerName;
+        this.leaderLock = leaderLock;
     }
 
     @Scheduled(fixedDelayString = "${events.relay.delay-ms:5000}")
     public void relayAll() {
+        // 모든 인스턴스가 틱을 돌지만 락을 쥔 하나만 옮긴다. 리더보드별 순서는 활성 릴레이가 하나일 때만 지켜진다.
+        if (!leaderLock.isLeader()) {
+            log.debug("relay skipped not-leader consumer={}", consumerName);
+            return;
+        }
         for (UUID leaderboardId : leaderboardRepository.findAllIds()) {
             try {
                 relayOne(leaderboardId);

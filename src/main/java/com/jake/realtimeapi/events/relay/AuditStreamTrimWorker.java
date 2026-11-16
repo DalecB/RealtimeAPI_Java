@@ -34,14 +34,26 @@ public class AuditStreamTrimWorker {
 
     private final LeaderboardRepository leaderboardRepository;
     private final StringRedisTemplate redisTemplate;
+    private final AuditRelayLeaderLock leaderLock;
 
-    public AuditStreamTrimWorker(LeaderboardRepository leaderboardRepository, StringRedisTemplate redisTemplate) {
+    public AuditStreamTrimWorker(
+            LeaderboardRepository leaderboardRepository,
+            StringRedisTemplate redisTemplate,
+            AuditRelayLeaderLock leaderLock
+    ) {
         this.leaderboardRepository = leaderboardRepository;
         this.redisTemplate = redisTemplate;
+        this.leaderLock = leaderLock;
     }
 
     @Scheduled(fixedDelayString = "${events.relay.trim-delay-ms:40000}")
     public void trimAll() {
+        // 워터마크는 XPENDING과 XINFO GROUPS 두 번에 나눠 읽는다. 그 사이에 다른 인스턴스의 릴레이가
+        // 새 기록을 읽으면 아직 XACK 안 된 구간까지 잘린다. 리더에서만 돌리면 릴레이와 같은 스케줄러
+        // 스레드에서 순서대로 실행돼 겹치지 않는다.
+        if (!leaderLock.isLeader()) {
+            return;
+        }
         for (UUID leaderboardId : leaderboardRepository.findAllIds()) {
             try {
                 trimOne(leaderboardId);
