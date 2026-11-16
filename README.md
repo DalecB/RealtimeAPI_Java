@@ -20,7 +20,7 @@ Redis 핫패스와 PostgreSQL 콜드패스를 분리하고, 감사 이벤트를 
 - Hot Path: `POST /events` -> Redis Lua -> ZSET / idempotency key / audit stream
 - Audit Path: Redis Stream -> relay -> Kafka `lb-audit-events` -> consumer -> PostgreSQL `audit_events`
 - Cold Path: Snapshot worker (`30s` 기본 주기) -> Redis Top-N 조회 -> PostgreSQL upsert
-- Recovery: Redis cold start 시 PostgreSQL 최신 snapshot으로 복구
+- Recovery: Redis가 랭킹을 잃으면 리더보드별 warm 키도 함께 사라진다. 쓰기는 503, 읽기는 PostgreSQL 최신 snapshot으로 응답하고, 스냅샷 워커가 다음 주기(앱 시작 시에는 즉시)에 복구한다
 
 상세 설계와 ADR은 [docs/PRD.md](docs/PRD.md)에 정리되어 있습니다.
 

@@ -1,12 +1,20 @@
 -- KEYS[1] = "lb:{leaderboardId}:idem:{eventUuid}"
 -- KEYS[2] = "lb:{leaderboardId}:z"
 -- KEYS[3] = "lb:{leaderboardId}:events"
+-- KEYS[4] = "lb:{leaderboardId}:warm"
 -- ARGV[1] = userId
 -- ARGV[2] = deltaScore
 -- ARGV[3] = ttlSeconds
 -- ARGV[4] = idempotency record (e.g. "v2:<payloadHash>:<processedAtEpochMillis>")
 -- ARGV[5] = apiKeyId
 -- ARGV[6] = idempotency key
+
+-- 0) Warm check
+-- The warm key disappears together with the ranking when Redis loses its data.
+-- Without it, a score would land on an empty ranking and block recovery from the snapshot.
+if redis.call('EXISTS', KEYS[4]) == 0 then
+    return {-1, 'cold'}
+end
 
 -- 1) Idempotency check
 local existing = redis.call('GET', KEYS[1])

@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -19,7 +18,6 @@ import java.util.function.Supplier;
 public class RedisReadPathCircuitBreaker {
 
     private final CircuitBreaker circuitBreaker;
-    private final AtomicReference<String> manualOpenReason = new AtomicReference<>();
 
     public RedisReadPathCircuitBreaker(
             @Qualifier("redisReadPathCircuitBreakerDelegate") CircuitBreaker redisReadPathCircuitBreakerDelegate,
@@ -40,12 +38,9 @@ public class RedisReadPathCircuitBreaker {
 
     /**
      * Redis 읽기를 시도하고, 못 읽으면 fallback으로 답한다.
-     * 수동 OPEN(복구 중)·자동 OPEN·개별 Redis 실패 모두 fallback이다. 느린 호출은 결과를 그대로 돌려주되 창에 slow로 기록된다.
+     * 자동 OPEN·개별 Redis 실패 모두 fallback이다. 느린 호출은 결과를 그대로 돌려주되 창에 slow로 기록된다.
      */
     public <T> T execute(Supplier<T> redisCall, Supplier<T> fallback) {
-        if (isManualOpen()) {
-            return fallback.get();
-        }
         try {
             return circuitBreaker.executeSupplier(redisCall);
         } catch (CallNotPermittedException | DataAccessException exception) {
@@ -61,14 +56,6 @@ public class RedisReadPathCircuitBreaker {
         return new ReadPathCircuitBreakerStatus(currentState(), failureRate(), slowCallRate());
     }
 
-    public void openManually(String reason) {
-        manualOpenReason.set(reason == null || reason.isBlank() ? "manual-open" : reason);
-    }
-
-    public void clearManualOverride() {
-        manualOpenReason.set(null);
-    }
-
     private void registerStateGauge(MeterRegistry meterRegistry, String state) {
         Gauge.builder("circuit_breaker_state", this, breaker -> breaker.currentState().equalsIgnoreCase(state) ? 1 : 0)
                 .tag("name", circuitBreaker.getName())
@@ -76,14 +63,7 @@ public class RedisReadPathCircuitBreaker {
                 .register(meterRegistry);
     }
 
-    private boolean isManualOpen() {
-        return manualOpenReason.get() != null;
-    }
-
     private String currentState() {
-        if (isManualOpen()) {
-            return "OPEN";
-        }
         return circuitBreaker.getState().name();
     }
 

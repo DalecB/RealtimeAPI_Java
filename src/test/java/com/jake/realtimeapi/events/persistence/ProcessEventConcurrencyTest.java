@@ -5,6 +5,7 @@ import com.jake.realtimeapi.events.domain.exception.IdempotencyKeyReuseMismatchE
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.model.ProcessEventResult;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.junit.jupiter.api.AfterEach;
@@ -48,6 +49,10 @@ class ProcessEventConcurrencyTest {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    // 실제로는 리더보드 생성(POST /leaderboards)이 쓰는 키다. 이 테스트는 리더보드를 직접 만들므로 직접 쓴다.
+    @Autowired
+    private RankingWarmthRepository rankingWarmthRepository;
+
     private ExecutorService executor;
 
     @BeforeEach
@@ -65,6 +70,7 @@ class ProcessEventConcurrencyTest {
         // 테스트 간 격리를 위해 매 테스트 새 leaderboard/key 사용 (컨테이너는 컨텍스트 캐시로 공유됨)
         UUID leaderboardId = UUID.randomUUID();
         UUID idempotencyKey = UUID.randomUUID();
+        rankingWarmthRepository.markWarm(leaderboardId);
         EventPayload payload = new EventPayload(leaderboardId, USER_ID, DELTA_SCORE, idempotencyKey);
 
         // JCIP startGate/endGate 패턴: 전원이 게이트 앞에 모인 뒤 일제 출발시켜 경합을 강제한다
@@ -122,6 +128,7 @@ class ProcessEventConcurrencyTest {
     void process_throwsMismatchWhenSameKeyIsReusedWithDifferentPayload() {
         UUID leaderboardId = UUID.randomUUID();
         UUID idempotencyKey = UUID.randomUUID();
+        rankingWarmthRepository.markWarm(leaderboardId);
 
         EventPayload payload1 = new EventPayload(leaderboardId, USER_ID, DELTA_SCORE, idempotencyKey);
         eventCommandRepository.process(payload1, API_KEY_ID);

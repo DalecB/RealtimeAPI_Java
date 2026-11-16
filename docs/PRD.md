@@ -427,6 +427,14 @@ Redis 재시작 직후 또는 Cold Start 시 ZSET이 비어 있는 상태에서 
   └── snapshot_skip_total 메트릭 증가
 ```
 
+Empty Guard는 빈 랭킹만 막는다. Redis가 데이터를 잃은 뒤 일부만 다시 쌓이면 줄어든 랭킹이 스냅샷을 덮어쓴다. 이 시스템에는 참여자를 지우는 기능이 없고 점수는 늘기만 하므로 Top-N 행 수는 줄지 않는다. 이 불변식으로 Shrink Guard를 둔다(ADR-011).
+
+```
+조회 결과 size < min(직전 snapshot 행 수, topN) → 스냅샷 저장 중단
+  └── WARN 로그: "snapshots.capture skipped reason=SHRUNK"
+  └── snapshot_skip_total 메트릭 증가
+```
+
 ### 8.3 재시도 및 장애 처리
 
 ```
@@ -513,7 +521,7 @@ Redis를 Source of Truth로 사용하는 구조에서 데이터 유실 허용 �
 
 ### Cold Start 복구 플로우
 
-Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서로 복구한다.
+Redis가 랭킹을 잃으면 리더보드별 warm 키(`lb:{leaderboardId}:warm`)도 함께 사라진다. warm 키가 없는 상태(cold)를 감지하면 다음 순서로 복구한다(ADR-011).
 
 ```
 1. Redis 재시작 → AOF 복구 시도 (everysec 기준, 최대 1초 유실)
@@ -526,10 +534,11 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 3. RDB도 유실 시 → PostgreSQL 최신 snapshot 기준 복구
    └── 복구 대상: snapshot_batches에서 leaderboard별 최신 snapshot_at 1건을 찾고,
                  해당 snapshot_id의 snapshot_entries Top-1000을 복구
-   └── 복구 방법: ZADD lb:{leaderboardId}:z {score} {userId} 배치 실행
-   └── 복구 완료 판단: ZCARD lb:{leaderboardId}:z > 0 확인
-   └── 복구 중 Write 처리: Circuit Breaker 수동 OPEN으로 Write 차단 (데이터 오염 방지)
-   └── 복구 완료 후 Circuit Breaker 정상화 → Write 재개
+   └── 복구 시점: 앱 시작 시(ColdStartRecoveryRunner)와 스냅샷 워커 매 주기. 둘 다 같은 advisory lock 아래에서 실행
+   └── 복구 방법: ZADD lb:{leaderboardId}:z {score} {userId} 배치 실행 후 warm 키 SET
+   └── 복구 중 Write 처리: Lua가 warm 키를 확인해 503 RANKING_REBUILDING 반환 (빈 랭킹에 점수가 쌓여 복구가 막히는 것을 방지)
+   └── 복구 중 Read 처리: warm 키가 없으면 최신 snapshot으로 응답 (ADR-010)
+   └── warm 키 생성 후 Write 재개
    └── 복구 범위는 랭킹 Top-1,000이며 멱등키·Redis Stream 상태는 제외
 ```
 
@@ -543,6 +552,7 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 | --------------------- | --------------------------------------------- | ------------------------------------ |
 | Redis 일시 응답 지연  | Circuit Breaker (Closed → Half-Open → Open)   | Resilience4j 활용                    |
 | Redis 완전 장애       | Circuit Breaker OPEN → 503 즉시 반환          | Write 요청 차단으로 데이터 오염 방지 |
+| Redis 데이터 유실 (앱 실행 중) | warm 키 소실로 cold 감지 → 쓰기 503, 읽기 snapshot → 다음 스냅샷 주기에 복구 | 재시작 없이 최대 약 30초 안에 복구 (ADR-011) |
 | Redis 읽기 장애·지연  | 읽기 전용 Circuit Breaker OPEN → 최신 snapshot으로 응답 | snapshot 10분 초과·Top-N 밖 요청은 503 (ADR-010) |
 | Redis 재시작          | AOF Persistence로 데이터 복구 (최대 1초 유실) | AOF fsync: everysec                  |
 | Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 랭킹 Top-1,000까지만 복구, 최대 약 30초 |
@@ -1173,7 +1183,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 - 읽기 전용 브레이커(`redisReadPath`)를 쓰기 브레이커와 별도로 둔다. 실패율 50% 또는 100ms 초과 호출 비율 50%에서 연다.
 - 브레이커가 열려 있거나 Redis 호출이 실패하면 PostgreSQL 최신 snapshot으로 응답하고 `source=SNAPSHOT`, `asOf`를 붙인다.
 - snapshot이 10분보다 오래됐거나, 잘린 snapshot(Top-N)으로 정확히 답할 수 없는 요청(Top-N 밖 유저, Top-N 경계를 넘는 페이지)은 503 + `Retry-After`를 반환한다. 틀린 순위나 "미참여"를 반환하지 않는다.
-- Cold Start 복구 중에는 읽기 브레이커도 수동 OPEN 한다. 반쯤 채워진 ZSET 대신 복구 원본과 같은 snapshot으로 응답한다.
+- Cold Start 복구 중에는 읽기 브레이커도 수동 OPEN 한다. 반쯤 채워진 ZSET 대신 복구 원본과 같은 snapshot으로 응답한다. (ADR-011의 warm 키로 대체됐다.)
 
 **근거:**
 
@@ -1186,7 +1196,42 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 - **장애 중 응답은 최대 10분 전 값이다.** 클라이언트는 `source`와 `asOf`로 구분해야 한다.
 - **잘린 snapshot에서는 전체 참여자 수를 모른다.** snapshot은 Top-N만 저장하므로 `total`은 null이다. 참여자가 Top-N보다 적었던 snapshot은 전원이 들어 있으므로 `total`과 미참여 판정을 그대로 제공한다.
 - **장애가 PostgreSQL로 번질 수 있다.** 읽기 트래픽이 snapshot 조회로 넘어간다. 리더보드별 snapshot을 앱 메모리에 30초 캐시해 DB 조회를 리더보드당 주기 1회로 제한한다.
-- **복구 중 수동 OPEN은 인스턴스 로컬이다.** 다른 인스턴스는 복구 중인 ZSET을 읽을 수 있다. readiness 연동은 범위 밖이다.
+- **복구 중 수동 OPEN은 인스턴스 로컬이다.** 다른 인스턴스는 복구 중인 ZSET을 읽을 수 있다. ADR-011에서 Redis에 있는 warm 키로 바꿔 해소했다.
+
+---
+
+### ADR-011: Redis 데이터 유실 감지를 warm 키로, 복구를 스냅샷 워커로
+
+**상태:** 확정 (2026-11-16)
+
+**상황:** Cold Start 복구는 앱이 시작될 때만 돌았고, 복구 여부를 "ZSET이 비어 있는가"로 판단했다. 앱이 떠 있는 동안 Redis가 데이터를 잃자(Redis + AOF 유실, `FLUSHALL`) 두 문제가 로컬 compose에서 재현됐다.
+
+- 앱을 재시작할 때까지 `GET /tops`가 빈 랭킹을 `source=REDIS`로 정상 응답했다. Redis는 응답하므로 브레이커도 열리지 않는다.
+- 유실 직후 점수 이벤트가 1건 들어오자 ZSET에 1명이 생겼다. 다음 스냅샷 주기에 1명짜리 랭킹이 스냅샷을 덮어썼고(Empty Guard는 빈 랭킹만 막는다), 앱을 재시작해도 `REDIS_ALREADY_WARM`으로 복구가 건너뛰어졌다. 13명 중 12명의 점수가 Redis와 snapshot 양쪽에서 사라졌다.
+
+두 경로는 TLA+ 모델(TLC)에서도 각각 2단계, 3단계의 최단 반례로 나왔다.
+
+**결정:**
+
+- 리더보드별 warm 키 `lb:{leaderboardId}:warm`을 둔다. 랭킹과 같은 Redis에 있으므로 데이터가 유실되면 같이 사라지고, 모든 인스턴스가 같은 값을 본다.
+- 쓰기: Lua가 warm 키를 확인하고, 없으면 점수를 반영하지 않고 503 `RANKING_REBUILDING` + `Retry-After`(스냅샷 주기)를 반환한다.
+- 읽기: warm 키가 없으면 최신 snapshot으로 응답한다(ADR-010의 fallback). cold는 Redis 장애가 아니므로 브레이커 창에 실패로 남지 않는다.
+- 복구: 스냅샷 워커가 매 주기 캡처 전에 cold 여부를 확인하고 복구한다. 앱 시작 시 복구도 같은 advisory lock 아래에서 같은 코드를 쓴다. 복구 중 브레이커 수동 OPEN은 제거한다.
+- 리더보드를 만들 때 warm 키를 쓴다. 복구할 snapshot이 없으면 빈 랭킹으로 warm을 다시 시작한다.
+- Shrink Guard: 캡처할 행 수가 직전 snapshot보다 적으면 저장하지 않는다(`8.2`).
+
+**근거:**
+
+- **유실 감지에 별도 장치가 필요 없다.** Redis 재시작 감지(`INFO`의 `run_id`)는 `FLUSHALL`·eviction처럼 재시작 없는 유실을 놓친다. "ZSET이 비었는가"는 쓰기 1건에 무너진다. 데이터와 같은 곳에 있는 표식은 데이터와 함께만 사라진다.
+- **복구가 막히지 않는다.** cold인 동안 쓰기를 거부하므로 랭킹은 비어 있고, 복구가 snapshot을 그대로 채울 수 있다.
+- **Shrink Guard는 추정이 아니라 도메인 불변식이다.** 참여자는 줄지 않으므로 임계값을 고를 필요가 없다. warm 키 로직이 틀려도 snapshot은 남는다.
+
+**트레이드오프:**
+
+- **유실 직후 쓰기가 최대 약 30초 동안 503이다.** 앱 시작 직후라면 시작 시 복구가 바로 처리한다. 틀린 랭킹이 영구히 굳는 대신 쓰기 가용성을 낮춘다.
+- **읽기·쓰기마다 Redis 연산이 하나(EXISTS) 늘어난다.**
+- **warm 키 도입 배포 직후에는 키가 없다.** 이때 ZSET 행 수가 snapshot 이상이면 데이터가 온전하다고 보고 덮어쓰지 않은 채 warm만 쓴다.
+- **snapshot 이후의 점수와 Top-N 밖 참여자는 복구하지 않는다.** 멱등키·Redis Stream도 함께 사라지므로, 유실 전에 처리된 요청의 재시도는 새 요청으로 처리된다. 모든 이벤트는 `audit_events`에 남아 있어 재생으로 되살릴 수 있지만 현재 범위 밖이다.
 
 ---
 

@@ -59,11 +59,12 @@ if [[ "$ROW_COUNT" == "0" ]]; then
   exit 1
 fi
 
-print_section "2. delete redis hot path key"
+print_section "2. delete redis hot path key and warm key (simulate Redis data loss)"
 REDIS_KEY="lb:{$LEADERBOARD_ID}:z"
-docker compose exec -T redis redis-cli DEL "$REDIS_KEY"
+WARM_KEY="lb:{$LEADERBOARD_ID}:warm"
+docker compose exec -T redis redis-cli DEL "$REDIS_KEY" "$WARM_KEY"
 
-echo "[recovery] redis key deleted: $REDIS_KEY"
+echo "[recovery] redis keys deleted: $REDIS_KEY $WARM_KEY"
 
 print_section "3. restart app to trigger cold start runner"
 docker compose restart app >/dev/null
@@ -84,7 +85,7 @@ curl -sS "$BASE_URL/leaderboards/$LEADERBOARD_ID/tops?offset=0&limit=10" | jq
 print_section "expected"
 cat <<SUMMARY
 - 앱 재시작 시 cold start recovery runner가 최신 snapshot을 읽는다.
-- Redis ZSET이 비어 있었으면 snapshot_entries 기준으로 ZADD 복구한다.
-- recovery 중에는 circuit breaker 수동 OPEN 으로 write를 막고, 완료 후 해제한다.
+- warm 키가 없으면 snapshot_entries 기준으로 ZADD 복구하고 warm 키를 쓴다.
+- 복구 전까지 write는 503 RANKING_REBUILDING, read는 source=SNAPSHOT 이다.
 - 최종적으로 /leaderboards/{leaderboardId}/tops 에 데이터가 다시 보여야 한다.
 SUMMARY

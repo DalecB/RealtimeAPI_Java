@@ -3,6 +3,7 @@ package com.jake.realtimeapi.events.persistence;
 import com.jake.realtimeapi.TestcontainersConfiguration;
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.infra.circuitbreaker.CircuitBreakerStatus;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisCircuitBreakerOpenException;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
@@ -43,6 +44,10 @@ class RedisOutageCircuitBreakerTest {
     @Autowired
     private RedisHotPathCircuitBreaker circuitBreaker;
 
+    // 실제로는 리더보드 생성(POST /leaderboards)이 쓰는 키다. 이 테스트는 리더보드를 직접 만들므로 직접 쓴다.
+    @Autowired
+    private RankingWarmthRepository rankingWarmthRepository;
+
     // 빈 이름(redisContainer)으로 매칭 — PostgreSQLContainer도 GenericContainer라 타입만으론 모호함
     @Autowired
     private GenericContainer<?> redisContainer;
@@ -60,6 +65,7 @@ class RedisOutageCircuitBreakerTest {
     @Test
     void process_failsFastWithBreakerOpenWhenRedisIsDown() {
         UUID leaderboardId = UUID.randomUUID();
+        rankingWarmthRepository.markWarm(leaderboardId);
 
         // 웜업: 성공 호출로 sliding window를 채운다 (실패하면 테스트가 죽는 게 맞으므로 try/catch 없음)
         for (int i = 0; i < WARMUP_CALLS; i++) {

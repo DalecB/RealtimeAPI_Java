@@ -255,9 +255,9 @@ curl -s http://localhost:8080/internal/streams/status \
 이 검증은 `docker compose`의 `app` 컨테이너로 실행할 때 가장 단순하다.
 
 1. 먼저 snapshot이 존재해야 한다.
-2. Redis hot path key를 비운다.
-3. app 컨테이너를 재시작한다.
-4. startup runner가 최신 snapshot으로 Redis ZSET을 복구한다.
+2. Redis hot path key와 warm 키를 지운다(Redis가 데이터를 잃은 상태).
+3. app 컨테이너를 재시작한다. 재시작하지 않아도 스냅샷 워커가 다음 주기(최대 30초)에 복구한다.
+4. startup runner가 최신 snapshot으로 Redis ZSET을 복구하고 warm 키를 쓴다.
 
 자동화된 검증:
 
@@ -266,7 +266,7 @@ LEADERBOARD_ID=<LEADERBOARD_ID> bash scripts/verify-cold-start-recovery.sh
 ```
 
 기대 결과:
-- 앱 재시작 직후 breaker는 recovery 동안 수동 OPEN 상태를 사용한다.
+- 복구 전까지 `POST /events`는 503 `RANKING_REBUILDING`, `GET /tops`는 `source=SNAPSHOT`으로 응답한다.
 - recovery 완료 후 `/leaderboards/{leaderboardId}/tops`에서 데이터가 다시 보여야 한다.
 - 복구된 데이터는 최신 `snapshot_entries`와 동일해야 한다.
 

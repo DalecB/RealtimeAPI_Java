@@ -1,11 +1,6 @@
 package com.jake.realtimeapi.snapshots.worker;
 
-import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
-import com.jake.realtimeapi.infra.circuitbreaker.RedisReadPathCircuitBreaker;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
-import com.jake.realtimeapi.snapshots.application.command.RecoverLeaderboardSnapshotCommand;
-import com.jake.realtimeapi.snapshots.application.model.RecoverLeaderboardSnapshotResult;
-import com.jake.realtimeapi.snapshots.application.usecase.RecoverLeaderboardSnapshotUseCase;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -16,6 +11,10 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/**
+ * 앱 시작 시 cold(warm 키 없음)인 리더보드를 스냅샷으로 되살린다. 스냅샷 워커도 매 주기 같은 일을 하지만,
+ * 시작 직후 첫 주기를 기다리지 않게 한다. 복구 중 쓰기는 Lua가 거부하고 읽기는 스냅샷으로 가므로 브레이커를 따로 열지 않는다.
+ */
 @Component
 @ConditionalOnProperty(name = "snapshots.recovery.enabled", havingValue = "true", matchIfMissing = true)
 public class ColdStartRecoveryRunner implements ApplicationRunner {
@@ -23,40 +22,26 @@ public class ColdStartRecoveryRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(ColdStartRecoveryRunner.class);
 
     private final LeaderboardRepository leaderboardRepository;
-    private final RecoverLeaderboardSnapshotUseCase recoverLeaderboardSnapshotUseCase;
-    private final RedisHotPathCircuitBreaker redisHotPathCircuitBreaker;
-    private final RedisReadPathCircuitBreaker redisReadPathCircuitBreaker;
+    private final SnapshotCaptureExecutionService snapshotCaptureExecutionService;
     private final Counter coldStartRecoveryCounter;
     private final int topN;
 
     public ColdStartRecoveryRunner(
             LeaderboardRepository leaderboardRepository,
-            RecoverLeaderboardSnapshotUseCase recoverLeaderboardSnapshotUseCase,
-            RedisHotPathCircuitBreaker redisHotPathCircuitBreaker,
-            RedisReadPathCircuitBreaker redisReadPathCircuitBreaker,
+            SnapshotCaptureExecutionService snapshotCaptureExecutionService,
             MeterRegistry meterRegistry,
             @Value("${snapshots.recovery.top-n:1000}") int topN
     ) {
         this.leaderboardRepository = leaderboardRepository;
-        this.recoverLeaderboardSnapshotUseCase = recoverLeaderboardSnapshotUseCase;
-        this.redisHotPathCircuitBreaker = redisHotPathCircuitBreaker;
-        this.redisReadPathCircuitBreaker = redisReadPathCircuitBreaker;
+        this.snapshotCaptureExecutionService = snapshotCaptureExecutionService;
         this.coldStartRecoveryCounter = meterRegistry.counter("cold_start_recovery_total");
         this.topN = topN;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        // PRD 요구: recovery 중에는 write 오염을 막기 위해 breaker를 수동 OPEN 한다.
-        redisHotPathCircuitBreaker.openManually("cold-start-recovery");
-        // 복구 중 ZSET은 반쯤 찬 상태라 틀린 순위가 나간다. 읽기는 복구 원본과 같은 스냅샷으로 답한다.
-        redisReadPathCircuitBreaker.openManually("cold-start-recovery");
-        try {
-            for (var leaderboardId : leaderboardRepository.findAllIds()) {
-                RecoverLeaderboardSnapshotResult result = recoverLeaderboardSnapshotUseCase.recover(
-                        new RecoverLeaderboardSnapshotCommand(leaderboardId, topN)
-                );
-
+        for (var leaderboardId : leaderboardRepository.findAllIds()) {
+            snapshotCaptureExecutionService.recover(leaderboardId, topN).ifPresentOrElse(result -> {
                 if (result.recovered()) {
                     coldStartRecoveryCounter.increment();
                     log.info("cold-start.recovery restored leaderboardId={} rows={} snapshotAt={}",
@@ -64,10 +49,7 @@ public class ColdStartRecoveryRunner implements ApplicationRunner {
                 } else {
                     log.info("cold-start.recovery skipped leaderboardId={} reason={}", leaderboardId, result.reason());
                 }
-            }
-        } finally {
-            redisHotPathCircuitBreaker.clearManualOverride();
-            redisReadPathCircuitBreaker.clearManualOverride();
+            }, () -> log.info("cold-start.recovery skipped leaderboardId={} reason=LOCK_HELD_BY_OTHER_INSTANCE", leaderboardId));
         }
     }
 }

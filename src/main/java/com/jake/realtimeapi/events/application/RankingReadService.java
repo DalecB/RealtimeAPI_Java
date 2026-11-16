@@ -11,6 +11,7 @@ import com.jake.realtimeapi.events.domain.model.TopRanksResult;
 import com.jake.realtimeapi.events.domain.model.UserRankResult;
 import com.jake.realtimeapi.events.domain.repository.RankingQueryRepository;
 import com.jake.realtimeapi.events.domain.repository.RankingSnapshotRepository;
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.infra.circuitbreaker.RankingReadUnavailableException;
 import com.jake.realtimeapi.infra.circuitbreaker.RankingReadUnavailableException.Reason;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisReadPathCircuitBreaker;
@@ -27,7 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 랭킹 읽기. Redis를 읽기 브레이커로 감싸고, 못 읽으면 PostgreSQL 최신 스냅샷으로 답한다.
+ * 랭킹 읽기. Redis를 읽기 브레이커로 감싸고, 못 읽거나 Redis가 랭킹을 잃었으면(warm 키 없음) PostgreSQL 최신 스냅샷으로 답한다.
  * 스냅샷으로 정확히 답할 수 없는 요청(너무 오래됨, Top-N 밖)은 틀린 값 대신 503을 준다.
  */
 @Service
@@ -38,6 +39,7 @@ public class RankingReadService implements GetTopRanksUseCase, GetUserRankUseCas
 
     private final RankingQueryRepository rankingQueryRepository;
     private final RankingSnapshotRepository rankingSnapshotRepository;
+    private final RankingWarmthRepository rankingWarmthRepository;
     private final RedisReadPathCircuitBreaker readPathCircuitBreaker;
     private final Duration maxSnapshotAge;
     private final Clock clock;
@@ -47,12 +49,14 @@ public class RankingReadService implements GetTopRanksUseCase, GetUserRankUseCas
     public RankingReadService(
             RankingQueryRepository rankingQueryRepository,
             RankingSnapshotRepository rankingSnapshotRepository,
+            RankingWarmthRepository rankingWarmthRepository,
             RedisReadPathCircuitBreaker readPathCircuitBreaker,
             @Value("${rankings.fallback.max-snapshot-age:10m}") Duration maxSnapshotAge,
             Clock clock
     ) {
         this.rankingQueryRepository = rankingQueryRepository;
         this.rankingSnapshotRepository = rankingSnapshotRepository;
+        this.rankingWarmthRepository = rankingWarmthRepository;
         this.readPathCircuitBreaker = readPathCircuitBreaker;
         this.maxSnapshotAge = maxSnapshotAge;
         this.clock = clock;
@@ -60,23 +64,31 @@ public class RankingReadService implements GetTopRanksUseCase, GetUserRankUseCas
 
     @Override
     public TopRanksResult getTopRanks(GetTopRanksQuery query) {
-        return readPathCircuitBreaker.execute(
+        // 빈 Optional = Redis에서 답할 수 없음(브레이커 OPEN, Redis 오류, 또는 cold). 모두 스냅샷으로 답한다.
+        Optional<TopRanksResult> live = readPathCircuitBreaker.execute(
                 () -> {
+                    if (!rankingWarmthRepository.isWarm(query.leaderboardId())) {
+                        return Optional.empty();
+                    }
                     List<TopRankItem> items = rankingQueryRepository.findTopByLeaderboardId(
                             query.leaderboardId(), query.offset(), query.limit());
                     long total = rankingQueryRepository.countParticipants(query.leaderboardId());
-                    return new TopRanksResult(query.leaderboardId(), items, total);
+                    return Optional.of(new TopRanksResult(query.leaderboardId(), items, total));
                 },
-                () -> topRanksFromSnapshot(query)
+                Optional::empty
         );
+        return live.orElseGet(() -> topRanksFromSnapshot(query));
     }
 
     @Override
     public UserRankResult getUserRank(GetUserRankQuery query) {
-        return readPathCircuitBreaker.execute(
-                () -> rankingQueryRepository.findUserRank(query.leaderboardId(), query.userId()),
-                () -> userRankFromSnapshot(query)
+        Optional<UserRankResult> live = readPathCircuitBreaker.execute(
+                () -> rankingWarmthRepository.isWarm(query.leaderboardId())
+                        ? Optional.of(rankingQueryRepository.findUserRank(query.leaderboardId(), query.userId()))
+                        : Optional.empty(),
+                Optional::empty
         );
+        return live.orElseGet(() -> userRankFromSnapshot(query));
     }
 
     private TopRanksResult topRanksFromSnapshot(GetTopRanksQuery query) {

@@ -7,6 +7,7 @@ import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
 import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
 import com.jake.realtimeapi.events.consumer.AuditEventRepository;
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.events.relay.AuditRelayLeaderLock;
 import com.jake.realtimeapi.events.relay.AuditRelayWorker;
 import com.jake.realtimeapi.events.relay.AuditTopicStatusReader;
@@ -114,6 +115,10 @@ class KafkaAuditRoundTripTest {
 
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    // 실제로는 리더보드 생성(POST /leaderboards)이 쓰는 키다. 이 테스트는 리더보드를 직접 만들므로 직접 쓴다.
+    @Autowired
+    private RankingWarmthRepository rankingWarmthRepository;
 
     @Autowired
     private KafkaTemplate<String, String> kafkaTemplate;
@@ -771,6 +776,7 @@ class KafkaAuditRoundTripTest {
         Project project = projectRepository.save(Project.newProject("kafka-project-" + token, user.id()));
         Leaderboard leaderboard = leaderboardRepository.save(
                 Leaderboard.newLeaderboard(project.id(), "kafka-board-" + token));
+        rankingWarmthRepository.markWarm(leaderboard.id());
         return new Fixture(user.id(), leaderboard.id());
     }
 

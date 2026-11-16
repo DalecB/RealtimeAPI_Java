@@ -5,6 +5,7 @@ import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.model.ProcessEventResult;
 import com.jake.realtimeapi.events.persistence.redis.ProcessEventLuaExecutor;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisCircuitBreakerOpenException;
+import com.jake.realtimeapi.infra.circuitbreaker.RankingRebuildingException;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
 import com.jake.realtimeapi.infra.metrics.HotPathMetrics;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +49,25 @@ class EventCommandRepositoryAdapterTest {
 
     @BeforeEach
     void setUp() {
-        repository = new EventCommandRepositoryAdapter(processEventLuaExecutor, redisHotPathCircuitBreaker, hotPathMetrics);
+        repository = new EventCommandRepositoryAdapter(processEventLuaExecutor, redisHotPathCircuitBreaker, hotPathMetrics, 30_000L);
+    }
+
+    @Test
+    void process_rejectsWithRebuildingWhenTheRankingIsCold() {
+        // Redis가 랭킹을 잃었다. 빈 랭킹에 점수를 쌓으면 스냅샷 복구가 막히므로 쓰기를 받지 않는다.
+        EventPayload payload = new EventPayload(UUID.randomUUID(), 101L, 50L, UUID.randomUUID());
+        doAnswer(invocation -> {
+            Supplier<?> supplier = invocation.getArgument(0);
+            return supplier.get();
+        }).when(redisHotPathCircuitBreaker).execute(any());
+        when(processEventLuaExecutor.execute(any(), any(), anyString(), anyLong(), anyLong(), anyString(), anyLong()))
+                .thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(false, null, true));
+
+        RankingRebuildingException exception = assertThrows(RankingRebuildingException.class,
+                () -> repository.process(payload, API_KEY_ID));
+
+        // 다음 스냅샷 주기(30초)에 복구되므로 그 뒤에 재시도하게 한다
+        assertEquals(30L, exception.getRetryAfterSeconds());
     }
 
     @Test
@@ -67,7 +86,7 @@ class EventCommandRepositoryAdapterTest {
                 eq(86400L),
                 anyString(),
                 anyLong()
-        )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(true, "f34ad01d9184e83d23855dd4aa9011cfdbcbf8199b13f40f81f26871032d9a03"));
+        )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(true, "f34ad01d9184e83d23855dd4aa9011cfdbcbf8199b13f40f81f26871032d9a03", false));
 
         ProcessEventResult result = repository.process(payload, API_KEY_ID);
 
@@ -103,7 +122,8 @@ class EventCommandRepositoryAdapterTest {
                 anyLong()
         )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(
                 false,
-                "v2:358712c8a759753081014787e39822f9afed47aee1ce8a3026ce855f3afcf4e6:" + firstProcessedAt.toEpochMilli()
+                "v2:358712c8a759753081014787e39822f9afed47aee1ce8a3026ce855f3afcf4e6:" + firstProcessedAt.toEpochMilli(),
+                false
         ));
 
         ProcessEventResult result = repository.process(payload, API_KEY_ID);
@@ -131,7 +151,8 @@ class EventCommandRepositoryAdapterTest {
                 anyLong()
         )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(
                 false,
-                "358712c8a759753081014787e39822f9afed47aee1ce8a3026ce855f3afcf4e6"
+                "358712c8a759753081014787e39822f9afed47aee1ce8a3026ce855f3afcf4e6",
+                false
         ));
 
         ProcessEventResult result = repository.process(payload, API_KEY_ID);
@@ -171,7 +192,7 @@ class EventCommandRepositoryAdapterTest {
                 eq(86400L),
                 anyString(),
                 anyLong()
-        )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(false, "another-hash"));
+        )).thenReturn(new ProcessEventLuaExecutor.LuaExecutionResult(false, "another-hash", false));
 
         assertThrows(IdempotencyKeyReuseMismatchException.class, () -> repository.process(payload, API_KEY_ID));
     }

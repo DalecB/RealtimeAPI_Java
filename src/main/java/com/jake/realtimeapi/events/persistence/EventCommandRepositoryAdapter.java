@@ -5,9 +5,11 @@ import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.model.ProcessEventResult;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.persistence.redis.ProcessEventLuaExecutor;
+import com.jake.realtimeapi.infra.circuitbreaker.RankingRebuildingException;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
 import com.jake.realtimeapi.infra.metrics.HotPathMetrics;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.nio.charset.StandardCharsets;
@@ -27,15 +29,19 @@ public class EventCommandRepositoryAdapter implements EventCommandRepository {
     private final ProcessEventLuaExecutor processEventLuaExecutor;
     private final RedisHotPathCircuitBreaker redisHotPathCircuitBreaker;
     private final HotPathMetrics hotPathMetrics;
+    private final long rebuildRetryAfterSeconds;
 
     public EventCommandRepositoryAdapter(
             ProcessEventLuaExecutor processEventLuaExecutor,
             RedisHotPathCircuitBreaker redisHotPathCircuitBreaker,
-            HotPathMetrics hotPathMetrics
+            HotPathMetrics hotPathMetrics,
+            // 스냅샷 워커 주기. 다음 주기에 복구가 끝나므로 그만큼 뒤에 재시도하게 한다.
+            @Value("${snapshots.worker.delay-ms:30000}") long snapshotWorkerDelayMs
     ) {
         this.processEventLuaExecutor = processEventLuaExecutor;
         this.redisHotPathCircuitBreaker = redisHotPathCircuitBreaker;
         this.hotPathMetrics = hotPathMetrics;
+        this.rebuildRetryAfterSeconds = Math.max(1, snapshotWorkerDelayMs / 1000);
     }
 
     @Override
@@ -57,6 +63,11 @@ public class EventCommandRepositoryAdapter implements EventCommandRepository {
                         apiKeyId
                 )
         );
+
+        if (luaResult.cold()) {
+            // Redis가 랭킹을 잃었다. 스냅샷 워커가 복구할 때까지 쓰기를 받지 않는다.
+            throw new RankingRebuildingException(rebuildRetryAfterSeconds);
+        }
 
         if (luaResult.isNew()) {
             hotPathMetrics.recordIdempotencyMiss();

@@ -56,7 +56,7 @@ groups:
 
       # 근거: PRD `10.2 Circuit Breaker 설정` waitDurationInOpenState 10초.
       # Redis가 계속 죽어 있으면 OPEN 10초 → HALF_OPEN 짧게 → OPEN을 반복하므로 30초 창(3주기)의 최댓값으로 본다.
-      # 10초짜리 단발 OPEN은 창에서 40초만 잡혀 for 1m을 넘지 못한다. cold start 복구의 수동 OPEN도 같은 게이지에 잡힌다.
+      # 10초짜리 단발 OPEN은 창에서 40초만 잡혀 for 1m을 넘지 못한다.
       - alert: RedisCircuitBreakerOpen
         expr: max_over_time(circuit_breaker_state{name="redisHotPath",state="open"}[30s]) == 1
         for: 1m

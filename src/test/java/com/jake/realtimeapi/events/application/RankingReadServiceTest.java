@@ -9,6 +9,7 @@ import com.jake.realtimeapi.events.domain.model.TopRanksResult;
 import com.jake.realtimeapi.events.domain.model.UserRankResult;
 import com.jake.realtimeapi.events.domain.repository.RankingQueryRepository;
 import com.jake.realtimeapi.events.domain.repository.RankingSnapshotRepository;
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.infra.circuitbreaker.RankingReadUnavailableException;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisReadPathCircuitBreaker;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisReadPathCircuitBreakerConfig;
@@ -51,6 +52,7 @@ class RankingReadServiceTest {
 
     private final RankingQueryRepository redis = mock(RankingQueryRepository.class);
     private final RankingSnapshotRepository snapshots = mock(RankingSnapshotRepository.class);
+    private final RankingWarmthRepository warmth = mock(RankingWarmthRepository.class);
     private CircuitBreaker delegate;
     private RedisReadPathCircuitBreaker breaker;
 
@@ -58,10 +60,11 @@ class RankingReadServiceTest {
     void setUp() {
         delegate = new RedisReadPathCircuitBreakerConfig().redisReadPathCircuitBreakerDelegate(PROPERTIES);
         breaker = new RedisReadPathCircuitBreaker(delegate, new SimpleMeterRegistry());
+        when(warmth.isWarm(any())).thenReturn(true);
     }
 
     private RankingReadService service(Instant now) {
-        return new RankingReadService(redis, snapshots, breaker, Duration.ofMinutes(10), Clock.fixed(now, ZoneOffset.UTC));
+        return new RankingReadService(redis, snapshots, warmth, breaker, Duration.ofMinutes(10), Clock.fixed(now, ZoneOffset.UTC));
     }
 
     // 1위 300, 2위 동점 200·200, 4위 100
@@ -187,14 +190,18 @@ class RankingReadServiceTest {
     }
 
     @Test
-    void manualOpenDuringRecovery_readsSnapshotWithoutTouchingRedis() {
+    void coldRanking_readsSnapshotWithoutReadingTheZset() {
+        // Redis는 살아 있지만 랭킹을 잃었다(warm 키 없음). 빈 ZSET을 정상 응답으로 내보내면 안 된다.
+        when(warmth.isWarm(LEADERBOARD)).thenReturn(false);
         when(snapshots.findLatest(LEADERBOARD)).thenReturn(Optional.of(snapshot(SNAPSHOT_AT, 1000)));
-        breaker.openManually("cold-start-recovery");
 
         TopRanksResult result = service(NOW).getTopRanks(new GetTopRanksQuery(LEADERBOARD, 0, 10));
 
         assertEquals(RankingSource.SNAPSHOT, result.source());
+        assertEquals(4L, result.total());
         verify(redis, times(0)).findTopByLeaderboardId(any(), anyInt(), anyInt());
+        // cold는 Redis 장애가 아니므로 브레이커 창에 실패로 남지 않는다
+        assertEquals(0, delegate.getMetrics().getNumberOfFailedCalls());
     }
 
     @Test

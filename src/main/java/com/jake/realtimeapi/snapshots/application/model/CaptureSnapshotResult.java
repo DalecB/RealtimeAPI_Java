@@ -9,11 +9,18 @@ public record CaptureSnapshotResult(
         int topN,
         Long snapshotId,
         int rowCount,
-        boolean skipped
+        boolean skipped,
+        // EMPTY(Empty Guard) | SHRUNK(Shrink Guard). 저장했으면 null
+        String skipReason
 ) {
     // Empty Guard에 걸려 저장을 생략한 경우의 표준 결과.
     public static CaptureSnapshotResult skipped(UUID leaderboardId, Instant snapshotAt, int topN) {
-        return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, null, 0, true);
+        return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, null, 0, true, "EMPTY");
+    }
+
+    // Shrink Guard: 참여자는 줄지 않으므로, 직전 스냅샷보다 행이 적으면 Redis가 데이터를 잃은 것으로 보고 저장하지 않는다.
+    public static CaptureSnapshotResult shrunk(UUID leaderboardId, Instant snapshotAt, int topN, int rowCount) {
+        return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, null, rowCount, true, "SHRUNK");
     }
 
     // 저장이 완료된 경우의 표준 결과.
@@ -24,6 +31,6 @@ public record CaptureSnapshotResult(
             long snapshotId,
             int rowCount
     ) {
-        return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, snapshotId, rowCount, false);
+        return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, snapshotId, rowCount, false, null);
     }
 }

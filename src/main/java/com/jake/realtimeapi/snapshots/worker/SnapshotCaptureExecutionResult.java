@@ -1,18 +1,24 @@
 package com.jake.realtimeapi.snapshots.worker;
 
 import com.jake.realtimeapi.snapshots.application.model.CaptureSnapshotResult;
+import com.jake.realtimeapi.snapshots.application.model.RecoverLeaderboardSnapshotResult;
 
 public record SnapshotCaptureExecutionResult(
         boolean lockAcquired,
+        // 캡처 전에 한 cold 확인·복구 결과. 락을 못 잡았으면 null
+        RecoverLeaderboardSnapshotResult recoveryResult,
         CaptureSnapshotResult captureResult
 ) {
     // 락 획득 실패: 실제 capture 로직은 실행되지 않았다.
     public static SnapshotCaptureExecutionResult lockNotAcquired() {
-        return new SnapshotCaptureExecutionResult(false, null);
+        return new SnapshotCaptureExecutionResult(false, null, null);
     }
 
-    // 락 획득 후 capture가 정상 실행된 결과.
-    public static SnapshotCaptureExecutionResult executed(CaptureSnapshotResult captureResult) {
-        return new SnapshotCaptureExecutionResult(true, captureResult);
+    // 락 획득 후 복구 확인과 capture가 정상 실행된 결과.
+    public static SnapshotCaptureExecutionResult executed(
+            RecoverLeaderboardSnapshotResult recoveryResult,
+            CaptureSnapshotResult captureResult
+    ) {
+        return new SnapshotCaptureExecutionResult(true, recoveryResult, captureResult);
     }
 }

@@ -6,7 +6,7 @@ import com.jake.realtimeapi.events.application.usecase.GetTopRanksUseCase;
 import com.jake.realtimeapi.events.domain.model.RankingSource;
 import com.jake.realtimeapi.events.domain.model.TopRankItem;
 import com.jake.realtimeapi.events.domain.model.TopRanksResult;
-import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.leaderboards.domain.model.Leaderboard;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import com.jake.realtimeapi.projects.domain.model.Project;
@@ -60,7 +60,10 @@ class RankingReadFallbackIntegrationTest {
     private GetTopRanksUseCase getTopRanksUseCase;
 
     @Autowired
-    private RedisHotPathCircuitBreaker writeBreaker;
+    private CircuitBreaker redisHotPathCircuitBreakerDelegate;
+
+    @Autowired
+    private RankingWarmthRepository rankingWarmthRepository;
 
     @Autowired
     private CircuitBreaker redisReadPathCircuitBreakerDelegate;
@@ -80,6 +83,7 @@ class RankingReadFallbackIntegrationTest {
                 .toList();
         Project project = projectRepository.save(Project.newProject("rf-proj-" + UUID.randomUUID(), users.get(0).id()));
         UUID leaderboardId = leaderboardRepository.save(Leaderboard.newLeaderboard(project.id(), "rf-board")).id();
+        rankingWarmthRepository.markWarm(leaderboardId);
         String rankingKey = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
         redisTemplate.opsForZSet().add(rankingKey, UserIdCodec.format(users.get(0).id()), 300);
         redisTemplate.opsForZSet().add(rankingKey, UserIdCodec.format(users.get(1).id()), 200);
@@ -89,11 +93,11 @@ class RankingReadFallbackIntegrationTest {
         GetTopRanksQuery query = new GetTopRanksQuery(leaderboardId, 0, 10);
 
         // ① 쓰기만 막힌 장애(예: noeviction OOM으로 Lua SET 거부)에서 읽기는 영향을 받지 않는다
-        writeBreaker.openManually("write-only-outage");
+        redisHotPathCircuitBreakerDelegate.transitionToForcedOpenState();
         try {
             assertEquals(RankingSource.REDIS, getTopRanksUseCase.getTopRanks(query).source());
         } finally {
-            writeBreaker.clearManualOverride();
+            redisHotPathCircuitBreakerDelegate.reset();
         }
 
         // ② Redis 자체가 죽으면 스냅샷 시점의 같은 순위로 답한다

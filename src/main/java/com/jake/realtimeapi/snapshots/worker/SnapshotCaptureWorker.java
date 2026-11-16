@@ -84,11 +84,18 @@ public class SnapshotCaptureWorker {
                     return;
                 }
 
+                if (execution.recoveryResult() != null && execution.recoveryResult().recovered()) {
+                    // 앱이 떠 있는 동안 Redis가 랭킹을 잃었고, 이번 주기에 스냅샷으로 되살렸다.
+                    log.warn("snapshots.recovery restored leaderboardId={} rows={} snapshotAt={}",
+                            leaderboardId, execution.recoveryResult().restoredRowCount(), execution.recoveryResult().snapshotAt());
+                }
+
                 CaptureSnapshotResult result = execution.captureResult();
                 if (result.skipped()) {
-                    // Empty Guard 분기: 저장은 하지 않고 skip 메트릭만 증가.
+                    // Empty Guard·Shrink Guard 분기: 저장은 하지 않고 skip 메트릭만 증가.
                     snapshotSkipCounter.increment();
-                    log.warn("snapshots.capture skipped empty leaderboardId={} snapshotAt={}", leaderboardId, snapshotAt);
+                    log.warn("snapshots.capture skipped reason={} leaderboardId={} rows={} snapshotAt={}",
+                            result.skipReason(), leaderboardId, result.rowCount(), snapshotAt);
                     return;
                 }
 

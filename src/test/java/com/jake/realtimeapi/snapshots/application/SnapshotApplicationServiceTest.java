@@ -1,5 +1,6 @@
 package com.jake.realtimeapi.snapshots.application;
 
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.snapshots.application.command.CaptureSnapshotCommand;
 import com.jake.realtimeapi.snapshots.application.command.RecoverLeaderboardSnapshotCommand;
 import com.jake.realtimeapi.snapshots.application.model.CaptureSnapshotResult;
@@ -20,6 +21,7 @@ import com.jake.realtimeapi.snapshots.domain.repository.command.SnapshotBatchUps
 import com.jake.realtimeapi.snapshots.domain.repository.command.SnapshotEntryUpsertParam;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,6 +62,9 @@ class SnapshotApplicationServiceTest {
 
     @Mock
     private SnapshotStatusTracker snapshotStatusTracker;
+
+    @Mock
+    private RankingWarmthRepository rankingWarmthRepository;
 
     @InjectMocks
     private SnapshotApplicationService snapshotApplicationService;
@@ -198,35 +205,93 @@ class SnapshotApplicationServiceTest {
     }
 
     @Test
-    void recover_skipsWhenRedisAlreadyHasRanks() {
+    void capture_refusesToOverwriteWithFewerPlayersThanTheLastSnapshot() {
+        // Redis가 랭킹을 잃은 뒤 한 명만 다시 쌓였다. 그대로 저장하면 스냅샷에서도 두 명이 사라진다.
         UUID leaderboardId = UUID.randomUUID();
-        when(snapshotRankingRestoreRepository.countRanks(leaderboardId)).thenReturn(3L);
+        Instant snapshotAt = Instant.parse("2026-03-17T00:00:30Z");
+        SnapshotBatches previous = new SnapshotBatches(41L, leaderboardId, snapshotAt.minusSeconds(30), 1000, snapshotAt);
+        when(snapshotRankingQueryRepository.findTopRanks(leaderboardId, 1000)).thenReturn(List.of(new SnapshotRankingRow(10L, 1, 5L)));
+        when(snapshotBatchesRepository.findLatestByLeaderboardId(leaderboardId)).thenReturn(Optional.of(previous));
+        when(snapshotEntriesRepository.countBySnapshotId(41L)).thenReturn(3L);
+
+        CaptureSnapshotResult result = snapshotApplicationService.capture(new CaptureSnapshotCommand(leaderboardId, snapshotAt, 1000));
+
+        assertTrue(result.skipped());
+        assertEquals("SHRUNK", result.skipReason());
+        verify(snapshotBatchesRepository, never()).upsert(any());
+    }
+
+    @Test
+    void capture_doesNotTreatALowerTopNAsShrinking() {
+        // 운영자가 topN을 1,000에서 500으로 줄인 것은 데이터 유실이 아니다
+        UUID leaderboardId = UUID.randomUUID();
+        Instant snapshotAt = Instant.parse("2026-03-17T00:00:30Z");
+        SnapshotBatches previous = new SnapshotBatches(41L, leaderboardId, snapshotAt.minusSeconds(30), 1000, snapshotAt);
+        List<SnapshotRankingRow> rows = IntStream.rangeClosed(1, 500)
+                .mapToObj(i -> new SnapshotRankingRow(i, i, 10_000L - i)).toList();
+        when(snapshotRankingQueryRepository.findTopRanks(leaderboardId, 500)).thenReturn(rows);
+        when(snapshotBatchesRepository.findLatestByLeaderboardId(leaderboardId)).thenReturn(Optional.of(previous));
+        when(snapshotEntriesRepository.countBySnapshotId(41L)).thenReturn(1000L);
+        when(snapshotBatchesRepository.upsert(any())).thenReturn(42L);
+
+        CaptureSnapshotResult result = snapshotApplicationService.capture(new CaptureSnapshotCommand(leaderboardId, snapshotAt, 500));
+
+        assertEquals(false, result.skipped());
+        assertEquals(500, result.rowCount());
+    }
+
+    @Test
+    void recover_skipsWhenWarmKeyExists() {
+        UUID leaderboardId = UUID.randomUUID();
+        when(rankingWarmthRepository.isWarm(leaderboardId)).thenReturn(true);
 
         RecoverLeaderboardSnapshotResult result = snapshotApplicationService.recover(
                 new RecoverLeaderboardSnapshotCommand(leaderboardId, 1000)
         );
 
         assertTrue(!result.recovered());
-        assertEquals("REDIS_ALREADY_WARM", result.reason());
+        assertEquals("WARM", result.reason());
         verify(snapshotBatchesRepository, never()).findLatestByLeaderboardId(any());
     }
 
     @Test
-    void recover_skipsWhenLatestSnapshotDoesNotExist() {
+    void recover_marksWarmWhenThereIsNoSnapshotToRestore() {
+        // 되살릴 것이 없을 때 cold로 남겨 두면 쓰기가 영원히 막힌다
         UUID leaderboardId = UUID.randomUUID();
-        when(snapshotRankingRestoreRepository.countRanks(leaderboardId)).thenReturn(0L);
         when(snapshotBatchesRepository.findLatestByLeaderboardId(leaderboardId)).thenReturn(Optional.empty());
 
         RecoverLeaderboardSnapshotResult result = snapshotApplicationService.recover(
                 new RecoverLeaderboardSnapshotCommand(leaderboardId, 1000)
         );
 
-        assertTrue(!result.recovered());
         assertEquals("SNAPSHOT_NOT_FOUND", result.reason());
+        verify(rankingWarmthRepository).markWarm(leaderboardId);
     }
 
     @Test
-    void recover_restoresLatestSnapshotIntoRedisWhenRedisIsEmpty() {
+    void recover_marksWarmWithoutRestoringWhenRedisAlreadyHoldsAtLeastTheSnapshot() {
+        // warm 키 도입 배포 직후: 키는 없지만 데이터는 온전하다. 30초 전 스냅샷으로 덮어쓰면 안 된다.
+        UUID leaderboardId = UUID.randomUUID();
+        Instant snapshotAt = Instant.parse("2026-03-20T00:00:00Z");
+        when(snapshotBatchesRepository.findLatestByLeaderboardId(leaderboardId))
+                .thenReturn(Optional.of(new SnapshotBatches(42L, leaderboardId, snapshotAt, 1000, snapshotAt)));
+        when(snapshotEntriesRepository.findBySnapshotId(42L, 0, 1000)).thenReturn(List.of(
+                new SnapshotEntries(1L, 42L, 1, 10L, 1000L, snapshotAt),
+                new SnapshotEntries(2L, 42L, 2, 20L, 800L, snapshotAt)
+        ));
+        when(snapshotRankingRestoreRepository.countRanks(leaderboardId)).thenReturn(3L);
+
+        RecoverLeaderboardSnapshotResult result = snapshotApplicationService.recover(
+                new RecoverLeaderboardSnapshotCommand(leaderboardId, 1000)
+        );
+
+        assertEquals("REDIS_ALREADY_WARM", result.reason());
+        verify(snapshotRankingRestoreRepository, never()).replaceTopRanks(any(), anyList());
+        verify(rankingWarmthRepository).markWarm(leaderboardId);
+    }
+
+    @Test
+    void recover_restoresTheSnapshotThenMarksWarm() {
         UUID leaderboardId = UUID.randomUUID();
         Instant snapshotAt = Instant.parse("2026-03-20T00:00:00Z");
         SnapshotBatches snapshot = new SnapshotBatches(42L, leaderboardId, snapshotAt, 1000, snapshotAt);
@@ -245,9 +310,12 @@ class SnapshotApplicationServiceTest {
         assertTrue(result.recovered());
         assertEquals(2L, result.restoredRowCount());
         assertEquals(snapshotAt, result.snapshotAt());
-        verify(snapshotRankingRestoreRepository).replaceTopRanks(eq(leaderboardId), eq(List.of(
+        // warm으로 바꾸기 전에 랭킹을 다 채운다. 그 사이 읽기는 스냅샷으로, 쓰기는 503으로 간다.
+        InOrder inOrder = inOrder(snapshotRankingRestoreRepository, rankingWarmthRepository);
+        inOrder.verify(snapshotRankingRestoreRepository).replaceTopRanks(eq(leaderboardId), eq(List.of(
                 new SnapshotRankingRow(10L, 1, 1000L),
                 new SnapshotRankingRow(20L, 2, 800L)
         )));
+        inOrder.verify(rankingWarmthRepository).markWarm(leaderboardId);
     }
 }

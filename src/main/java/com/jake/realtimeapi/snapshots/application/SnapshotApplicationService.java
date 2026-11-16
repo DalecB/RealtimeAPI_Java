@@ -1,5 +1,6 @@
 package com.jake.realtimeapi.snapshots.application;
 
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.snapshots.application.command.CaptureSnapshotCommand;
 import com.jake.realtimeapi.snapshots.application.command.RecoverLeaderboardSnapshotCommand;
 import com.jake.realtimeapi.snapshots.application.model.CaptureSnapshotResult;
@@ -45,19 +46,22 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
     private final SnapshotEntriesRepository snapshotEntriesRepository;
     private final SnapshotRankingRestoreRepository snapshotRankingRestoreRepository;
     private final SnapshotStatusTracker snapshotStatusTracker;
+    private final RankingWarmthRepository rankingWarmthRepository;
 
     public SnapshotApplicationService(
             SnapshotRankingQueryRepository snapshotRankingQueryRepository,
             SnapshotBatchesRepository snapshotBatchesRepository,
             SnapshotEntriesRepository snapshotEntriesRepository,
             SnapshotRankingRestoreRepository snapshotRankingRestoreRepository,
-            SnapshotStatusTracker snapshotStatusTracker
+            SnapshotStatusTracker snapshotStatusTracker,
+            RankingWarmthRepository rankingWarmthRepository
     ) {
         this.snapshotRankingQueryRepository = snapshotRankingQueryRepository;
         this.snapshotBatchesRepository = snapshotBatchesRepository;
         this.snapshotEntriesRepository = snapshotEntriesRepository;
         this.snapshotRankingRestoreRepository = snapshotRankingRestoreRepository;
         this.snapshotStatusTracker = snapshotStatusTracker;
+        this.rankingWarmthRepository = rankingWarmthRepository;
     }
 
     public List<SnapshotRankingRow> findTopRanks(UUID leaderboardId, int limit) {
@@ -108,6 +112,16 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
             return CaptureSnapshotResult.skipped(command.leaderboardId(), command.snapshotAt(), command.topN());
         }
 
+        // Shrink Guard: 플레이어는 지워지지 않고 점수는 늘기만 하므로 Top-N 행 수는 줄지 않는다.
+        // 줄었다면 Redis가 데이터를 잃은 뒤 일부만 다시 쌓인 것이라, 덮어쓰면 스냅샷에서도 플레이어가 사라진다.
+        Optional<SnapshotBatches> previous = snapshotBatchesRepository.findLatestByLeaderboardId(command.leaderboardId());
+        if (previous.isPresent()) {
+            long previousRows = Math.min(snapshotEntriesRepository.countBySnapshotId(previous.get().id()), command.topN());
+            if (rows.size() < previousRows) {
+                return CaptureSnapshotResult.shrunk(command.leaderboardId(), command.snapshotAt(), command.topN(), rows.size());
+            }
+        }
+
         // 3) snapshot 배치 메타를 upsert하고 snapshotId를 확보한다.
         long snapshotId = snapshotBatchesRepository.upsert(
                 new SnapshotBatchUpsertParam(command.leaderboardId(), command.snapshotAt(), command.topN())
@@ -134,23 +148,33 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
     @Override
     @Transactional
     public RecoverLeaderboardSnapshotResult recover(RecoverLeaderboardSnapshotCommand command) {
-        // PRD Cold Start Recovery: Redis ZSET이 이미 살아 있으면 PostgreSQL snapshot으로 덮어쓰지 않는다.
-        long currentRankCount = snapshotRankingRestoreRepository.countRanks(command.leaderboardId());
-        if (currentRankCount > 0) {
-            return RecoverLeaderboardSnapshotResult.skipped(command.leaderboardId(), "REDIS_ALREADY_WARM");
+        UUID leaderboardId = command.leaderboardId();
+        // warm 키는 랭킹과 함께 사라진다. 있으면 Redis 데이터가 온전하다.
+        if (rankingWarmthRepository.isWarm(leaderboardId)) {
+            return RecoverLeaderboardSnapshotResult.skipped(leaderboardId, "WARM");
         }
 
         // leaderboard별 최신 snapshot 1건만 복구 대상으로 사용한다.
-        Optional<SnapshotBatches> latestSnapshot = snapshotBatchesRepository.findLatestByLeaderboardId(command.leaderboardId());
+        Optional<SnapshotBatches> latestSnapshot = snapshotBatchesRepository.findLatestByLeaderboardId(leaderboardId);
         if (latestSnapshot.isEmpty()) {
-            return RecoverLeaderboardSnapshotResult.skipped(command.leaderboardId(), "SNAPSHOT_NOT_FOUND");
+            // 되살릴 것이 없다. 계속 cold로 두면 쓰기가 영원히 막히므로 빈 랭킹으로 다시 시작한다.
+            rankingWarmthRepository.markWarm(leaderboardId);
+            return RecoverLeaderboardSnapshotResult.skipped(leaderboardId, "SNAPSHOT_NOT_FOUND");
         }
 
         SnapshotBatches snapshot = latestSnapshot.get();
         int restoreLimit = Math.min(command.topN(), snapshot.topN());
         List<SnapshotEntries> entries = snapshotEntriesRepository.findBySnapshotId(snapshot.id(), 0, restoreLimit);
         if (entries.isEmpty()) {
-            return RecoverLeaderboardSnapshotResult.skipped(command.leaderboardId(), "SNAPSHOT_ENTRIES_EMPTY");
+            rankingWarmthRepository.markWarm(leaderboardId);
+            return RecoverLeaderboardSnapshotResult.skipped(leaderboardId, "SNAPSHOT_ENTRIES_EMPTY");
+        }
+
+        // cold인 동안 쓰기는 Lua가 거부하므로, 데이터를 잃은 Redis의 랭킹은 비어 있다.
+        // 스냅샷 이상으로 차 있다면 warm 키가 생기기 전부터 있던 온전한 데이터다(warm 키 도입 배포 직후).
+        if (snapshotRankingRestoreRepository.countRanks(leaderboardId) >= entries.size()) {
+            rankingWarmthRepository.markWarm(leaderboardId);
+            return RecoverLeaderboardSnapshotResult.skipped(leaderboardId, "REDIS_ALREADY_WARM");
         }
 
         // snapshot_entries의 rank/userId/score shape를 Redis ZSET 복구용 row로 변환한다.
@@ -158,8 +182,10 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
                 .map(entry -> new SnapshotRankingRow(entry.userId(), entry.rank(), entry.score()))
                 .toList();
 
-        snapshotRankingRestoreRepository.replaceTopRanks(command.leaderboardId(), rows);
-        return RecoverLeaderboardSnapshotResult.recovered(command.leaderboardId(), rows.size(), snapshot.snapshotAt());
+        snapshotRankingRestoreRepository.replaceTopRanks(leaderboardId, rows);
+        // 랭킹을 다 채운 뒤에 warm으로 바꾼다. 그 전까지 읽기는 스냅샷으로, 쓰기는 503으로 간다.
+        rankingWarmthRepository.markWarm(leaderboardId);
+        return RecoverLeaderboardSnapshotResult.recovered(leaderboardId, rows.size(), snapshot.snapshotAt());
     }
 
     private SnapshotBatches resolveSnapshotBatch(GetSnapshotEntriesQuery query) {

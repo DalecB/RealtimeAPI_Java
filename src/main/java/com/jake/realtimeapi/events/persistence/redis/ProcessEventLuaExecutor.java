@@ -66,7 +66,8 @@ public class ProcessEventLuaExecutor {
         List<String> keys = List.of(
                 LeaderboardRedisKeyFactory.idempotencyKey(leaderboardId, eventUuid),
                 LeaderboardRedisKeyFactory.rankingKey(leaderboardId),
-                LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId)
+                LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId),
+                LeaderboardRedisKeyFactory.warmKey(leaderboardId)
         );
 
         long startedAt = System.nanoTime();
@@ -87,6 +88,9 @@ public class ProcessEventLuaExecutor {
         }
 
         long isNew = toLong(rawResult.get(0), "isNew");
+        if (isNew == -1L) {
+            return LuaExecutionResult.COLD;
+        }
         if (isNew != 0L && isNew != 1L) {
             throw new IllegalStateException("process_event.lua returned invalid isNew flag: " + isNew);
         }
@@ -96,7 +100,7 @@ public class ProcessEventLuaExecutor {
             throw new IllegalStateException("process_event.lua returned empty payload value");
         }
 
-        return new LuaExecutionResult(isNew == 1L, value);
+        return new LuaExecutionResult(isNew == 1L, value, false);
     }
 
     private long toLong(Object value, String fieldName) {
@@ -115,7 +119,10 @@ public class ProcessEventLuaExecutor {
 
     public record LuaExecutionResult(
             boolean isNew,
-            String value
+            String value,
+            // 랭킹 warm 키가 없어 점수를 반영하지 않았다
+            boolean cold
     ) {
+        static final LuaExecutionResult COLD = new LuaExecutionResult(false, null, true);
     }
 }

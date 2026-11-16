@@ -1,5 +1,6 @@
 package com.jake.realtimeapi.leaderboards.application;
 
+import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
 import com.jake.realtimeapi.leaderboards.application.command.CreateLeaderboardCommand;
 import com.jake.realtimeapi.leaderboards.application.usecase.CreateLeaderboardUseCase;
 import com.jake.realtimeapi.leaderboards.application.usecase.GetLeaderboardUseCase;
@@ -23,13 +24,16 @@ public class LeaderboardApplicationService implements CreateLeaderboardUseCase, 
 
     private final LeaderboardRepository leaderboardRepository;
     private final ProjectRepository projectRepository;
+    private final RankingWarmthRepository rankingWarmthRepository;
 
     public LeaderboardApplicationService(
             LeaderboardRepository leaderboardRepository,
-            ProjectRepository projectRepository
+            ProjectRepository projectRepository,
+            RankingWarmthRepository rankingWarmthRepository
     ) {
         this.leaderboardRepository = leaderboardRepository;
         this.projectRepository = projectRepository;
+        this.rankingWarmthRepository = rankingWarmthRepository;
     }
 
     @Override
@@ -43,7 +47,10 @@ public class LeaderboardApplicationService implements CreateLeaderboardUseCase, 
         if(leaderboardRepository.existsByName(command.projectId(), command.name())) {
             throw new LeaderboardAlreadyExistsException(command.projectId(), command.name());
         }
-        return leaderboardRepository.save(Leaderboard.newLeaderboard(command.projectId(), command.name()));
+        Leaderboard leaderboard = leaderboardRepository.save(Leaderboard.newLeaderboard(command.projectId(), command.name()));
+        // 새 리더보드는 잃을 데이터가 없으므로 처음부터 warm이다. 없으면 첫 쓰기가 cold로 거부된다.
+        rankingWarmthRepository.markWarm(leaderboard.id());
+        return leaderboard;
     }
 
     @Override

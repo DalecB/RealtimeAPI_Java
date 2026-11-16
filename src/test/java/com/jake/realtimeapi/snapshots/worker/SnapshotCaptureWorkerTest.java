@@ -71,6 +71,7 @@ class SnapshotCaptureWorkerTest {
         when(leaderboardRepository.findAllIds()).thenReturn(List.of(leaderboardId));
         when(snapshotCaptureExecutionService.execute(any(), any(), anyInt()))
                 .thenReturn(SnapshotCaptureExecutionResult.executed(
+                        null,
                         CaptureSnapshotResult.skipped(leaderboardId, snapshotAt, 1000)
                 ));
 
