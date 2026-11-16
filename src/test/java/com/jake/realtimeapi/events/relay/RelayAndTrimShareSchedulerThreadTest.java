@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -21,32 +23,41 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-// 트림은 XPENDING과 XINFO GROUPS 사이에 릴레이의 XREADGROUP이 끼면 미XACK 본문을 자르므로, 같은 인스턴스에서는 두 작업이 한 스케줄러 스레드에 직렬화돼야 한다.
+// 릴레이는 Kafka 장애 동안 스레드를 붙잡으므로 트림과 함께 전용 스레드에서 직렬로 돌고, 다른 작업은 Boot 기본 스케줄러에 남아야 한다.
 class RelayAndTrimShareSchedulerThreadTest {
 
     private static final List<String> tickThreads = new CopyOnWriteArrayList<>();
     private static final CountDownLatch bothTicked = new CountDownLatch(2);
+    private static final List<String> otherJobThreads = new CopyOnWriteArrayList<>();
+    private static final CountDownLatch otherJobTicked = new CountDownLatch(1);
 
     @Test
-    void relayAndTrimRunOnSameSchedulerThread() throws InterruptedException {
-        try (ConfigurableApplicationContext ignored = new SpringApplicationBuilder(Config.class)
+    void relayAndTrimShareTheDedicatedThread_otherJobsStayOnTheDefaultScheduler() throws InterruptedException {
+        try (ConfigurableApplicationContext context = new SpringApplicationBuilder(Config.class)
                 .web(WebApplicationType.NONE)
                 .run("--events.relay.enabled=true")) {
             assertTrue(bothTicked.await(5, TimeUnit.SECONDS));
+            assertTrue(otherJobTicked.await(5, TimeUnit.SECONDS));
+            assertInstanceOf(ThreadPoolTaskScheduler.class, context.getBean("taskScheduler"));
         }
 
         assertEquals(2, tickThreads.size());
         assertEquals(tickThreads.get(0), tickThreads.get(1), "relay and trim ticked on " + tickThreads);
+        assertTrue(tickThreads.get(0).startsWith("audit-relay-"), tickThreads.get(0));
+        assertTrue(otherJobThreads.get(0).startsWith("scheduling-"), otherJobThreads.get(0));
+        assertNotEquals(tickThreads.get(0), otherJobThreads.get(0));
     }
 
     @Configuration(proxyBeanMethods = false)
     @EnableScheduling
     @ImportAutoConfiguration(TaskSchedulingAutoConfiguration.class)
-    @Import({AuditRelayWorker.class, AuditStreamTrimWorker.class})
+    @Import({AuditRelaySchedulerConfig.class, AuditRelayWorker.class, AuditStreamTrimWorker.class})
     static class Config {
 
         @Bean
@@ -60,6 +71,11 @@ class RelayAndTrimShareSchedulerThreadTest {
                 return false;
             });
             return lock;
+        }
+
+        @Bean
+        OtherJob otherJob() {
+            return new OtherJob();
         }
 
         @Bean
@@ -81,6 +97,15 @@ class RelayAndTrimShareSchedulerThreadTest {
         @Bean
         ObjectMapper objectMapper() {
             return new ObjectMapper();
+        }
+    }
+
+    static class OtherJob {
+
+        @Scheduled(fixedDelay = 60_000)
+        public void tick() {
+            otherJobThreads.add(Thread.currentThread().getName());
+            otherJobTicked.countDown();
         }
     }
 }

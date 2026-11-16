@@ -37,7 +37,7 @@ public class AuditStreamTrimWorker {
         this.leaderLock = leaderLock;
     }
 
-    @Scheduled(fixedDelayString = "${events.relay.trim-delay-ms:40000}")
+    @Scheduled(fixedDelayString = "${events.relay.trim-delay-ms:40000}", scheduler = AuditRelaySchedulerConfig.SCHEDULER)
     public void trimAll() {
         // 워터마크는 어느 인스턴스에서 읽어도 안전하지만 여러 인스턴스가 같은 스트림을 자를 이유가 없어 리더에서만 돈다.
         if (!leaderLock.isLeader()) {

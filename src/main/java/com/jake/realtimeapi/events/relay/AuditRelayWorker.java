@@ -78,7 +78,7 @@ public class AuditRelayWorker {
         this.leaderLock = leaderLock;
     }
 
-    @Scheduled(fixedDelayString = "${events.relay.delay-ms:5000}")
+    @Scheduled(fixedDelayString = "${events.relay.delay-ms:5000}", scheduler = AuditRelaySchedulerConfig.SCHEDULER)
     public void relayAll() {
         // 리더보드별 순서는 활성 릴레이가 하나일 때만 지켜지므로 락을 쥔 인스턴스만 옮긴다.
         if (!leaderLock.isLeader()) {
