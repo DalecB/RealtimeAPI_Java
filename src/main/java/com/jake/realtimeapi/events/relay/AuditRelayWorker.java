@@ -214,6 +214,11 @@ public class AuditRelayWorker {
         if (!acknowledged.isEmpty()) {
             redisTemplate.opsForStream().acknowledge(streamKey, GROUP, acknowledged.toArray(new String[0]));
         }
+        if (acknowledged.size() < records.size()) {
+            // 실패 뒤에도 계속 읽으면 장애 동안 틱이 유입이 멈출 때까지 끝나지 않으므로, 이 리더보드는 다음 틱에 PEL부터 다시 시도한다.
+            throw new IllegalStateException("relay batch publish failed streamKey=" + streamKey
+                    + " failed=" + (records.size() - acknowledged.size()) + "/" + records.size());
+        }
         return records.size();
     }
 

@@ -65,9 +65,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -808,6 +810,53 @@ class KafkaAuditRoundTripTest {
             assertEquals(1, findAuditRows(blocked.leaderboardId()).size());
             assertEquals(0, pendingCount(blockedStream));
         });
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void failedBatchPublish_stopsDrainingThatLeaderboardUntilNextTick() {
+        Fixture fixture = createFixture();
+        processEvents(fixture, 5);
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+
+        LeaderboardRepository onlyFixture = mock(LeaderboardRepository.class);
+        when(onlyFixture.findAllIds()).thenReturn(List.of(fixture.leaderboardId()));
+        AtomicBoolean kafkaDown = new AtomicBoolean(true);
+        AtomicInteger failedSends = new AtomicInteger();
+        KafkaTemplate<String, String> failingKafka = spy(kafkaTemplate);
+        doAnswer(invocation -> {
+            if (kafkaDown.get()) {
+                failedSends.incrementAndGet();
+                return CompletableFuture.failedFuture(
+                        new KafkaException("Send failed", new TimeoutException("Expiring 2 record(s)")));
+            }
+            return invocation.callRealMethod();
+        }).when(failingKafka).send(any(ProducerRecord.class));
+        AuditRelayWorker relay = new AuditRelayWorker(
+                onlyFixture,
+                redisTemplate,
+                failingKafka,
+                objectMapper,
+                2,
+                600_000,
+                "relay-" + UUID.randomUUID(),
+                auditRelayLeaderLock
+        );
+
+        relay.relayAll();
+
+        assertEquals(2, failedSends.get());
+        assertEquals(2, pendingCount(streamKey));
+        assertEquals(0, findAuditRows(fixture.leaderboardId()).size());
+
+        kafkaDown.set(false);
+        relay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(5, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(0, pendingCount(streamKey));
+        });
+        assertEquals(5, distinctEventIds(fixture.leaderboardId()));
     }
 
     private String eventJson(Fixture fixture, String eventId, UUID idempotencyKey) throws Exception {
