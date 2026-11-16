@@ -537,6 +537,10 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
    └── 복구 범위는 랭킹 Top-1,000이며 멱등키·Redis Stream 상태는 제외
 ```
 
+> **트래픽 게이트**: 복구는 `ApplicationRunner`라 Tomcat이 포트를 연 뒤에 돈다. Boot는 러너가 모두 끝난 뒤에야 readiness를 `ACCEPTING_TRAFFIC`으로 올리므로, 트래픽은 반드시 `/actuator/health/readiness` 기준으로 받아야 복구 전 쓰기가 들어오지 않는다(`ColdStartRecoveryReadinessTest`). 로컬 compose에는 이 게이트가 없어서, 브레이커 수동 OPEN 전에 들어온 쓰기가 ZSET을 채우면 `REDIS_ALREADY_WARM`으로 복구를 건너뛸 수 있다.
+>
+> 리더보드가 하나라도 있는데 기동 시 Redis에 연결할 수 없으면 복구가 예외를 던져 기동이 실패하고, 재시작은 오케스트레이터에 맡긴다. `snapshots.recovery.enabled=false`면 Redis 없이도 기동한다(`ColdStartRecoveryStartupFailureTest`).
+
 ---
 
 ## 10. Redis SPOF 대응 전략
