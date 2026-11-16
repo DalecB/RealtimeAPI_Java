@@ -11,12 +11,10 @@ public record CaptureSnapshotResult(
         int rowCount,
         boolean skipped
 ) {
-    // Empty Guard에 걸려 저장을 생략한 경우의 표준 결과.
     public static CaptureSnapshotResult skipped(UUID leaderboardId, Instant snapshotAt, int topN) {
         return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, null, 0, true);
     }
 
-    // 저장이 완료된 경우의 표준 결과.
     public static CaptureSnapshotResult captured(
             UUID leaderboardId,
             Instant snapshotAt,

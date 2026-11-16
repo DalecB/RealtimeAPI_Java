@@ -26,7 +26,6 @@ public class SnapshotCaptureExecutionService {
 
     @Transactional
     public SnapshotCaptureExecutionResult execute(UUID leaderboardId, Instant snapshotAt, int topN) {
-        // lockKey를 leaderboard 단위로 고정해 동일 leaderboard의 중복 스냅샷을 차단한다.
         long lockKey = lockKey(leaderboardId);
         boolean locked = snapshotExecutionLockRepository.tryLock(lockKey);
         if (!locked) {
@@ -34,13 +33,11 @@ public class SnapshotCaptureExecutionService {
         }
 
         try {
-            // 락을 획득한 실행만 실제 capture usecase를 호출한다.
             CaptureSnapshotResult result = captureSnapshotUseCase.capture(
                     new CaptureSnapshotCommand(leaderboardId, snapshotAt, topN)
             );
             return SnapshotCaptureExecutionResult.executed(result);
         } finally {
-            // 예외 여부와 무관하게 락을 반환한다.
             snapshotExecutionLockRepository.unlock(lockKey);
         }
     }

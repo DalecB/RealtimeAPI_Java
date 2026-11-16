@@ -47,7 +47,6 @@ public class RedisHotPathCircuitBreaker {
     }
 
     public void openManually(String reason) {
-        // Cold start recovery처럼 운영 절차가 우선인 구간에서는 자동 상태와 무관하게 강제로 OPEN 할 수 있다.
         manualOpenReason.set(reason == null || reason.isBlank() ? "manual-open" : reason);
     }
 

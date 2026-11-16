@@ -56,7 +56,6 @@ public class HotPathMetrics {
 
     public void recordRateLimitBlocked(long apiKeyId) {
         String cacheKey = Long.toString(apiKeyId);
-        // PRD는 apiKeyId label을 요구하므로 key별 counter를 lazy하게 생성한다.
         rateLimitBlockCounters.computeIfAbsent(cacheKey, ignored -> Counter.builder("rate_limit_block_total")
                 .tag("apiKeyId", cacheKey)
                 .register(meterRegistry)).increment();

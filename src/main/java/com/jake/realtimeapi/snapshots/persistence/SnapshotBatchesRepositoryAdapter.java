@@ -45,7 +45,7 @@ public class SnapshotBatchesRepositoryAdapter implements SnapshotBatchesReposito
                 UPSERT_SQL,
                 new MapSqlParameterSource()
                         .addValue("leaderboardId", param.leaderboardId())
-                        // JDBC cannot infer Instant for native SQL here, so bind it as SQL timestamp explicitly.
+                        // 네이티브 SQL에서는 JDBC가 Instant 타입을 추론하지 못해 Timestamp로 명시 바인딩한다.
                         .addValue("snapshotAt", Timestamp.from(param.snapshotAt()), Types.TIMESTAMP)
                         .addValue("topN", param.topN()),
                 Long.class

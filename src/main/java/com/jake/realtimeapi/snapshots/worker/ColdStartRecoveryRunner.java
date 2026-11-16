@@ -43,7 +43,7 @@ public class ColdStartRecoveryRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        // PRD 요구: recovery 중에는 write 오염을 막기 위해 breaker를 수동 OPEN 한다.
+        // 복구 중 들어온 write가 Redis를 warm으로 만들거나 DEL에 지워지지 않도록 breaker를 수동 OPEN 한다.
         redisHotPathCircuitBreaker.openManually("cold-start-recovery");
         try {
             for (var leaderboardId : leaderboardRepository.findAllIds()) {

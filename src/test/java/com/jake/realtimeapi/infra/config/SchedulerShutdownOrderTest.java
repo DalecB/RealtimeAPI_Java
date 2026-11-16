@@ -20,10 +20,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * application.properties 설정 그대로 띄운 자동 구성 스케줄러가, 종료 시 실행 중인 틱을 끝낸 뒤에야
- * phase 0 빈(LettuceConnectionFactory와 같은 단계)을 멈추는지 확인한다.
- */
+// phaseZeroResource는 LettuceConnectionFactory(phase 0) 대역이고, 스케줄러 종료 설정은 application.properties 값을 그대로 쓴다.
 class SchedulerShutdownOrderTest {
 
     private static final List<String> events = new CopyOnWriteArrayList<>();

@@ -18,7 +18,7 @@ public class PostgresSnapshotExecutionLockRepository implements SnapshotExecutio
 
     @Override
     public boolean tryLock(long lockKey) {
-        // Postgres advisory lock: 같은 lockKey에 대해 동시 실행을 1개로 제한한다.
+        // Redis SET NX 대신 PG advisory lock을 쓴다: Redis 장애 때 Cold Path까지 멈추지 않게 한다(PRD ADR-003).
         Boolean locked = jdbcTemplate.queryForObject("SELECT pg_try_advisory_lock(?)", Boolean.class, lockKey);
         return Boolean.TRUE.equals(locked);
     }

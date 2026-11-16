@@ -38,7 +38,6 @@ public class RedisSnapshotRankingQueryRepository implements SnapshotRankingQuery
                 redisTemplate.opsForZSet().reverseRangeWithScores(key, 0, limit - 1L);
 
         if (tuples == null || tuples.isEmpty()) {
-            // Empty Guard 판단은 상위(application/worker)에서 하므로 여기서는 빈 리스트만 반환한다.
             return List.of();
         }
 
@@ -56,8 +55,6 @@ public class RedisSnapshotRankingQueryRepository implements SnapshotRankingQuery
             long userId = UserIdCodec.parse(tuple.getValue());
             long score = toLongScore(tuple.getScore());
 
-            // competition ranking: 점수가 바뀌는 지점에서만 rank를 현재 position으로 갱신한다.
-            // 예) 1000, 800, 800, 600 -> 1, 2, 2, 4
             if (position == 1 || score != previousScore) {
                 currentRank = position;
             }
@@ -72,7 +69,6 @@ public class RedisSnapshotRankingQueryRepository implements SnapshotRankingQuery
     private long toLongScore(double score) {
         long converted = (long) score;
         if (Double.compare(score, converted) != 0) {
-            // PRD: snapshot score는 integer only.
             throw new IllegalStateException("score must be an integer, but was: " + score);
         }
         return converted;

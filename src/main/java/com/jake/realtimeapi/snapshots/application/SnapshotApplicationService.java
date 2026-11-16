@@ -61,13 +61,11 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
     }
 
     public List<SnapshotRankingRow> findTopRanks(UUID leaderboardId, int limit) {
-        // 스냅샷을 뜨기 위해 Redis Top-N을 읽는다. 이 클래스 안에서만 쓰인다.
         return snapshotRankingQueryRepository.findTopRanks(leaderboardId, limit);
     }
 
     @Override
     public SnapshotStatus getStatus() {
-        // 상태 조회 유스케이스: worker가 기록한 현재 snapshot 상태를 그대로 반환한다.
         return snapshotStatusTracker.currentStatus();
     }
 
@@ -101,27 +99,21 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
     @Override
     @Transactional
     public CaptureSnapshotResult capture(CaptureSnapshotCommand command) {
-        // 1) Hot Path(Redis)에서 snapshot 대상 Top-N을 읽는다.
         List<SnapshotRankingRow> rows = snapshotRankingQueryRepository.findTopRanks(command.leaderboardId(), command.topN());
         if (rows.isEmpty()) {
-            // 2) Empty Guard: 빈 결과면 Cold Path 저장을 건너뛴다.
             return CaptureSnapshotResult.skipped(command.leaderboardId(), command.snapshotAt(), command.topN());
         }
 
-        // 3) snapshot 배치 메타를 upsert하고 snapshotId를 확보한다.
         long snapshotId = snapshotBatchesRepository.upsert(
                 new SnapshotBatchUpsertParam(command.leaderboardId(), command.snapshotAt(), command.topN())
         );
 
-        // 4) Redis row를 DB upsert용 command 모델로 변환한다.
         List<SnapshotEntryUpsertParam> entryParams = rows.stream()
                 .map(row -> new SnapshotEntryUpsertParam(snapshotId, row.userId(), row.rank(), row.score()))
                 .toList();
 
-        // 5) 해당 snapshotId 기준으로 entries를 교체한다(기존 삭제 + 배치 insert).
         snapshotEntriesRepository.replaceBySnapshotId(snapshotId, entryParams);
 
-        // 6) 호출자가 로그/메트릭에 활용할 수 있도록 실행 결과 메타를 반환한다.
         return CaptureSnapshotResult.captured(
                 command.leaderboardId(),
                 command.snapshotAt(),
@@ -134,13 +126,11 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
     @Override
     @Transactional
     public RecoverLeaderboardSnapshotResult recover(RecoverLeaderboardSnapshotCommand command) {
-        // PRD Cold Start Recovery: Redis ZSET이 이미 살아 있으면 PostgreSQL snapshot으로 덮어쓰지 않는다.
         long currentRankCount = snapshotRankingRestoreRepository.countRanks(command.leaderboardId());
         if (currentRankCount > 0) {
             return RecoverLeaderboardSnapshotResult.skipped(command.leaderboardId(), "REDIS_ALREADY_WARM");
         }
 
-        // leaderboard별 최신 snapshot 1건만 복구 대상으로 사용한다.
         Optional<SnapshotBatches> latestSnapshot = snapshotBatchesRepository.findLatestByLeaderboardId(command.leaderboardId());
         if (latestSnapshot.isEmpty()) {
             return RecoverLeaderboardSnapshotResult.skipped(command.leaderboardId(), "SNAPSHOT_NOT_FOUND");
@@ -153,7 +143,6 @@ public class SnapshotApplicationService implements        CaptureSnapshotUseCase
             return RecoverLeaderboardSnapshotResult.skipped(command.leaderboardId(), "SNAPSHOT_ENTRIES_EMPTY");
         }
 
-        // snapshot_entries의 rank/userId/score shape를 Redis ZSET 복구용 row로 변환한다.
         List<SnapshotRankingRow> rows = entries.stream()
                 .map(entry -> new SnapshotRankingRow(entry.userId(), entry.rank(), entry.score()))
                 .toList();
