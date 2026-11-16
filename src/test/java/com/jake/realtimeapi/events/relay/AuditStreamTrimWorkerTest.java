@@ -6,6 +6,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.stubbing.Answer;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -16,6 +17,7 @@ import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.connection.stream.StreamRecords;
+import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -23,11 +25,16 @@ import org.testcontainers.utility.DockerImageName;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -92,6 +99,20 @@ class AuditStreamTrimWorkerTest {
     }
 
     @Test
+    void relayReadBetweenStatusReads_keepsUnackedEntries() {
+        appendEntries(5);
+        createGroup();
+        readAsRelay(3);
+        acknowledge("1-0", "2-0", "3-0");
+        AuditStreamTrimWorker interleaved = new AuditStreamTrimWorker(
+                leaderboardRepository, relayReadsAfterFirstStatusRead(2), leaderLock);
+
+        interleaved.trimAll();
+
+        assertEquals(List.of("4-0", "5-0"), remainingIds());
+    }
+
+    @Test
     void noGroup_trimsNothing() {
         appendEntries(3);
 
@@ -119,6 +140,24 @@ class AuditStreamTrimWorkerTest {
 
         assertEquals(List.of("1-0", "2-0", "3-0", "4-0", "5-0"), remainingIds());
         verifyNoInteractions(leaderboardRepository);
+    }
+
+    @SuppressWarnings("unchecked")
+    private StringRedisTemplate relayReadsAfterFirstStatusRead(int count) {
+        StreamOperations<String, Object, Object> streamOps = spy(redisTemplate.opsForStream());
+        AtomicBoolean interleaved = new AtomicBoolean();
+        Answer<Object> readThenInterleave = invocation -> {
+            Object result = invocation.callRealMethod();
+            if (interleaved.compareAndSet(false, true)) {
+                readAsRelay(count);
+            }
+            return result;
+        };
+        doAnswer(readThenInterleave).when(streamOps).pending(any(String.class), any(String.class));
+        doAnswer(readThenInterleave).when(streamOps).groups(any(String.class));
+        StringRedisTemplate template = spy(redisTemplate);
+        doReturn(streamOps).when(template).opsForStream();
+        return template;
     }
 
     private void appendEntries(int count) {

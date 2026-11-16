@@ -39,7 +39,7 @@ public class AuditStreamTrimWorker {
 
     @Scheduled(fixedDelayString = "${events.relay.trim-delay-ms:40000}")
     public void trimAll() {
-        // XPENDING과 XINFO 사이에 릴레이가 새로 읽으면 미XACK 구간이 잘리므로, 리더에서만 돌려 릴레이와 같은 스케줄러 스레드로 직렬화한다.
+        // 워터마크는 어느 인스턴스에서 읽어도 안전하지만 여러 인스턴스가 같은 스트림을 자를 이유가 없어 리더에서만 돈다.
         if (!leaderLock.isLeader()) {
             return;
         }
@@ -72,20 +72,25 @@ public class AuditStreamTrimWorker {
         }
     }
 
-    // PEL이 비었으면 배달분이 모두 XACK된 것이라 그룹이 마지막으로 받아간 지점까지 자를 수 있다.
     private String watermark(String streamKey) {
+        String lastDelivered;
         PendingMessagesSummary pending;
         try {
+            // last-delivered를 XPENDING보다 먼저 읽어야 한다. 그 이하는 이미 배달됐으니 뒤이어 본 PEL이 비면 모두 XACK된 것이고, 반대 순서면 사이에 릴레이가 읽은 미XACK 구간까지 자른다.
+            lastDelivered = lastDeliveredId(streamKey);
+            if (lastDelivered == null) {
+                return null;
+            }
             pending = redisTemplate.opsForStream().pending(streamKey, AuditRelayWorker.GROUP);
         } catch (DataAccessException ex) {
-            // 그룹·스트림이 없으면 XPENDING이 실패한다. 옮긴 게 없으니 자르지 않는다.
+            // 스트림이 없으면 XINFO GROUPS가 실패한다. 옮긴 게 없으니 자르지 않는다.
             return null;
         }
 
         if (pending != null && pending.getTotalPendingMessages() > 0) {
             return pending.minMessageId();
         }
-        return lastDeliveredId(streamKey);
+        return lastDelivered;
     }
 
     private String lastDeliveredId(String streamKey) {
