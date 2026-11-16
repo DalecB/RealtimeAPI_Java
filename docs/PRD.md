@@ -249,13 +249,13 @@ Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이�
 ```
 Snapshot Worker (30초 주기)
   │
-  ├── PostgreSQL Advisory Lock 획득 시도
-  │     (pg_try_advisory_lock(UUID 상·하위 64비트 XOR 값))
+  ├── 트랜잭션 시작 → PostgreSQL Advisory Lock 획득 시도
+  │     (pg_try_advisory_xact_lock(UUID 상·하위 64비트 XOR 값))
   │     └── 획득 실패 → Skip (중복 실행 방지)
   │
   ├── Redis ZREVRANGE Top-1000 조회
   │
-  ├── [Empty Guard] 조회 결과 0건 시 → 저장 중단, Lock 해제
+  ├── [Empty Guard] 조회 결과 0건 시 → 저장 중단 (트랜잭션이 끝나며 Lock 해제)
   │     (Cold Start 직후 빈 데이터로 스냅샷 덮어쓰기 방지)
   │
   ├── PostgreSQL Upsert
@@ -264,7 +264,7 @@ Snapshot Worker (30초 주기)
   │
   ├── last_successful_snapshot_at 갱신
   │
-  └── Advisory Lock 해제 (pg_advisory_unlock)
+  └── 트랜잭션 커밋·롤백 → Advisory Lock 자동 해제 (unlock 호출 없음)
         └── 스냅샷 실패 시: 재시도 3회 → 알림 + snapshot_failure_total 증가
 ```
 
@@ -398,19 +398,26 @@ return {1, newScore}  -- {isNew=true, newScore}
 단일 인스턴스에서도, 다중 인스턴스에서도 중복 스냅샷이 발생하지 않아야 한다. Redis와 독립적으로 동작하여 Cold Path가 Hot Path 장애에 영향받지 않는다.
 
 ```
-Lock 구현: PostgreSQL pg_try_advisory_lock(lockKey)
+Lock 구현: PostgreSQL pg_try_advisory_xact_lock(lockKey) (트랜잭션 범위 락)
 Lock Key: leaderboardId UUID의 상·하위 64비트를 XOR한 long 값
 
-획득 방법: pg_try_advisory_lock(lockKey)  -- non-blocking, 즉시 반환
+획득 방법: 캡처 트랜잭션 안에서 pg_try_advisory_xact_lock(lockKey)  -- non-blocking, 즉시 반환
+  - 트랜잭션 밖에서 호출하면 바로 예외를 던진다 (autocommit에서는 SELECT가 끝나자마자 풀려 아무것도 막지 못한다)
 해제 조건:
-  - 정상 완료 후 즉시 해제: pg_advisory_unlock(lockKey)
+  - 트랜잭션 커밋·롤백 시 자동 해제 (unlock 호출 없음)
   - 커넥션 종료 시 자동 해제 (PostgreSQL 세션 종료)
   - 워커 크래시 시에도 커넥션 종료와 함께 Lock 자동 해제 보장
 
 장점:
   - Redis 장애와 완전 독립
   - TTL/clock skew 리스크 없음
-  - 소유자 검증 불필요 (세션 연결이 Lock 식별자임)
+  - 소유자 검증 불필요 (트랜잭션이 Lock 식별자임)
+  - 캡처 중 SQL 오류로 트랜잭션이 abort돼도 롤백이 Lock을 푼다
+
+세션 락(pg_try_advisory_lock + pg_advisory_unlock)을 쓰지 않는 이유:
+  - abort된 트랜잭션 안에서 pg_advisory_unlock이 25P02로 실패해 Lock이 풀 커넥션에 남는다
+  - 이후 다른 커넥션으로 간 같은 리더보드 캡처는 커넥션이 폐기될 때까지 조용히 Skip된다
+  - unlock 예외가 원래 SQL 오류를 덮어 로그에 25P02만 남는다
 ```
 
 ### 8.2 Empty Guard (Snapshot Overwrite 방지)
@@ -1027,6 +1034,8 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 **근거:** Cold Path의 Snapshot Worker는 Redis 장애와 독립적으로 동작해야 한다. Redis SET NX EX 방식은 Hot Path 장애 시 락을 획득할 수 없어 Cold Path까지 연쇄적으로 중단될 수 있다. PostgreSQL Advisory Lock은 세션이 종료되면 자동으로 해제되므로 워커가 비정상 종료돼도 락이 남지 않으며, TTL이나 시계 오차도 고려할 필요가 없다.
 
 **트레이드오프:** PostgreSQL 커넥션을 사용한다. 다만 Snapshot Worker는 30초마다 한 번 실행되므로 커넥션 점유 시간은 짧다. 락 키는 `leaderboardId` UUID의 상·하위 64비트를 XOR한 `long` 값을 사용한다.
+
+**후속 (2026-11-16):** 세션 락 `pg_try_advisory_lock`을 트랜잭션 락 `pg_try_advisory_xact_lock`으로 바꿨다. 캡처는 이미 한 트랜잭션 안에서 돌기 때문에, 캡처 중 SQL 오류로 트랜잭션이 abort되면 `finally`의 `pg_advisory_unlock`이 `25P02`로 실패했다. 락은 풀 커넥션에 남았고, 원래 오류는 unlock 예외에 가려졌다. 다른 커넥션에서 실행된 같은 리더보드 캡처는 그 커넥션이 폐기될 때까지 건너뛰었다. 트랜잭션 락은 커밋·롤백 때 PostgreSQL이 풀기 때문에 unlock 호출이 없어진다. 락 수명은 `SnapshotCaptureExecutionService.execute`의 트랜잭션 경계와 같다. 락 저장소는 트랜잭션 밖에서 호출되면 바로 예외를 던진다. Testcontainers로 abort 뒤 `pg_locks`에 락이 남지 않는 것, 다음 캡처가 락을 잡는 것, 원래 FK 오류가 그대로 올라오는 것을 검증했다. 키 체계는 바꾸지 않았다. bigint 키라 릴레이 리더 락의 두 int 키 `(1, 1)`과는 키 공간이 다르다.
 
 ---
 

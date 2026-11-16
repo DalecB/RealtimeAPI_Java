@@ -26,20 +26,15 @@ public class SnapshotCaptureExecutionService {
 
     @Transactional
     public SnapshotCaptureExecutionResult execute(UUID leaderboardId, Instant snapshotAt, int topN) {
-        long lockKey = lockKey(leaderboardId);
-        boolean locked = snapshotExecutionLockRepository.tryLock(lockKey);
+        boolean locked = snapshotExecutionLockRepository.tryLockForCurrentTransaction(lockKey(leaderboardId));
         if (!locked) {
             return SnapshotCaptureExecutionResult.lockNotAcquired();
         }
 
-        try {
-            CaptureSnapshotResult result = captureSnapshotUseCase.capture(
-                    new CaptureSnapshotCommand(leaderboardId, snapshotAt, topN)
-            );
-            return SnapshotCaptureExecutionResult.executed(result);
-        } finally {
-            snapshotExecutionLockRepository.unlock(lockKey);
-        }
+        CaptureSnapshotResult result = captureSnapshotUseCase.capture(
+                new CaptureSnapshotCommand(leaderboardId, snapshotAt, topN)
+        );
+        return SnapshotCaptureExecutionResult.executed(result);
     }
 
     static long lockKey(UUID leaderboardId) {
