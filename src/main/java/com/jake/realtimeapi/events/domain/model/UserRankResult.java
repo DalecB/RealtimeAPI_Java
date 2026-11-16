@@ -1,10 +1,19 @@
 package com.jake.realtimeapi.events.domain.model;
 
+import java.time.Instant;
+
 public record UserRankResult(
         long userId,
         long score,
-        Integer rank
+        Integer rank,
+        RankingSource source,
+        // source가 SNAPSHOT일 때 스냅샷 시각, REDIS면 null
+        Instant asOf
 ) {
+
+    public UserRankResult(long userId, long score, Integer rank) {
+        this(userId, score, rank, RankingSource.REDIS, null);
+    }
 
     public UserRankResult {
         if (userId <= 0) {

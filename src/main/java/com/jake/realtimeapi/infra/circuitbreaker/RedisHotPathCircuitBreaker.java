@@ -4,6 +4,7 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -17,7 +18,7 @@ public class RedisHotPathCircuitBreaker {
     private final AtomicReference<String> manualOpenReason = new AtomicReference<>();
 
     public RedisHotPathCircuitBreaker(
-            CircuitBreaker redisHotPathCircuitBreakerDelegate,
+            @Qualifier("redisHotPathCircuitBreakerDelegate") CircuitBreaker redisHotPathCircuitBreakerDelegate,
             RedisHotPathCircuitBreakerProperties properties,
             MeterRegistry meterRegistry
     ) {
@@ -25,6 +26,7 @@ public class RedisHotPathCircuitBreaker {
         this.properties = properties;
 
         Gauge.builder("circuit_breaker_failure_rate", this, RedisHotPathCircuitBreaker::failureRate)
+                .tag("name", circuitBreaker.getName())
                 .register(meterRegistry);
         registerStateGauge(meterRegistry, "closed");
         registerStateGauge(meterRegistry, "half_open");
@@ -57,6 +59,7 @@ public class RedisHotPathCircuitBreaker {
 
     private void registerStateGauge(MeterRegistry meterRegistry, String state) {
         Gauge.builder("circuit_breaker_state", this, breaker -> breaker.currentState().equalsIgnoreCase(state) ? 1 : 0)
+                .tag("name", circuitBreaker.getName())
                 .tag("state", state)
                 .register(meterRegistry);
     }

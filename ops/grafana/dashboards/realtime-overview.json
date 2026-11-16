@@ -62,10 +62,10 @@
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
       "id": 6,
       "targets": [
-        {"expr": "circuit_breaker_failure_rate", "legendFormat": "failure_rate", "refId": "A"},
-        {"expr": "circuit_breaker_state{state='open'}", "legendFormat": "open", "refId": "B"},
-        {"expr": "circuit_breaker_state{state='half_open'}", "legendFormat": "half_open", "refId": "C"},
-        {"expr": "circuit_breaker_state{state='closed'}", "legendFormat": "closed", "refId": "D"}
+        {"expr": "circuit_breaker_failure_rate", "legendFormat": "{{name}} failure_rate", "refId": "A"},
+        {"expr": "circuit_breaker_state{state='open'}", "legendFormat": "{{name}} open", "refId": "B"},
+        {"expr": "circuit_breaker_state{state='half_open'}", "legendFormat": "{{name}} half_open", "refId": "C"},
+        {"expr": "circuit_breaker_state{state='closed'}", "legendFormat": "{{name}} closed", "refId": "D"}
       ],
       "title": "Circuit Breaker",
       "type": "timeseries"

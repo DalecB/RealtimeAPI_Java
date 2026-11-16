@@ -34,8 +34,9 @@ docker compose up -d postgres redis kafka app prometheus grafana
 - `rate_limit_block_total{apiKeyId="..."}`
 
 ### Circuit Breaker
-- `circuit_breaker_state{state="closed|half_open|open"}`
-- `circuit_breaker_failure_rate`
+- `circuit_breaker_state{name="redisHotPath|redisReadPath",state="closed|half_open|open"}`
+- `circuit_breaker_failure_rate{name="redisHotPath|redisReadPath"}`
+- `circuit_breaker_slow_call_rate{name="redisReadPath"}` (읽기 브레이커만, 100ms 초과 호출 비율)
 
 ### Cold Path
 - `snapshot_duration_seconds`

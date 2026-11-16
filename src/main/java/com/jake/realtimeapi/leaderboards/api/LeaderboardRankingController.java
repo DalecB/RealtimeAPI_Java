@@ -47,7 +47,7 @@ public class LeaderboardRankingController {
                 .map(item -> new TopRankItemResponse(item.rank(), UserIdCodec.format(item.userId()), item.score()))
                 .toList();
 
-        return new TopRanksResponse(result.leaderboardId(), items, result.total());
+        return new TopRanksResponse(result.leaderboardId(), items, result.total(), result.source().name(), result.asOf());
     }
 
     @GetMapping("/{leaderboardId}/users/{userId}")
@@ -63,6 +63,6 @@ public class LeaderboardRankingController {
                 )
         );
 
-        return new UserRankResponse(UserIdCodec.format(result.userId()), result.score(), result.rank());
+        return new UserRankResponse(UserIdCodec.format(result.userId()), result.score(), result.rank(), result.source().name(), result.asOf());
     }
 }

@@ -3,7 +3,6 @@ package com.jake.realtimeapi.events.application;
 import com.jake.realtimeapi.events.domain.model.StreamsStatus;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
-import com.jake.realtimeapi.events.domain.repository.RankingQueryRepository;
 import com.jake.realtimeapi.events.domain.policy.DeltaScorePolicy;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import org.junit.jupiter.api.Test;
@@ -23,9 +22,6 @@ class EventApplicationServiceTest {
 
     @Mock
     private EventCommandRepository eventCommandRepository;
-
-    @Mock
-    private RankingQueryRepository rankingQueryRepository;
 
     @Mock
     private DeltaScorePolicy deltaScorePolicy;

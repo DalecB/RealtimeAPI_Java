@@ -236,6 +236,9 @@ Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이�
   ├── Redis ZSCORE lb:{leaderboardId}:z {userId}  → score
   └── Redis ZCOUNT lb:{leaderboardId}:z ({score} +inf  → rank 계산 (Competition Ranking)
 
+Redis를 못 읽을 때 (읽기 브레이커 OPEN·Redis 오류·Cold Start 복구 중):
+  └── PostgreSQL 최신 snapshot으로 응답 (source=SNAPSHOT, asOf=snapshot 시각, ADR-010)
+
 과거 랭킹/리포트 조회 (Cold):
   └── PostgreSQL snapshot_batches + snapshot_entries 조회
 
@@ -540,6 +543,7 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 | --------------------- | --------------------------------------------- | ------------------------------------ |
 | Redis 일시 응답 지연  | Circuit Breaker (Closed → Half-Open → Open)   | Resilience4j 활용                    |
 | Redis 완전 장애       | Circuit Breaker OPEN → 503 즉시 반환          | Write 요청 차단으로 데이터 오염 방지 |
+| Redis 읽기 장애·지연  | 읽기 전용 Circuit Breaker OPEN → 최신 snapshot으로 응답 | snapshot 10분 초과·Top-N 밖 요청은 503 (ADR-010) |
 | Redis 재시작          | AOF Persistence로 데이터 복구 (최대 1초 유실) | AOF fsync: everysec                  |
 | Redis + AOF 동시 유실 | PostgreSQL Snapshot 기준 Cold Start 복구      | 랭킹 Top-1,000까지만 복구, 최대 약 30초 |
 | Snapshot Worker 실패  | 재시도 3회 후 알림, 다음 주기 재개            | Cold Path 장애는 Hot Path와 독립     |
@@ -560,6 +564,14 @@ Redis 재시작 후 ZSET이 비어 있는 상태를 감지하면 다음 순서�
 OPEN 상태 응답:
   HTTP 503 + Retry-After: 10 헤더
   → 클라이언트가 exponential backoff 재시도 가능하도록 유도
+
+읽기 전용 브레이커 (랭킹 조회, ADR-010):
+  slidingWindowSize: 10
+  failureRateThreshold: 50%
+  slowCallDurationThreshold: 100ms (T3 혼합 부하 읽기 최대 47ms의 약 2배, 읽기 SLO 20ms의 5배)
+  slowCallRateThreshold: 50%
+  waitDurationInOpenState: 10초
+  OPEN 상태 응답: 최신 snapshot (source=SNAPSHOT, asOf)
 
 Retry 정책 (클라이언트 권고):
   - 초기 대기: 1초
@@ -1147,6 +1159,34 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 - **Redis Streams 아웃박스가 추가된다.** Kafka producer는 Lua 블록 안에 들어갈 수 없으므로 Lua의 XADD를 유지하고, 별도 릴레이가 Kafka로 전달한다. 이 결정으로 ADR-002의 원자성 범위는 유지되지만 릴레이 운영 비용이 생긴다.
 
 **관련 문서:** 구현 스펙과 검증 항목은 [SPIKE-001](SPIKE-001-kafka-migration-path.md)에서 다룬다.
+
+---
+
+### ADR-010: 랭킹 읽기 전용 Circuit Breaker와 Snapshot Fallback
+
+**상태:** 확정 (2026-11-16)
+
+**상황:** Circuit Breaker는 쓰기 경로(`POST /events`의 Lua 호출)와 API 키 rate limit만 감쌌다. 로컬 compose에서 Redis를 중지하고 측정하자 `GET /leaderboards/{id}/tops`는 Redis timeout(2초)을 다 기다린 뒤 500을 반환했다. 읽기 SLO(p99 < 20ms)를 선언했지만 장애 중 읽기 거동은 정의되어 있지 않았다.
+
+**결정:**
+
+- 읽기 전용 브레이커(`redisReadPath`)를 쓰기 브레이커와 별도로 둔다. 실패율 50% 또는 100ms 초과 호출 비율 50%에서 연다.
+- 브레이커가 열려 있거나 Redis 호출이 실패하면 PostgreSQL 최신 snapshot으로 응답하고 `source=SNAPSHOT`, `asOf`를 붙인다.
+- snapshot이 10분보다 오래됐거나, 잘린 snapshot(Top-N)으로 정확히 답할 수 없는 요청(Top-N 밖 유저, Top-N 경계를 넘는 페이지)은 503 + `Retry-After`를 반환한다. 틀린 순위나 "미참여"를 반환하지 않는다.
+- Cold Start 복구 중에는 읽기 브레이커도 수동 OPEN 한다. 반쯤 채워진 ZSET 대신 복구 원본과 같은 snapshot으로 응답한다.
+
+**근거:**
+
+- **쓰기만 실패하는 장애가 있다.** `noeviction` 설정에서 Redis 메모리가 차면 Lua의 SET이 OOM으로 거부되지만 ZSET 읽기는 성공한다. 256MB에서 1,000 TPS면 멱등 키가 약 16분 만에 메모리를 채운다(`artifacts/README.md`). 브레이커를 공유하면 이 장애에서 정상인 읽기까지 막힌다.
+- **읽기 장애는 실패보다 지연으로 먼저 온다.** 실패율만 보는 브레이커는 호출마다 2초 timeout을 기다린 뒤에야 실패를 센다. 100ms는 1,000 TPS 혼합 부하(T3)에서 관측한 읽기 최대 지연 47ms의 약 2배로, GC·네트워크 지터에는 열리지 않고 SLO 위반은 빠르게 잡는다.
+- **랭킹은 수십 초 지연을 허용한다.** snapshot 주기 30초의 지연은 랭킹 조회에서 수용 가능하다. 반면 장애 중에는 snapshot도 갱신되지 않으므로 지연은 장애 시간만큼 커진다. 10분 상한으로 무기한 오래된 값을 막는다.
+
+**트레이드오프:**
+
+- **장애 중 응답은 최대 10분 전 값이다.** 클라이언트는 `source`와 `asOf`로 구분해야 한다.
+- **잘린 snapshot에서는 전체 참여자 수를 모른다.** snapshot은 Top-N만 저장하므로 `total`은 null이다. 참여자가 Top-N보다 적었던 snapshot은 전원이 들어 있으므로 `total`과 미참여 판정을 그대로 제공한다.
+- **장애가 PostgreSQL로 번질 수 있다.** 읽기 트래픽이 snapshot 조회로 넘어간다. 리더보드별 snapshot을 앱 메모리에 30초 캐시해 DB 조회를 리더보드당 주기 1회로 제한한다.
+- **복구 중 수동 OPEN은 인스턴스 로컬이다.** 다른 인스턴스는 복구 중인 ZSET을 읽을 수 있다. readiness 연동은 범위 밖이다.
 
 ---
 

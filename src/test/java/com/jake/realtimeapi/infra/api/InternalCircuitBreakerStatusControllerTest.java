@@ -3,7 +3,9 @@ package com.jake.realtimeapi.infra.api;
 import com.jake.realtimeapi.auth.application.usecase.AuthenticateAdminJwtUseCase;
 import com.jake.realtimeapi.auth.domain.model.AuthenticatedAdminUser;
 import com.jake.realtimeapi.infra.circuitbreaker.CircuitBreakerStatus;
+import com.jake.realtimeapi.infra.circuitbreaker.ReadPathCircuitBreakerStatus;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
+import com.jake.realtimeapi.infra.circuitbreaker.RedisReadPathCircuitBreaker;
 import com.jake.realtimeapi.infra.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,9 @@ class InternalCircuitBreakerStatusControllerTest {
     private RedisHotPathCircuitBreaker redisHotPathCircuitBreaker;
 
     @MockitoBean
+    private RedisReadPathCircuitBreaker redisReadPathCircuitBreaker;
+
+    @MockitoBean
     private AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase;
 
     // /internal/** 인증 자체는 InternalEndpointAuthenticationTest가 검증한다. 여기서는 응답 계약만 본다.
@@ -41,14 +46,18 @@ class InternalCircuitBreakerStatusControllerTest {
     }
 
     @Test
-    void getStatus_returnsCurrentBreakerStateAndFailureRate() throws Exception {
+    void getStatus_returnsWriteBreakerAtTopLevelAndReadBreakerUnderRead() throws Exception {
         when(redisHotPathCircuitBreaker.getStatus()).thenReturn(new CircuitBreakerStatus("OPEN", 50.0));
+        when(redisReadPathCircuitBreaker.getStatus()).thenReturn(new ReadPathCircuitBreakerStatus("CLOSED", 0.0, 10.0));
 
         mockMvc.perform(get("/internal/circuit-breaker/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("OPEN"))
-                .andExpect(jsonPath("$.failureRate").value(50.0));
+                .andExpect(jsonPath("$.failureRate").value(50.0))
+                .andExpect(jsonPath("$.read.state").value("CLOSED"))
+                .andExpect(jsonPath("$.read.slowCallRate").value(10.0));
 
         verify(redisHotPathCircuitBreaker).getStatus();
+        verify(redisReadPathCircuitBreaker).getStatus();
     }
 }

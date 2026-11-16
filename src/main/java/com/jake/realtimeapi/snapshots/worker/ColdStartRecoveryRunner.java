@@ -1,6 +1,7 @@
 package com.jake.realtimeapi.snapshots.worker;
 
 import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
+import com.jake.realtimeapi.infra.circuitbreaker.RedisReadPathCircuitBreaker;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import com.jake.realtimeapi.snapshots.application.command.RecoverLeaderboardSnapshotCommand;
 import com.jake.realtimeapi.snapshots.application.model.RecoverLeaderboardSnapshotResult;
@@ -24,6 +25,7 @@ public class ColdStartRecoveryRunner implements ApplicationRunner {
     private final LeaderboardRepository leaderboardRepository;
     private final RecoverLeaderboardSnapshotUseCase recoverLeaderboardSnapshotUseCase;
     private final RedisHotPathCircuitBreaker redisHotPathCircuitBreaker;
+    private final RedisReadPathCircuitBreaker redisReadPathCircuitBreaker;
     private final Counter coldStartRecoveryCounter;
     private final int topN;
 
@@ -31,12 +33,14 @@ public class ColdStartRecoveryRunner implements ApplicationRunner {
             LeaderboardRepository leaderboardRepository,
             RecoverLeaderboardSnapshotUseCase recoverLeaderboardSnapshotUseCase,
             RedisHotPathCircuitBreaker redisHotPathCircuitBreaker,
+            RedisReadPathCircuitBreaker redisReadPathCircuitBreaker,
             MeterRegistry meterRegistry,
             @Value("${snapshots.recovery.top-n:1000}") int topN
     ) {
         this.leaderboardRepository = leaderboardRepository;
         this.recoverLeaderboardSnapshotUseCase = recoverLeaderboardSnapshotUseCase;
         this.redisHotPathCircuitBreaker = redisHotPathCircuitBreaker;
+        this.redisReadPathCircuitBreaker = redisReadPathCircuitBreaker;
         this.coldStartRecoveryCounter = meterRegistry.counter("cold_start_recovery_total");
         this.topN = topN;
     }
@@ -45,6 +49,8 @@ public class ColdStartRecoveryRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         // PRD 요구: recovery 중에는 write 오염을 막기 위해 breaker를 수동 OPEN 한다.
         redisHotPathCircuitBreaker.openManually("cold-start-recovery");
+        // 복구 중 ZSET은 반쯤 찬 상태라 틀린 순위가 나간다. 읽기는 복구 원본과 같은 스냅샷으로 답한다.
+        redisReadPathCircuitBreaker.openManually("cold-start-recovery");
         try {
             for (var leaderboardId : leaderboardRepository.findAllIds()) {
                 RecoverLeaderboardSnapshotResult result = recoverLeaderboardSnapshotUseCase.recover(
@@ -61,6 +67,7 @@ public class ColdStartRecoveryRunner implements ApplicationRunner {
             }
         } finally {
             redisHotPathCircuitBreaker.clearManualOverride();
+            redisReadPathCircuitBreaker.clearManualOverride();
         }
     }
 }

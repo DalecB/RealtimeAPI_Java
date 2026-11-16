@@ -10,6 +10,7 @@ import com.jake.realtimeapi.events.domain.exception.IdempotencyKeyReuseMismatchE
 import com.jake.realtimeapi.events.domain.exception.InvalidDeltaScoreException;
 import com.jake.realtimeapi.leaderboards.domain.exception.LeaderboardAlreadyExistsException;
 import com.jake.realtimeapi.leaderboards.domain.exception.LeaderboardNotFoundException;
+import com.jake.realtimeapi.infra.circuitbreaker.RankingReadUnavailableException;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisCircuitBreakerOpenException;
 import com.jake.realtimeapi.projects.domain.exception.ProjectAlreadyExistsException;
 import com.jake.realtimeapi.projects.domain.exception.ProjectAccessDeniedException;
@@ -73,6 +74,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header("Retry-After", Long.toString(exception.getRetryAfterSeconds()))
                 .body(ApiErrorResponse.of(HttpStatus.SERVICE_UNAVAILABLE, "CIRCUIT_BREAKER_OPEN", exception.getMessage()));
+    }
+
+    @ExceptionHandler(RankingReadUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleRankingReadUnavailable(RankingReadUnavailableException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header("Retry-After", Long.toString(exception.getRetryAfterSeconds()))
+                .body(ApiErrorResponse.of(HttpStatus.SERVICE_UNAVAILABLE, "RANKING_" + exception.getReason().name(), exception.getMessage()));
     }
 
     @ExceptionHandler(UserNotFoundException.class)

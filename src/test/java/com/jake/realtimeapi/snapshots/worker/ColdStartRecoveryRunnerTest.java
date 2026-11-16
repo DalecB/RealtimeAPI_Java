@@ -1,6 +1,7 @@
 package com.jake.realtimeapi.snapshots.worker;
 
 import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
+import com.jake.realtimeapi.infra.circuitbreaker.RedisReadPathCircuitBreaker;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import com.jake.realtimeapi.snapshots.application.model.RecoverLeaderboardSnapshotResult;
 import com.jake.realtimeapi.snapshots.application.usecase.RecoverLeaderboardSnapshotUseCase;
@@ -34,6 +35,9 @@ class ColdStartRecoveryRunnerTest {
     @Mock
     private RedisHotPathCircuitBreaker redisHotPathCircuitBreaker;
 
+    @Mock
+    private RedisReadPathCircuitBreaker redisReadPathCircuitBreaker;
+
     @Test
     void run_opensBreakerRestoresAllLeaderboardsAndClearsManualOverride() throws Exception {
         UUID leaderboardA = UUID.randomUUID();
@@ -47,16 +51,20 @@ class ColdStartRecoveryRunnerTest {
                 leaderboardRepository,
                 recoverLeaderboardSnapshotUseCase,
                 redisHotPathCircuitBreaker,
+                redisReadPathCircuitBreaker,
                 new SimpleMeterRegistry(),
                 1000
         );
 
         runner.run(new DefaultApplicationArguments(new String[0]));
 
-        InOrder inOrder = inOrder(redisHotPathCircuitBreaker, recoverLeaderboardSnapshotUseCase);
+        // 쓰기는 오염 방지로 막고, 읽기는 반쯤 찬 ZSET 대신 스냅샷으로 돌린다. 복구가 끝나면 둘 다 푼다.
+        InOrder inOrder = inOrder(redisHotPathCircuitBreaker, redisReadPathCircuitBreaker, recoverLeaderboardSnapshotUseCase);
         inOrder.verify(redisHotPathCircuitBreaker).openManually("cold-start-recovery");
+        inOrder.verify(redisReadPathCircuitBreaker).openManually("cold-start-recovery");
         inOrder.verify(recoverLeaderboardSnapshotUseCase, times(2)).recover(any());
         inOrder.verify(redisHotPathCircuitBreaker).clearManualOverride();
+        inOrder.verify(redisReadPathCircuitBreaker).clearManualOverride();
         verify(leaderboardRepository).findAllIds();
     }
 }
