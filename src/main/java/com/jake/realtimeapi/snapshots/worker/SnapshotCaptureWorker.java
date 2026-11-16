@@ -50,7 +50,6 @@ public class SnapshotCaptureWorker {
         this.maxAttempts = maxAttempts;
         this.retryDelayMs = retryDelayMs;
 
-        // PRD 관측 지표: 실패/스킵 카운터와 tracker 기반 lag gauge.
         this.snapshotFailureCounter = meterRegistry.counter("snapshot_failure_total");
         this.snapshotSkipCounter = meterRegistry.counter("snapshot_skip_total");
         this.snapshotDurationTimer = meterRegistry.timer("snapshot_duration_seconds");
@@ -60,7 +59,6 @@ public class SnapshotCaptureWorker {
 
     @Scheduled(fixedDelayString = "${snapshots.worker.delay-ms:30000}")
     public void captureAllLeaderboards() {
-        // 주기마다 모든 leaderboard를 순회하며 snapshot을 시도한다.
         List<UUID> leaderboardIds = leaderboardRepository.findAllIds();
         if (leaderboardIds.isEmpty()) {
             return;
@@ -79,7 +77,6 @@ public class SnapshotCaptureWorker {
             try {
                 SnapshotCaptureExecutionResult execution = snapshotCaptureExecutionService.execute(leaderboardId, snapshotAt, topN);
                 if (!execution.lockAcquired()) {
-                    // 다른 인스턴스/스레드가 처리 중이면 현재 실행은 조용히 스킵.
                     log.debug("snapshots.capture skipped lock-not-acquired leaderboardId={}", leaderboardId);
                     return;
                 }
@@ -92,14 +89,12 @@ public class SnapshotCaptureWorker {
 
                 CaptureSnapshotResult result = execution.captureResult();
                 if (result.skipped()) {
-                    // Empty Guard·Shrink Guard 분기: 저장은 하지 않고 skip 메트릭만 증가.
                     snapshotSkipCounter.increment();
                     log.warn("snapshots.capture skipped reason={} leaderboardId={} rows={} snapshotAt={}",
                             result.skipReason(), leaderboardId, result.rowCount(), snapshotAt);
                     return;
                 }
 
-                // 성공 시점은 tracker에 기록되고, 이후 internal API와 lag gauge가 이 값을 읽는다.
                 snapshotStatusTracker.recordSuccess(snapshotAt);
                 log.info(
                         "snapshots.capture success leaderboardId={} snapshotId={} rows={} snapshotAt={}",
@@ -111,14 +106,12 @@ public class SnapshotCaptureWorker {
                 return;
             } catch (RuntimeException ex) {
                 if (attempt == maxAttempts) {
-                    // 재시도 한도를 초과하면 실패 메트릭을 올리고 다음 대상 처리로 넘어간다.
                     snapshotFailureCounter.increment();
                     log.error("snapshots.capture failed leaderboardId={} attempts={}", leaderboardId, maxAttempts, ex);
                     return;
                 }
 
                 if (attempt >= 2) {
-                    // PRD 정책: 첫 실패는 즉시 재시도, 이후 실패는 지연 후 재시도.
                     sleepRetryDelay();
                 }
             }

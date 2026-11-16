@@ -1,8 +1,8 @@
 package com.jake.realtimeapi.snapshots.persistence.redis;
 
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.snapshots.domain.model.SnapshotRankingRow;
 import com.jake.realtimeapi.snapshots.domain.repository.SnapshotRankingRestoreRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -45,7 +45,6 @@ public class RedisSnapshotRankingRestoreRepository implements SnapshotRankingRes
             tuples.add(new DefaultTypedTuple<>(UserIdCodec.format(row.userId()), (double) row.score()));
         }
 
-        // recovery는 snapshot이 source of record인 상황이므로 기존 Hot Path 값을 지우고 batch ZADD로 재구성한다.
         redisTemplate.delete(key);
         redisTemplate.opsForZSet().add(key, tuples);
     }

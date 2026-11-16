@@ -2,30 +2,32 @@ package com.jake.realtimeapi.events;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jake.realtimeapi.TestcontainersConfiguration;
-import com.jake.realtimeapi.events.domain.model.EventPayload;
-import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
-import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
+import com.jake.realtimeapi.events.consumer.AuditConsumerErrorConfig;
 import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
-import com.jake.realtimeapi.events.consumer.AuditEventRepository;
+import com.jake.realtimeapi.events.domain.model.EventPayload;
+import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
+import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
+import com.jake.realtimeapi.events.kafka.AuditTopicConfig;
+import com.jake.realtimeapi.events.kafka.AuditTopicStatusReader;
+import com.jake.realtimeapi.events.persistence.AuditEventQueryRepository;
+import com.jake.realtimeapi.events.persistence.AuditEventRepository;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.events.relay.AuditRelayLeaderLock;
 import com.jake.realtimeapi.events.relay.AuditRelayWorker;
-import com.jake.realtimeapi.events.relay.AuditTopicStatusReader;
-import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
-import com.jake.realtimeapi.infra.config.AuditConsumerErrorConfig;
-import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import com.jake.realtimeapi.leaderboards.domain.model.Leaderboard;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import com.jake.realtimeapi.projects.domain.model.Project;
 import com.jake.realtimeapi.projects.domain.repository.ProjectRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.users.domain.model.User;
 import com.jake.realtimeapi.users.domain.repository.UserRepository;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.junit.jupiter.api.Test;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +44,7 @@ import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -63,17 +66,23 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
-/** 실제 Redis·Kafka·PostgreSQL을 사용하는 audit event 왕복 통합 테스트. */
 @SpringBootTest(properties = {
         "events.relay.enabled=true",
         "events.relay.delay-ms=3600000",
@@ -727,7 +736,7 @@ class KafkaAuditRoundTripTest {
             await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
                     assertEquals(1, findAuditRows(fixture.leaderboardId()).size()));
 
-            // 프로세스 크래시처럼 A의 세션을 서버에서 끊는다. 두 int 키라 objsubid=2로 잡힌다.
+            // 두 int 키 advisory lock은 pg_locks에서 objsubid=2로 잡힌다.
             Integer terminated = jdbcTemplate.queryForObject("""
                     SELECT count(pg_terminate_backend(pid))::int FROM pg_locks
                     WHERE locktype = 'advisory' AND classid = 1 AND objid = 1 AND objsubid = 2 AND granted
@@ -741,7 +750,6 @@ class KafkaAuditRoundTripTest {
             });
             assertTrue(lockB.isLeader());
 
-            // 다시 연결한 A는 B가 쥔 락을 얻지 못해 옮기지 않는다.
             processEvents(fixture, 1);
             relayA.relayAll();
             assertTrue(!lockA.isLeader());
@@ -757,6 +765,103 @@ class KafkaAuditRoundTripTest {
             lockA.release();
             lockB.release();
         }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void immediateSendFailure_onOneLeaderboard_doesNotStarveNextLeaderboard() {
+        Fixture blocked = createFixture();
+        Fixture healthy = createFixture();
+        processEvents(blocked, 1);
+        processEvents(healthy, 1);
+        String blockedStream = LeaderboardRedisKeyFactory.auditStreamKey(blocked.leaderboardId());
+        String healthyStream = LeaderboardRedisKeyFactory.auditStreamKey(healthy.leaderboardId());
+
+        LeaderboardRepository blockedFirst = mock(LeaderboardRepository.class);
+        when(blockedFirst.findAllIds()).thenReturn(List.of(blocked.leaderboardId(), healthy.leaderboardId()));
+        AtomicBoolean metadataUnavailable = new AtomicBoolean(true);
+        KafkaTemplate<String, String> failingKafka = spy(kafkaTemplate);
+        // KafkaTemplate은 max.block.ms 초과 같은 즉시 실패를 future가 아니라 send에서 KafkaException으로 던진다.
+        doAnswer(invocation -> {
+            ProducerRecord<String, String> record = invocation.getArgument(0);
+            if (metadataUnavailable.get() && blocked.leaderboardId().toString().equals(record.key())) {
+                throw new KafkaException("Send failed", new TimeoutException("not present in metadata after 60000 ms"));
+            }
+            return invocation.callRealMethod();
+        }).when(failingKafka).send(any(ProducerRecord.class));
+        AuditRelayWorker relay = new AuditRelayWorker(
+                blockedFirst,
+                redisTemplate,
+                failingKafka,
+                objectMapper,
+                500,
+                600_000,
+                "relay-" + UUID.randomUUID(),
+                auditRelayLeaderLock
+        );
+
+        relay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertEquals(1, findAuditRows(healthy.leaderboardId()).size()));
+        assertEquals(0, pendingCount(healthyStream));
+        assertEquals(0, findAuditRows(blocked.leaderboardId()).size());
+        assertEquals(1, pendingCount(blockedStream));
+
+        metadataUnavailable.set(false);
+        relay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(1, findAuditRows(blocked.leaderboardId()).size());
+            assertEquals(0, pendingCount(blockedStream));
+        });
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void failedBatchPublish_stopsDrainingThatLeaderboardUntilNextTick() {
+        Fixture fixture = createFixture();
+        processEvents(fixture, 5);
+        String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(fixture.leaderboardId());
+
+        LeaderboardRepository onlyFixture = mock(LeaderboardRepository.class);
+        when(onlyFixture.findAllIds()).thenReturn(List.of(fixture.leaderboardId()));
+        AtomicBoolean kafkaDown = new AtomicBoolean(true);
+        AtomicInteger failedSends = new AtomicInteger();
+        KafkaTemplate<String, String> failingKafka = spy(kafkaTemplate);
+        doAnswer(invocation -> {
+            if (kafkaDown.get()) {
+                failedSends.incrementAndGet();
+                return CompletableFuture.failedFuture(
+                        new KafkaException("Send failed", new TimeoutException("Expiring 2 record(s)")));
+            }
+            return invocation.callRealMethod();
+        }).when(failingKafka).send(any(ProducerRecord.class));
+        AuditRelayWorker relay = new AuditRelayWorker(
+                onlyFixture,
+                redisTemplate,
+                failingKafka,
+                objectMapper,
+                2,
+                600_000,
+                "relay-" + UUID.randomUUID(),
+                auditRelayLeaderLock
+        );
+
+        relay.relayAll();
+
+        assertEquals(2, failedSends.get());
+        assertEquals(2, pendingCount(streamKey));
+        assertEquals(0, findAuditRows(fixture.leaderboardId()).size());
+
+        kafkaDown.set(false);
+        relay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(5, findAuditRows(fixture.leaderboardId()).size());
+            assertEquals(0, pendingCount(streamKey));
+        });
+        assertEquals(5, distinctEventIds(fixture.leaderboardId()));
     }
 
     private String eventJson(Fixture fixture, String eventId, UUID idempotencyKey) throws Exception {
@@ -794,18 +899,6 @@ class KafkaAuditRoundTripTest {
         Fixture second = createFixture();
         long now = Instant.now().toEpochMilli();
         listener.setCommonErrorHandler(errorHandler);
-        kafkaTemplate.send(
-                AuditTopicConfig.AUDIT_TOPIC,
-                0,
-                first.leaderboardId().toString(),
-                eventJson(first, now + "-0", UUID.randomUUID())
-        ).get();
-        kafkaTemplate.send(
-                AuditTopicConfig.AUDIT_TOPIC,
-                2,
-                second.leaderboardId().toString(),
-                eventJson(second, now + "-1", UUID.randomUUID())
-        ).get();
 
         setAuditDatabaseOutage(true);
         listener.start();
@@ -815,6 +908,19 @@ class KafkaAuditRoundTripTest {
                     assertEquals(2, listener.getAssignmentsByClientId().values().stream()
                             .filter(partitions -> !partitions.isEmpty())
                             .count()));
+            // 할당 전에 보내면 먼저 붙은 컨슈머가 두 레코드를 한 배치로 재시도해 편차가 0이 된다.
+            kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    0,
+                    first.leaderboardId().toString(),
+                    eventJson(first, now + "-0", UUID.randomUUID())
+            ).get();
+            kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    2,
+                    second.leaderboardId().toString(),
+                    eventJson(second, now + "-1", UUID.randomUUID())
+            ).get();
             await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
                 assertTrue(attempts.getOrDefault(first.leaderboardId(), List.of()).size() >= 6);
                 assertTrue(attempts.getOrDefault(second.leaderboardId(), List.of()).size() >= 6);
@@ -902,7 +1008,7 @@ class KafkaAuditRoundTripTest {
         try {
             redisTemplate.opsForStream().createGroup(streamKey, ReadOffset.from("0"), AuditRelayWorker.GROUP);
         } catch (org.springframework.dao.DataAccessException ex) {
-            // 컨텍스트 릴레이의 기동 틱이 먼저 그룹을 만들었을 수 있다(BUSYGROUP). 운영 ensureGroup과 같은 처리.
+            // 컨텍스트 릴레이의 기동 틱이 먼저 그룹을 만들었을 수 있다(BUSYGROUP).
         }
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
                 Consumer.from(AuditRelayWorker.GROUP, consumerName),

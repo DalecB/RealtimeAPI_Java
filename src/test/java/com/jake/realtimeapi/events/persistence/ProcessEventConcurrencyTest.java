@@ -6,7 +6,7 @@ import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.model.ProcessEventResult;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
 import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,10 +30,6 @@ import java.util.concurrent.Executors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/**
- * k6 t4(동일 Idempotency Key 50건 동시 요청)의 JVM판.
- * 어댑터 레벨에서 검증한다 — HTTP(인증·상태코드)를 배제하고 동시성만 변수로 남기기 위함.
- */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class ProcessEventConcurrencyTest {
@@ -67,13 +63,11 @@ class ProcessEventConcurrencyTest {
 
     @Test
     void process_appliesScoreOnceAndReplays49When50ConcurrentRequestsShareSameKeyAndPayload() throws Exception {
-        // 테스트 간 격리를 위해 매 테스트 새 leaderboard/key 사용 (컨테이너는 컨텍스트 캐시로 공유됨)
         UUID leaderboardId = UUID.randomUUID();
         UUID idempotencyKey = UUID.randomUUID();
         rankingWarmthRepository.markWarm(leaderboardId);
         EventPayload payload = new EventPayload(leaderboardId, USER_ID, DELTA_SCORE, idempotencyKey);
 
-        // JCIP startGate/endGate 패턴: 전원이 게이트 앞에 모인 뒤 일제 출발시켜 경합을 강제한다
         final CountDownLatch startGate = new CountDownLatch(1);
         final CountDownLatch endGate = new CountDownLatch(THREAD_COUNT);
         List<ProcessEventResult> results = Collections.synchronizedList(new ArrayList<>());
@@ -119,8 +113,6 @@ class ProcessEventConcurrencyTest {
         assertEquals(49, replayCount);
         assertEquals(0, exceptionCount);
         assertEquals(DELTA_SCORE, score);
-        // XLEN: replay 경로는 기록을 남기지 않으므로 49건이 재시도돼도 엔트리는 1건이다.
-        // 점수가 우연히 맞더라도 부수효과 중복은 여기서 걸린다.
         assertEquals(1, xLen);
     }
 
@@ -142,8 +134,6 @@ class ProcessEventConcurrencyTest {
         Double score = redisTemplate.opsForZSet().score(rankingKey, member);
         assertEquals(DELTA_SCORE, score);
 
-        // 감사 기록은 2건이어야 한다: 최초 처리(new) + 키 재사용 충돌(conflict).
-        // conflict 기록이 없으면 이상 탐지가 키 재사용을 볼 수 없다.
         String auditStreamKey = LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId);
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
                 .range(auditStreamKey, Range.unbounded());
@@ -153,7 +143,7 @@ class ProcessEventConcurrencyTest {
 
         Map<Object, Object> conflict = records.get(1).getValue();
         assertEquals("conflict", conflict.get("type"));
-        // delta는 반영된 값이 아니라 거부된 값이어야 한다 — 무엇을 시도했는지가 이상 탐지의 신호다
+        // conflict의 delta는 반영값이 아니라 거부된 값이어야 이상 탐지가 무엇을 시도했는지 본다.
         assertEquals(Long.toString(DELTA_SCORE + 3), conflict.get("delta"));
         assertEquals(idempotencyKey.toString(), conflict.get("idempotencyKey"));
         assertEquals(Long.toString(API_KEY_ID), conflict.get("apiKeyId"));

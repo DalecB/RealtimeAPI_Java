@@ -40,3 +40,34 @@ tests:
             exp_annotations:
               summary: "감사 이벤트가 DLT로 이동"
               description: "최근 5분 사이 lb-audit-events.DLT로 레코드가 발행됐다. 'audit event sent to DLT' 로그와 Ops Console Kafka Delivery의 DLT 건수를 확인한다."
+
+  # maxmemory 0(무제한)과 조회 실패(-1)는 사용률이 +Inf·1이 되지만 알림이 뜨면 안 된다.
+  - interval: 1m
+    input_series:
+      - series: 'redis_used_memory_bytes{job="realtime-api",instance="limited"}'
+        values: '900x10'
+      - series: 'redis_maxmemory_bytes{job="realtime-api",instance="limited"}'
+        values: '1000x10'
+      - series: 'redis_used_memory_bytes{job="realtime-api",instance="unlimited"}'
+        values: '900x10'
+      - series: 'redis_maxmemory_bytes{job="realtime-api",instance="unlimited"}'
+        values: '0x10'
+      - series: 'redis_used_memory_bytes{job="realtime-api",instance="scrape-failed"}'
+        values: '-1x10'
+      - series: 'redis_maxmemory_bytes{job="realtime-api",instance="scrape-failed"}'
+        values: '-1x10'
+    alert_rule_test:
+      # for 5m 전에는 pending이다.
+      - eval_time: 4m
+        alertname: RedisMemoryHigh
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: RedisMemoryHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: realtime-api
+              instance: limited
+            exp_annotations:
+              summary: "Redis 메모리 사용률 80% 초과"
+              description: "Redis used_memory가 maxmemory의 90%다. 가득 차면 noeviction으로 쓰기가 거부된다. 멱등 키 수와 스트림 적체(stream_consumer_group_lag)를 확인한다."

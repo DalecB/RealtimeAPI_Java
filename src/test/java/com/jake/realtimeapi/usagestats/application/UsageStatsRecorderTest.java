@@ -11,8 +11,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -83,6 +91,53 @@ class UsageStatsRecorderTest {
         assertEquals(1L, deltas.get(UsageBucketType.HOUR).idempotencyHitCount());
         assertEquals(1L, deltas.get(UsageBucketType.HOUR).idempotencyMissCount());
         assertEquals(2L, deltas.get(UsageBucketType.DAY).requestCount());
+    }
+
+    @Test
+    void flushPending_concurrentWithRecord_losesNoDelta() throws Exception {
+        int recorderThreads = 8;
+        int recordsPerThread = 50_000;
+        Instant occurredAt = Instant.parse("2026-03-20T01:23:45Z");
+        AtomicLong hourTotal = new AtomicLong();
+        AtomicLong dayTotal = new AtomicLong();
+        UsageStatsRecorder recorder = new UsageStatsRecorder(delta ->
+                (delta.bucketType() == UsageBucketType.HOUR ? hourTotal : dayTotal).addAndGet(delta.requestCount()));
+
+        ExecutorService pool = Executors.newFixedThreadPool(recorderThreads + 1);
+        CountDownLatch start = new CountDownLatch(1);
+        AtomicBoolean recording = new AtomicBoolean(true);
+        try {
+            pool.submit(() -> {
+                start.await();
+                while (recording.get()) {
+                    recorder.flushPending();
+                }
+                return null;
+            });
+            List<Future<?>> recorders = new ArrayList<>();
+            for (int t = 0; t < recorderThreads; t++) {
+                recorders.add(pool.submit(() -> {
+                    start.await();
+                    for (int i = 0; i < recordsPerThread; i++) {
+                        recorder.recordBlocked(7L, occurredAt);
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> future : recorders) {
+                future.get(30, TimeUnit.SECONDS);
+            }
+        } finally {
+            recording.set(false);
+            pool.shutdown();
+            pool.awaitTermination(30, TimeUnit.SECONDS);
+        }
+        recorder.flushPending();
+
+        long expected = (long) recorderThreads * recordsPerThread;
+        assertEquals(expected, hourTotal.get());
+        assertEquals(expected, dayTotal.get());
     }
 
     private Map<UsageBucketType, UsageStatsDelta> byBucketType(List<UsageStatsDelta> deltas) {

@@ -18,7 +18,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -34,10 +33,14 @@ class SnapshotCaptureExecutionServiceTest {
     private CaptureSnapshotUseCase captureSnapshotUseCase;
 
     @Mock
-    private SnapshotExecutionLockRepository snapshotExecutionLockRepository;
+    private RecoverLeaderboardSnapshotUseCase recoverLeaderboardSnapshotUseCase;
 
     @Mock
-    private RecoverLeaderboardSnapshotUseCase recoverLeaderboardSnapshotUseCase;
+    private SnapshotExecutionLockRepository snapshotExecutionLockRepository;
+
+    private SnapshotCaptureExecutionService service() {
+        return new SnapshotCaptureExecutionService(captureSnapshotUseCase, recoverLeaderboardSnapshotUseCase, snapshotExecutionLockRepository);
+    }
 
     @Test
     void lockKey_usesBothUuidHalves() {
@@ -48,39 +51,33 @@ class SnapshotCaptureExecutionServiceTest {
 
     @Test
     void execute_returnsLockNotAcquiredWhenTryLockFails() {
-        SnapshotCaptureExecutionService service =
-                new SnapshotCaptureExecutionService(captureSnapshotUseCase, recoverLeaderboardSnapshotUseCase, snapshotExecutionLockRepository);
         UUID leaderboardId = UUID.randomUUID();
         Instant snapshotAt = Instant.parse("2026-03-18T00:00:00Z");
 
-        when(snapshotExecutionLockRepository.tryLock(anyLong())).thenReturn(false);
+        when(snapshotExecutionLockRepository.tryLockForCurrentTransaction(anyLong())).thenReturn(false);
 
-        SnapshotCaptureExecutionResult result = service.execute(leaderboardId, snapshotAt, 1000);
+        SnapshotCaptureExecutionResult result = service().execute(leaderboardId, snapshotAt, 1000);
 
         assertFalse(result.lockAcquired());
         verify(captureSnapshotUseCase, never()).capture(any());
         verify(recoverLeaderboardSnapshotUseCase, never()).recover(any());
-        verify(snapshotExecutionLockRepository, never()).unlock(anyLong());
     }
 
     @Test
-    void execute_recoversColdRankingBeforeCapturingAndUnlocks() {
-        SnapshotCaptureExecutionService service =
-                new SnapshotCaptureExecutionService(captureSnapshotUseCase, recoverLeaderboardSnapshotUseCase, snapshotExecutionLockRepository);
+    void execute_recoversColdRankingBeforeCapturing() {
         UUID leaderboardId = UUID.randomUUID();
         Instant snapshotAt = Instant.parse("2026-03-18T00:00:00Z");
         long lockKey = SnapshotCaptureExecutionService.lockKey(leaderboardId);
         CaptureSnapshotResult captured = CaptureSnapshotResult.captured(leaderboardId, snapshotAt, 1000, 10L, 1000);
+        RecoverLeaderboardSnapshotResult recovered = RecoverLeaderboardSnapshotResult.recovered(leaderboardId, 1000, snapshotAt);
 
-        when(snapshotExecutionLockRepository.tryLock(lockKey)).thenReturn(true);
+        when(snapshotExecutionLockRepository.tryLockForCurrentTransaction(lockKey)).thenReturn(true);
+        when(recoverLeaderboardSnapshotUseCase.recover(new RecoverLeaderboardSnapshotCommand(leaderboardId, 1000)))
+                .thenReturn(recovered);
         when(captureSnapshotUseCase.capture(new CaptureSnapshotCommand(leaderboardId, snapshotAt, 1000)))
                 .thenReturn(captured);
 
-        RecoverLeaderboardSnapshotResult recovered = RecoverLeaderboardSnapshotResult.recovered(leaderboardId, 1000, snapshotAt);
-        when(recoverLeaderboardSnapshotUseCase.recover(new RecoverLeaderboardSnapshotCommand(leaderboardId, 1000)))
-                .thenReturn(recovered);
-
-        SnapshotCaptureExecutionResult result = service.execute(leaderboardId, snapshotAt, 1000);
+        SnapshotCaptureExecutionResult result = service().execute(leaderboardId, snapshotAt, 1000);
 
         assertTrue(result.lockAcquired());
         assertEquals(recovered, result.recoveryResult());
@@ -89,33 +86,13 @@ class SnapshotCaptureExecutionServiceTest {
         InOrder inOrder = inOrder(recoverLeaderboardSnapshotUseCase, captureSnapshotUseCase);
         inOrder.verify(recoverLeaderboardSnapshotUseCase).recover(any());
         inOrder.verify(captureSnapshotUseCase).capture(any());
-        verify(snapshotExecutionLockRepository).unlock(lockKey);
-    }
-
-    @Test
-    void execute_unlocksWhenCaptureThrows() {
-        SnapshotCaptureExecutionService service =
-                new SnapshotCaptureExecutionService(captureSnapshotUseCase, recoverLeaderboardSnapshotUseCase, snapshotExecutionLockRepository);
-        UUID leaderboardId = UUID.randomUUID();
-        Instant snapshotAt = Instant.parse("2026-03-18T00:00:00Z");
-        long lockKey = SnapshotCaptureExecutionService.lockKey(leaderboardId);
-
-        when(snapshotExecutionLockRepository.tryLock(lockKey)).thenReturn(true);
-        when(captureSnapshotUseCase.capture(new CaptureSnapshotCommand(leaderboardId, snapshotAt, 1000)))
-                .thenThrow(new IllegalStateException("boom"));
-
-        assertThrows(IllegalStateException.class, () -> service.execute(leaderboardId, snapshotAt, 1000));
-        verify(snapshotExecutionLockRepository).unlock(lockKey);
     }
 
     @Test
     void recover_skipsWhenAnotherInstanceHoldsTheLock() {
-        SnapshotCaptureExecutionService service =
-                new SnapshotCaptureExecutionService(captureSnapshotUseCase, recoverLeaderboardSnapshotUseCase, snapshotExecutionLockRepository);
-        UUID leaderboardId = UUID.randomUUID();
-        when(snapshotExecutionLockRepository.tryLock(anyLong())).thenReturn(false);
+        when(snapshotExecutionLockRepository.tryLockForCurrentTransaction(anyLong())).thenReturn(false);
 
-        assertTrue(service.recover(leaderboardId, 1000).isEmpty());
+        assertTrue(service().recover(UUID.randomUUID(), 1000).isEmpty());
         verify(recoverLeaderboardSnapshotUseCase, never()).recover(any());
     }
 }

@@ -104,7 +104,7 @@ export function bootstrap() {
     const response = http.post(
       `${BASE_URL}/users`,
       JSON.stringify({ externalId: `k6-user-${seed}-${i}` }),
-      jsonHeaders()
+      jsonHeaders({ Authorization: `Bearer ${adminJwt}` })
     );
     ensure(response, 201, `create event user ${i}`);
     userIds.push(String(JSON.parse(response.body).id));

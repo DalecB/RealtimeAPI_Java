@@ -1,33 +1,20 @@
--- KEYS[1] = "lb:{leaderboardId}:idem:{eventUuid}"
--- KEYS[2] = "lb:{leaderboardId}:z"
--- KEYS[3] = "lb:{leaderboardId}:events"
--- KEYS[4] = "lb:{leaderboardId}:warm"
--- ARGV[1] = userId
--- ARGV[2] = deltaScore
--- ARGV[3] = ttlSeconds
--- ARGV[4] = idempotency record (e.g. "v2:<payloadHash>:<processedAtEpochMillis>")
--- ARGV[5] = apiKeyId
--- ARGV[6] = idempotency key
+-- KEYS = idempotency, ranking(z), audit stream, warm / ARGV = userId, deltaScore, ttlSeconds, idempotencyRecord, apiKeyId, idempotencyKey, auditStreamMaxLen
 
--- 0) Warm check
--- The warm key disappears together with the ranking when Redis loses its data.
--- Without it, a score would land on an empty ranking and block recovery from the snapshot.
+-- warm 키는 Redis가 데이터를 잃으면 랭킹과 함께 사라진다. 없는데 점수를 쌓으면 빈 랭킹에 일부만 남아 스냅샷 복구가 막힌다.
 if redis.call('EXISTS', KEYS[4]) == 0 then
     return {-1, 'cold'}
 end
 
--- 1) Idempotency check
 local existing = redis.call('GET', KEYS[1])
 if existing then
-    -- Replayed request.
-    -- Java layer parses the stored idempotency record and compares its hash with the incoming hash:
+    -- v2:<hash>:<ms> 형식은 EventCommandRepositoryAdapter도 파싱한다. 바꾸면 양쪽을 같이 고친다.
     local existingHash = string.match(existing, "^v2:([^:]+):")
     local incomingHash = string.match(ARGV[4], "^v2:([^:]+):")
 
     if existingHash and incomingHash and existingHash ~= incomingHash then
         redis.call(
             'XADD', KEYS[3], 
-            'MAXLEN', '~', 100000, '*', 
+            'MAXLEN', '~', ARGV[7], '*', 
             'type', 'conflict', 
             'userId', ARGV[1], 
             'delta', ARGV[2], 
@@ -38,17 +25,13 @@ if existing then
     return {0, existing}
 end
 
--- 2) Increase user score in leaderboard ZSET
 local newScore = redis.call('ZINCRBY', KEYS[2], tonumber(ARGV[2]), ARGV[1])
 
--- 3) Persist idempotency key with TTL
 redis.call('SET', KEYS[1], ARGV[4], 'EX', tonumber(ARGV[3]))
 
--- 4) Append audit stream entry
--- Use bounded stream to avoid unbounded memory growth.
 redis.call(
     'XADD', KEYS[3], 
-    'MAXLEN', '~', 100000, '*', 
+    'MAXLEN', '~', ARGV[7], '*', 
     'type', 'new', 
     'userId', ARGV[1], 
     'delta', ARGV[2], 
@@ -56,5 +39,4 @@ redis.call(
     'idempotencyKey', ARGV[6]
 )
 
--- isNew=1, newScore returned as string from Redis
 return {1, newScore}

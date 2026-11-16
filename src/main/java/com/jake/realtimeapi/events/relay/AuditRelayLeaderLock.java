@@ -16,13 +16,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Properties;
 
-/**
- * 여러 인스턴스 중 릴레이를 실제로 돌릴 하나를 PostgreSQL advisory lock으로 고른다.
- *
- * <p>세션 락을 <b>풀 밖의 전용 연결</b>에 잡는다. 락은 이 연결(세션)이 살아 있는 동안 유지되고,
- * 프로세스가 죽어 연결이 끊기면 PostgreSQL이 즉시 풀어 다른 인스턴스가 다음 틱에 잡는다.
- * Hikari 연결에 잡으면 close()가 연결을 풀로 돌려줄 뿐 세션은 살아 있어 락이 남는다.
- */
+// Hikari 연결에 세션 락을 잡으면 close()가 풀로 반납할 뿐 세션이 살아 락이 남으므로 풀 밖 전용 연결을 쓴다.
 @Component
 @ConditionalOnProperty(name = "events.relay.enabled", havingValue = "true")
 public class AuditRelayLeaderLock {
@@ -30,7 +24,6 @@ public class AuditRelayLeaderLock {
     private static final Logger log = LoggerFactory.getLogger(AuditRelayLeaderLock.class);
 
     // 두 int 키는 스냅샷이 쓰는 bigint 키와 키 공간이 겹치지 않는다(pg_locks.objsubid 2 vs 1).
-    // 첫 값은 이 앱의 두 int 락 네임스페이스, 둘째 값은 그 안의 릴레이 락이다.
     static final int LOCK_NAMESPACE = 1;
     static final int RELAY_LOCK_ID = 1;
 
@@ -43,16 +36,14 @@ public class AuditRelayLeaderLock {
         Gauge.builder("audit_relay_leader", this, lock -> lock.leader ? 1 : 0).register(meterRegistry);
     }
 
-    /** 이번 틱에 릴레이해도 되는지. 연결이 끊겼으면 다시 연결해 락을 다시 시도한다. */
     public synchronized boolean isLeader() {
         try {
             if (connection == null || !connection.isValid(1)) {
-                // 세션이 죽었으면 그 세션의 락도 이미 풀렸다. 새 세션에서 처음부터 다시 잡는다.
                 release();
                 connection = DriverManager.getConnection(db.getJdbcUrl(), connectionProperties());
             }
             if (!leader) {
-                // 세션 락은 재진입된다. 이미 쥐고 있으면 다시 호출하지 않아 획득 횟수가 쌓이지 않게 한다.
+                // 세션 락은 재진입돼 매 틱 다시 잡으면 획득 횟수가 쌓이므로, 쥐고 있는 동안은 부르지 않는다.
                 leader = tryLock(connection);
             }
         } catch (SQLException ex) {
@@ -62,7 +53,6 @@ public class AuditRelayLeaderLock {
         return leader;
     }
 
-    /** 연결을 닫아 락을 놓는다. 종료 시 다른 인스턴스가 다음 틱에 바로 이어받게 한다. */
     @PreDestroy
     public synchronized void release() {
         leader = false;

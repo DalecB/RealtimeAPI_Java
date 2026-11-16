@@ -2,7 +2,7 @@ package com.jake.realtimeapi.events.api;
 
 import com.jake.realtimeapi.auth.application.usecase.AuthenticateAdminJwtUseCase;
 import com.jake.realtimeapi.auth.domain.model.AuthenticatedAdminUser;
-import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
+import com.jake.realtimeapi.events.persistence.AuditEventQueryRepository;
 import com.jake.realtimeapi.infra.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

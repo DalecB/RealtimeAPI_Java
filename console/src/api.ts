@@ -73,7 +73,7 @@ async function createUser(externalId: string): Promise<string> {
   const user = await json<{ id: number }>(
     await fetch('/users', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ externalId }),
     }),
   )

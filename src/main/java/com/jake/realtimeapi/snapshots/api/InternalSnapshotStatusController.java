@@ -19,7 +19,6 @@ public class InternalSnapshotStatusController {
 
     @GetMapping("/status")
     public SnapshotStatusResponse getStatus() {
-        // 내부 운영 API: worker 메모리 상태를 외부에서 확인할 수 있게 노출한다.
         SnapshotStatus status = getSnapshotStatusUseCase.getStatus();
         return new SnapshotStatusResponse(status.lastSuccessfulSnapshotAt(), status.snapshotLagSeconds());
     }

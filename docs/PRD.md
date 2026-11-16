@@ -252,22 +252,22 @@ Redis를 못 읽을 때 (읽기 브레이커 OPEN·Redis 오류·Cold Start 복�
 ```
 Snapshot Worker (30초 주기)
   │
-  ├── PostgreSQL Advisory Lock 획득 시도
-  │     (pg_try_advisory_lock(UUID 상·하위 64비트 XOR 값))
+  ├── 트랜잭션 시작 → PostgreSQL Advisory Lock 획득 시도
+  │     (pg_try_advisory_xact_lock(UUID 상·하위 64비트 XOR 값))
   │     └── 획득 실패 → Skip (중복 실행 방지)
   │
   ├── Redis ZREVRANGE Top-1000 조회
   │
-  ├── [Empty Guard] 조회 결과 0건 시 → 저장 중단, Lock 해제
+  ├── [Empty Guard] 조회 결과 0건 시 → 저장 중단 (트랜잭션이 끝나며 Lock 해제)
   │     (Cold Start 직후 빈 데이터로 스냅샷 덮어쓰기 방지)
   │
-  ├── PostgreSQL Upsert
+  ├── PostgreSQL 저장
   │     ├── snapshot_batches: ON CONFLICT (leaderboard_id, snapshot_at) DO UPDATE
-  │     └── snapshot_entries: ON CONFLICT (snapshot_id, user_id) DO UPDATE
+  │     └── snapshot_entries: 같은 snapshot_id 행을 DELETE한 뒤 batch INSERT (교체)
   │
   ├── last_successful_snapshot_at 갱신
   │
-  └── Advisory Lock 해제 (pg_advisory_unlock)
+  └── 트랜잭션 커밋·롤백 → Advisory Lock 자동 해제 (unlock 호출 없음)
         └── 스냅샷 실패 시: 재시도 3회 → 알림 + snapshot_failure_total 증가
 ```
 
@@ -351,6 +351,7 @@ XADD를 Lua 내부에 포함함으로써 score 반영과 감사 로그 기록이
 --           (payloadHash = userId + deltaScore 해시. processedAt은 replay 응답에 최초 처리 시각을 돌려주기 위해 함께 저장)
 -- ARGV[5] = apiKeyId
 -- ARGV[6] = 멱등키(eventUuid)
+-- ARGV[7] = auditStreamMaxLen (events.audit-stream.max-len, 기본 1000000)
 
 -- 1. 멱등키 중복 검사
 local existing = redis.call('GET', KEYS[1])
@@ -360,7 +361,7 @@ if existing then
     local existingHash = string.match(existing, "^v2:([^:]+):")
     local incomingHash = string.match(ARGV[4], "^v2:([^:]+):")
     if existingHash and incomingHash and existingHash ~= incomingHash then
-        redis.call('XADD', KEYS[3], 'MAXLEN', '~', 100000, '*',
+        redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[7], '*',
             'type', 'conflict', 'userId', ARGV[1], 'delta', ARGV[2],
             'apiKeyId', ARGV[5], 'idempotencyKey', ARGV[6])
     end
@@ -374,9 +375,9 @@ local newScore = redis.call('ZINCRBY', KEYS[2], tonumber(ARGV[2]), ARGV[1])
 redis.call('SET', KEYS[1], ARGV[4], 'EX', tonumber(ARGV[3]))
 
 -- 4. Audit Log Streams 기록 (score 반영과 원자적으로 처리)
--- MAXLEN ~ 100000: relay가 영구히 멈췄을 때 무한 증식을 막는 최후 방어선.
--- 평상시 정리는 relay 진행 기준 트림이 담당한다(SPIKE-001).
-redis.call('XADD', KEYS[3], 'MAXLEN', '~', 100000, '*',
+-- MAXLEN ~ 1000000: relay가 오래 멈췄을 때 무한 증식을 막는 최후 방어선. 릴레이 최악 중단 시간에 맞춘 값이다.
+-- 평상시 정리는 Consumer Group 워터마크 기준 MINID 트림이 담당한다(SPIKE-001).
+redis.call('XADD', KEYS[3], 'MAXLEN', '~', ARGV[7], '*',
     'type', 'new', 'userId', ARGV[1], 'delta', ARGV[2],
     'apiKeyId', ARGV[5], 'idempotencyKey', ARGV[6])
 
@@ -403,19 +404,26 @@ return {1, newScore}  -- {isNew=true, newScore}
 단일 인스턴스에서도, 다중 인스턴스에서도 중복 스냅샷이 발생하지 않아야 한다. Redis와 독립적으로 동작하여 Cold Path가 Hot Path 장애에 영향받지 않는다.
 
 ```
-Lock 구현: PostgreSQL pg_try_advisory_lock(lockKey)
+Lock 구현: PostgreSQL pg_try_advisory_xact_lock(lockKey) (트랜잭션 범위 락)
 Lock Key: leaderboardId UUID의 상·하위 64비트를 XOR한 long 값
 
-획득 방법: pg_try_advisory_lock(lockKey)  -- non-blocking, 즉시 반환
+획득 방법: 캡처 트랜잭션 안에서 pg_try_advisory_xact_lock(lockKey)  -- non-blocking, 즉시 반환
+  - 트랜잭션 밖에서 호출하면 바로 예외를 던진다 (autocommit에서는 SELECT가 끝나자마자 풀려 아무것도 막지 못한다)
 해제 조건:
-  - 정상 완료 후 즉시 해제: pg_advisory_unlock(lockKey)
+  - 트랜잭션 커밋·롤백 시 자동 해제 (unlock 호출 없음)
   - 커넥션 종료 시 자동 해제 (PostgreSQL 세션 종료)
   - 워커 크래시 시에도 커넥션 종료와 함께 Lock 자동 해제 보장
 
 장점:
   - Redis 장애와 완전 독립
   - TTL/clock skew 리스크 없음
-  - 소유자 검증 불필요 (세션 연결이 Lock 식별자임)
+  - 소유자 검증 불필요 (트랜잭션이 Lock 식별자임)
+  - 캡처 중 SQL 오류로 트랜잭션이 abort돼도 롤백이 Lock을 푼다
+
+세션 락(pg_try_advisory_lock + pg_advisory_unlock)을 쓰지 않는 이유:
+  - abort된 트랜잭션 안에서 pg_advisory_unlock이 25P02로 실패해 Lock이 풀 커넥션에 남는다
+  - 이후 다른 커넥션으로 간 같은 리더보드 캡처는 커넥션이 폐기될 때까지 조용히 Skip된다
+  - unlock 예외가 원래 SQL 오류를 덮어 로그에 25P02만 남는다
 ```
 
 ### 8.2 Empty Guard (Snapshot Overwrite 방지)
@@ -523,7 +531,7 @@ Redis를 Source of Truth로 사용하는 구조에서 데이터 유실 허용 �
 
 ### Cold Start 복구 플로우
 
-Redis가 랭킹을 잃으면 리더보드별 warm 키(`lb:{leaderboardId}:warm`)도 함께 사라진다. warm 키가 없는 상태(cold)를 감지하면 다음 순서로 복구한다(ADR-011).
+Redis가 랭킹을 잃으면 리더보드별 warm 키(`lb:{leaderboardId}:warm`)도 함께 사라진다. 복구는 애플리케이션 기동 시(`ColdStartRecoveryRunner`)와 스냅샷 워커의 매 주기에 돈다. 둘 다 같은 advisory lock 아래에서 warm 키가 없는 리더보드(cold)를 찾아 아래 3번 스냅샷 복구를 실행한다. 앱이 떠 있는 동안 Redis만 데이터를 잃어도 재시작 없이 다음 주기(최대 약 30초)에 복구된다(ADR-011).
 
 ```
 1. Redis 재시작 → AOF 복구 시도 (everysec 기준, 최대 1초 유실)
@@ -543,6 +551,10 @@ Redis가 랭킹을 잃으면 리더보드별 warm 키(`lb:{leaderboardId}:warm`)
    └── warm 키 생성 후 Write 재개
    └── 복구 범위는 랭킹 Top-1,000이며 멱등키·Redis Stream 상태는 제외
 ```
+
+> **트래픽 게이트**: 복구는 `ApplicationRunner`라 Tomcat이 포트를 연 뒤에 돈다. Boot는 러너가 모두 끝난 뒤에야 readiness를 `ACCEPTING_TRAFFIC`으로 올리므로, 트래픽은 `/actuator/health/readiness` 기준으로 받는다(`ColdStartRecoveryReadinessTest`). 게이트가 없는 로컬 compose에서도 복구 전 쓰기는 warm 키가 없어 Lua가 503으로 거부하므로, 빈 ZSET에 점수가 쌓여 복구를 건너뛰는 일은 없다(ADR-011).
+>
+> 리더보드가 하나라도 있는데 기동 시 Redis에 연결할 수 없으면 복구가 예외를 던져 기동이 실패하고, 재시작은 오케스트레이터에 맡긴다. `snapshots.recovery.enabled=false`면 Redis 없이도 기동한다(`ColdStartRecoveryStartupFailureTest`).
 
 ---
 
@@ -669,7 +681,7 @@ TTL 기본값: **24시간** (일 단위 이벤트 기준)
 - Lua Script를 통한 원자성 보장 (Idempotency + ZINCRBY + Key저장 + XADD 4연산 원자적)
 - Redis Streams를 감사 이벤트 아웃박스로 사용 (score 반영과 원자적 기록)
   - `audit-relay` Consumer Group이 `XREADGROUP`/`XACK`으로 전달 상태를 관리하고, 교체 릴레이는 `XAUTOCLAIM`으로 오래된 PEL을 인계
-  - 평상시에는 Consumer Group 진행 워터마크 기준 `MINID` 트림을 사용하고, `MAXLEN ~ 100000`은 릴레이가 장기간 멈췄을 때 무한 증가를 막는 최후 안전장치
+  - 평상시에는 Consumer Group 진행 워터마크 기준 `MINID` 트림을 사용하고, `MAXLEN ~ 1000000`(`events.audit-stream.max-len`)은 릴레이가 장기간 멈췄을 때 무한 증가를 막는 최후 안전장치. 값은 릴레이 최악 중단 시간(교체 인계 10분 × 피크 1,000/s)에 여유를 더해 잡았다
 
 ### 13.2 PostgreSQL (Cold Path – Source of Record)
 
@@ -850,7 +862,7 @@ GET /internal/circuit-breaker/status
 ### Admin / Seed (테스트 자동화)
 
 ```
-POST /users                   → 테스트/관리용 유저 생성
+POST /users                   → 테스트/관리용 유저 생성 (admin JWT 필요)
 POST /auth/login              → 시드 관리자 externalId + 비밀번호(BCrypt 검증) → admin JWT 발급
 POST /projects                → 프로젝트 생성
 POST /leaderboards            → 리더보드 생성
@@ -859,7 +871,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 또는 Flyway seed SQL로 대체 가능.
 
-> **인증 스코프 메모**: 관리자 계정은 기동 시 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`로만 시드한다(`users.password_hash`가 있는 행이 관리자). 비밀번호 설정이 없으면 관리자를 만들지 않는다. `POST /users`로 만든 유저는 비밀번호가 없어 로그인할 수 없고, 계정 없음·비밀번호 누락·불일치는 같은 401로 응답한다. 관리 API와 `/internal/**` 전체가 같은 admin JWT를 요구하며 `/actuator/**`만 프로브용으로 열어 둔다. `/auth/login` 계약은 `externalId`를 유지하고 `password`만 추가했다.
+> **인증 스코프 메모**: 관리자 계정은 기동 시 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`로만 시드한다(`users.password_hash`가 있는 행이 관리자). 비밀번호 설정이 없으면 관리자를 만들지 않는다. `POST /users`로 만든 유저는 비밀번호가 없어 로그인할 수 없고, 계정 없음·비밀번호 누락·불일치는 같은 401로 응답한다. 관리 API(`POST /projects`, `POST /leaderboards`, `/admin/**`)와 `/users/**`, `/internal/**` 전체가 같은 admin JWT를 요구한다. 경로 판정은 인터셉터 경로 패턴으로 하므로 `;x=1`·퍼센트 인코딩 변형도 같은 규칙을 탄다. 랭킹·프로젝트·리더보드 조회(GET)와 `/actuator/**`(프로브용)는 열어 둔다. `/auth/login` 계약은 `externalId`를 유지하고 `password`만 추가했다.
 
 ---
 
@@ -1052,6 +1064,8 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 **트레이드오프:** PostgreSQL 커넥션을 사용한다. 다만 Snapshot Worker는 30초마다 한 번 실행되므로 커넥션 점유 시간은 짧다. 락 키는 `leaderboardId` UUID의 상·하위 64비트를 XOR한 `long` 값을 사용한다.
 
+**후속 (2026-11-16):** 세션 락 `pg_try_advisory_lock`을 트랜잭션 락 `pg_try_advisory_xact_lock`으로 바꿨다. 캡처는 이미 한 트랜잭션 안에서 돌기 때문에, 캡처 중 SQL 오류로 트랜잭션이 abort되면 `finally`의 `pg_advisory_unlock`이 `25P02`로 실패했다. 락은 풀 커넥션에 남았고, 원래 오류는 unlock 예외에 가려졌다. 다른 커넥션에서 실행된 같은 리더보드 캡처는 그 커넥션이 폐기될 때까지 건너뛰었다. 트랜잭션 락은 커밋·롤백 때 PostgreSQL이 풀기 때문에 unlock 호출이 없어진다. 락 수명은 `SnapshotCaptureExecutionService.execute`의 트랜잭션 경계와 같다. 락 저장소는 트랜잭션 밖에서 호출되면 바로 예외를 던진다. Testcontainers로 abort 뒤 `pg_locks`에 락이 남지 않는 것, 다음 캡처가 락을 잡는 것, 원래 FK 오류가 그대로 올라오는 것을 검증했다. 키 체계는 바꾸지 않았다. bigint 키라 릴레이 리더 락의 두 int 키 `(1, 1)`과는 키 공간이 다르다.
+
 ---
 
 ### ADR-004: Rate Limit 구현 방식
@@ -1135,7 +1149,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 | -------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | audit 유입 (평균)          | 약 3.5/s            | `0. Scenario` 30만 건/일 ÷ 86,400                                                                                                               |
 | audit 유입 (피크)          | 1,000/s             | `0. Scenario` 목표 TPS (시스템 전체값, 리더보드별 아님)                                                                                         |
-| Stream 길이 안전 상한      | 약 8시간 유입량     | `MAXLEN ~ 100000` ÷ 30만 건/일. 평상시 보존 기간은 Consumer Group 워터마크 기반 트림에 따라 더 짧다                                            |
+| Stream 길이 안전 상한      | 평균 약 3.3일, 피크 약 16분 유입량 | `MAXLEN ~ 1000000` ÷ 30만 건/일(평균), ÷ 1,000/s(피크). 평상시 보존 기간은 Consumer Group 워터마크 기반 트림에 따라 더 짧다 |
 | 한 달 보존 시 Redis 메모리 | 약 900MB / 리더보드 | 30일 × 30만 × ~100B                                                                                                                             |
 | 메모리 초과 시 거동        | **write 실패**      | `maxmemory-policy noeviction`                                                                                                                   |
 | Redis 버전                 | 7.x                 | `docker-compose.yml` `redis:7`. `lag`/`entries-read`/`entries-added`는 7.0+ 필드이므로, Streams 쪽 관측 가능 범위는 이 버전 조건에서만 성립한다 |

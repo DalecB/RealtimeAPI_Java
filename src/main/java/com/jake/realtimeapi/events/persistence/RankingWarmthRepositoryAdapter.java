@@ -1,7 +1,7 @@
 package com.jake.realtimeapi.events.persistence;
 
 import com.jake.realtimeapi.events.domain.repository.RankingWarmthRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 

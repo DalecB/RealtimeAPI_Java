@@ -37,7 +37,6 @@ public class AdminAuthApplicationService implements AdminLoginUseCase, Authentic
 
     @Override
     public AdminLoginResult login(AdminLoginCommand command) {
-        // 계정 없음·플레이어 계정·비밀번호 누락·불일치를 모두 같은 예외로 돌려 어느 쪽이 틀렸는지 숨긴다.
         Optional<AdminAccount> account = adminAccountRepository.findByExternalId(command.externalId());
         boolean matched = passwordHasher.matches(command.password(), account.map(AdminAccount::passwordHash).orElse(null));
         if (account.isEmpty() || !matched) {

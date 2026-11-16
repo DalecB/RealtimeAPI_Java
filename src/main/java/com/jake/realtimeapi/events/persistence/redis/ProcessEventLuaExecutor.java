@@ -1,7 +1,7 @@
 package com.jake.realtimeapi.events.persistence.redis;
 
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.infra.metrics.HotPathMetrics;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -21,10 +21,19 @@ public class ProcessEventLuaExecutor {
     private final StringRedisTemplate redisTemplate;
     private final RedisScript<List> processEventScript;
     private final HotPathMetrics hotPathMetrics;
+    private final String auditStreamMaxLen;
 
-    public ProcessEventLuaExecutor(StringRedisTemplate redisTemplate, HotPathMetrics hotPathMetrics) {
+    public ProcessEventLuaExecutor(
+            StringRedisTemplate redisTemplate,
+            HotPathMetrics hotPathMetrics,
+            @Value("${events.audit-stream.max-len}") long auditStreamMaxLen
+    ) {
+        if (auditStreamMaxLen <= 0) {
+            throw new IllegalArgumentException("events.audit-stream.max-len must be positive");
+        }
         this.redisTemplate = redisTemplate;
         this.hotPathMetrics = hotPathMetrics;
+        this.auditStreamMaxLen = Long.toString(auditStreamMaxLen);
 
         DefaultRedisScript<List> script = new DefaultRedisScript<>();
         script.setLocation(new ClassPathResource(SCRIPT_PATH));
@@ -79,7 +88,8 @@ public class ProcessEventLuaExecutor {
                 Long.toString(ttlSeconds),
                 idempotencyValue,
                 Long.toString(apiKeyId),
-                eventUuid.toString()
+                eventUuid.toString(),
+                auditStreamMaxLen
         );
         hotPathMetrics.recordProcessEventLuaDuration(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
 

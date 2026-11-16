@@ -15,7 +15,7 @@ import com.jake.realtimeapi.projects.domain.model.Project;
 import com.jake.realtimeapi.projects.domain.repository.ProjectRepository;
 import com.jake.realtimeapi.snapshots.worker.SnapshotCaptureExecutionResult;
 import com.jake.realtimeapi.snapshots.worker.SnapshotCaptureExecutionService;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import com.jake.realtimeapi.users.domain.model.User;
 import com.jake.realtimeapi.users.domain.repository.UserRepository;

@@ -1,6 +1,5 @@
 package com.jake.realtimeapi.events.persistence.redis;
 
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.events.domain.model.StreamsStatus;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
 import org.springframework.dao.DataAccessException;
@@ -34,13 +33,12 @@ public class RedisAuditStreamStatusRepository implements AuditStreamStatusReposi
     }
 
     private long pendingCount(String key) {
-        // 릴레이가 읽었지만 아직 XACK하지 않은 PEL 크기. 읽기 전 적체는 아래 group lag으로 본다.
         try {
             PendingMessagesSummary summary = redisTemplate.opsForStream()
                     .pending(key, LeaderboardRedisKeyFactory.AUDIT_RELAY_GROUP);
             return summary == null ? 0L : summary.getTotalPendingMessages();
         } catch (DataAccessException ex) {
-            // relay가 아직 그룹을 안 만들었으면(비활성/미기동) 대기 0으로 본다.
+            // 릴레이가 그룹을 아직 안 만들었으면(비활성/미기동) XPENDING이 실패한다. 대기 0으로 본다.
             return 0L;
         }
     }
@@ -58,7 +56,7 @@ public class RedisAuditStreamStatusRepository implements AuditStreamStatusReposi
                 }
             }
         } catch (DataAccessException ex) {
-            // 그룹이 없으면 현재 스트림 전체가 아직 릴레이에 전달되지 않은 상태다.
+            // 그룹이 없으면 스트림 전체가 아직 릴레이에 전달되지 않은 적체다.
         }
         return streamLength;
     }

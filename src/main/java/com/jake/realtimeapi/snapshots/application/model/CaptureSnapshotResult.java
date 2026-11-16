@@ -13,7 +13,6 @@ public record CaptureSnapshotResult(
         // EMPTY(Empty Guard) | SHRUNK(Shrink Guard). 저장했으면 null
         String skipReason
 ) {
-    // Empty Guard에 걸려 저장을 생략한 경우의 표준 결과.
     public static CaptureSnapshotResult skipped(UUID leaderboardId, Instant snapshotAt, int topN) {
         return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, null, 0, true, "EMPTY");
     }
@@ -23,7 +22,6 @@ public record CaptureSnapshotResult(
         return new CaptureSnapshotResult(leaderboardId, snapshotAt, topN, null, rowCount, true, "SHRUNK");
     }
 
-    // 저장이 완료된 경우의 표준 결과.
     public static CaptureSnapshotResult captured(
             UUID leaderboardId,
             Instant snapshotAt,

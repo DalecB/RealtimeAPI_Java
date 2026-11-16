@@ -20,7 +20,7 @@ public class AdminWebMvcConfig implements WebMvcConfigurer {
 
     @Bean
     public AdminAuthenticationInterceptor adminAuthenticationInterceptor() {
-        return new AdminAuthenticationInterceptor(authenticateAdminJwtUseCase);
+        return AdminAuthenticationInterceptor.forPostRequests(authenticateAdminJwtUseCase);
     }
 
     @Bean
@@ -31,9 +31,9 @@ public class AdminWebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(adminAuthenticationInterceptor())
-                .addPathPatterns("/projects", "/leaderboards", "/admin/**");
+                .addPathPatterns("/projects", "/leaderboards");
         registry.addInterceptor(AdminAuthenticationInterceptor.forAllRequests(authenticateAdminJwtUseCase))
-                .addPathPatterns("/internal/**");
+                .addPathPatterns("/admin/**", "/users/**", "/internal/**");
     }
 
     @Override

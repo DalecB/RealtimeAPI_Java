@@ -1,9 +1,10 @@
 package com.jake.realtimeapi.snapshots.persistence.redis;
 
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.snapshots.domain.model.SnapshotRankingRow;
 import com.jake.realtimeapi.snapshots.domain.repository.SnapshotRankingQueryRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
-import com.jake.realtimeapi.support.redis.RankingPageReader;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.RankingPageReader;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 

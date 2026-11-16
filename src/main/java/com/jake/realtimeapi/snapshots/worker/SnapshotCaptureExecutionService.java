@@ -33,27 +33,19 @@ public class SnapshotCaptureExecutionService {
 
     @Transactional
     public SnapshotCaptureExecutionResult execute(UUID leaderboardId, Instant snapshotAt, int topN) {
-        // lockKey를 leaderboard 단위로 고정해 동일 leaderboard의 중복 스냅샷을 차단한다.
-        long lockKey = lockKey(leaderboardId);
-        boolean locked = snapshotExecutionLockRepository.tryLock(lockKey);
+        boolean locked = snapshotExecutionLockRepository.tryLockForCurrentTransaction(lockKey(leaderboardId));
         if (!locked) {
             return SnapshotCaptureExecutionResult.lockNotAcquired();
         }
 
-        try {
-            // Redis가 랭킹을 잃었으면(warm 키 없음) 캡처 전에 먼저 되살린다. 앱이 떠 있는 동안 유실돼도 한 주기 안에 복구된다.
-            RecoverLeaderboardSnapshotResult recovery = recoverLeaderboardSnapshotUseCase.recover(
-                    new RecoverLeaderboardSnapshotCommand(leaderboardId, topN)
-            );
-            // 락을 획득한 실행만 실제 capture usecase를 호출한다.
-            CaptureSnapshotResult result = captureSnapshotUseCase.capture(
-                    new CaptureSnapshotCommand(leaderboardId, snapshotAt, topN)
-            );
-            return SnapshotCaptureExecutionResult.executed(recovery, result);
-        } finally {
-            // 예외 여부와 무관하게 락을 반환한다.
-            snapshotExecutionLockRepository.unlock(lockKey);
-        }
+        // Redis가 랭킹을 잃었으면(warm 키 없음) 캡처 전에 먼저 되살린다. 앱이 떠 있는 동안 유실돼도 한 주기 안에 복구된다.
+        RecoverLeaderboardSnapshotResult recovery = recoverLeaderboardSnapshotUseCase.recover(
+                new RecoverLeaderboardSnapshotCommand(leaderboardId, topN)
+        );
+        CaptureSnapshotResult result = captureSnapshotUseCase.capture(
+                new CaptureSnapshotCommand(leaderboardId, snapshotAt, topN)
+        );
+        return SnapshotCaptureExecutionResult.executed(recovery, result);
     }
 
     /**
@@ -62,15 +54,10 @@ public class SnapshotCaptureExecutionService {
      */
     @Transactional
     public Optional<RecoverLeaderboardSnapshotResult> recover(UUID leaderboardId, int topN) {
-        long lockKey = lockKey(leaderboardId);
-        if (!snapshotExecutionLockRepository.tryLock(lockKey)) {
+        if (!snapshotExecutionLockRepository.tryLockForCurrentTransaction(lockKey(leaderboardId))) {
             return Optional.empty();
         }
-        try {
-            return Optional.of(recoverLeaderboardSnapshotUseCase.recover(new RecoverLeaderboardSnapshotCommand(leaderboardId, topN)));
-        } finally {
-            snapshotExecutionLockRepository.unlock(lockKey);
-        }
+        return Optional.of(recoverLeaderboardSnapshotUseCase.recover(new RecoverLeaderboardSnapshotCommand(leaderboardId, topN)));
     }
 
     static long lockKey(UUID leaderboardId) {

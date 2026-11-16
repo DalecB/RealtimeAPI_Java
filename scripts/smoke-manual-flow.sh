@@ -67,22 +67,10 @@ print_section() {
   printf '\n[%s] %s\n' "smoke" "$1"
 }
 
-# 1. 테스트용 유저 생성.
-# /events 의 userId는 숫자 long 이므로, externalId가 아니라 응답의 내부 id를 저장한다.
-print_section "1. create user"
-USER_RESPONSE="$(json_request POST /users "$(cat <<JSON
-{
-  "externalId":"$USER_EXTERNAL_ID"
-}
-JSON
-)")"
-echo "$USER_RESPONSE" | jq
-USER_ID="$(echo "$USER_RESPONSE" | jq -r '.id')"
-
-# 2. 시드 관리자로 admin login.
+# 1. 시드 관리자로 admin login.
 # POST /users로 만든 플레이어는 비밀번호가 없어 로그인할 수 없다.
-# 여기서 받은 accessToken은 관리 API(/projects, /leaderboards, /admin/api-keys)와 /internal/** 조회에 사용한다.
-print_section "2. admin login"
+# 여기서 받은 accessToken은 관리 API(/users, /projects, /leaderboards, /admin/api-keys)와 /internal/** 조회에 사용한다.
+print_section "1. admin login"
 LOGIN_RESPONSE="$(json_request POST /auth/login "$(jq -n --arg u "$ADMIN_USERNAME" --arg p "$ADMIN_PASSWORD" '{externalId: $u, password: $p}')")"
 echo "$LOGIN_RESPONSE" | jq
 ADMIN_JWT="$(echo "$LOGIN_RESPONSE" | jq -r '.accessToken')"
@@ -90,6 +78,19 @@ if [[ -z "$ADMIN_JWT" || "$ADMIN_JWT" == "null" ]]; then
   echo "[smoke] admin login failed: ADMIN_USERNAME/ADMIN_PASSWORD가 서버 시드 관리자와 같은지 확인하세요" >&2
   exit 1
 fi
+
+# 2. 테스트용 유저 생성.
+# /events 의 userId는 숫자 long 이므로, externalId가 아니라 응답의 내부 id를 저장한다.
+print_section "2. create user"
+USER_RESPONSE="$(json_request POST /users "$(cat <<JSON
+{
+  "externalId":"$USER_EXTERNAL_ID"
+}
+JSON
+)" \
+  -H "Authorization: Bearer $ADMIN_JWT")"
+echo "$USER_RESPONSE" | jq
+USER_ID="$(echo "$USER_RESPONSE" | jq -r '.id')"
 
 # 3. 프로젝트 생성.
 # POST /projects 응답에는 defaultApiKey가 같이 오므로,
@@ -188,7 +189,7 @@ adminJwt=$ADMIN_JWT
 rawApiKey=$RAW_API_KEY
 
 검증 포인트:
-- 시드 관리자로 /auth/login 해서 받은 JWT로 /projects, /leaderboards 가 생성되어야 한다.
+- 시드 관리자로 /auth/login 해서 받은 JWT로 /users, /projects, /leaderboards 가 생성되어야 한다.
 - POST /projects 응답의 defaultApiKey.rawKey로 /events 호출이 성공해야 한다.
 - /leaderboards/{leaderboardId}/tops 와 /users/{userId}가 Hot Path 값을 보여야 한다.
 - /internal/streams/status 가 audit stream 누적 상태를 보여야 한다.

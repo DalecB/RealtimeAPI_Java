@@ -9,7 +9,6 @@ public record CaptureSnapshotCommand(
         int topN
 ) {
     public CaptureSnapshotCommand {
-        // 캡처 실행 단위에 필요한 최소 입력값을 command로 고정한다.
         if (leaderboardId == null) {
             throw new IllegalArgumentException("leaderboardId is required");
         }

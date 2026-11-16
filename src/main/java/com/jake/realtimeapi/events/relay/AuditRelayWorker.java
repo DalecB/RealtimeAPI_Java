@@ -1,9 +1,9 @@
 package com.jake.realtimeapi.events.relay;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jake.realtimeapi.infra.config.AuditTopicConfig;
+import com.jake.realtimeapi.events.kafka.AuditTopicConfig;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XAutoClaimArgs;
 import io.lettuce.core.cluster.api.async.RedisClusterAsyncCommands;
@@ -37,23 +37,12 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-/**
- * Redis audit stream(outbox)에 쌓인 기록을 Kafka로 옮긴다.
- *
- * <p>흐름: 리더보드마다 스트림이 하나이므로 전부 순회하며, 각 스트림에서
- * "받았지만 아직 확인 못 한 것(PEL)"을 먼저 재처리한 뒤 새 기록을 빌 때까지 읽어 Kafka로 produce한다.
- *
- * <p>핵심 순서: <b>produce 성공을 확인한 뒤에만 XACK</b>. 반대로 하면 XACK 직후 produce 전에 죽었을 때
- * PEL에도 없고 Kafka에도 없는 유실이 생긴다. 이 순서 덕에 최악의 경우는 "produce는 됐는데 XACK 전에 죽어
- * 다음 틱에 다시 보냄"(중복)이고, 중복은 소비자 멱등으로 흡수한다.
- */
 @Component
 @ConditionalOnProperty(name = "events.relay.enabled", havingValue = "true")
 public class AuditRelayWorker {
 
     private static final Logger log = LoggerFactory.getLogger(AuditRelayWorker.class);
 
-    // 트림 워커·상태 조회도 같은 그룹을 참조한다. 이름은 LeaderboardRedisKeyFactory가 단일 소유.
     public static final String GROUP = LeaderboardRedisKeyFactory.AUDIT_RELAY_GROUP;
     private static final String SCHEMA_VERSION_HEADER = "schema-version";
     private static final byte[] SCHEMA_VERSION = "1".getBytes(StandardCharsets.UTF_8);
@@ -67,7 +56,6 @@ public class AuditRelayWorker {
     private final Map<UUID, String> claimCursors = new ConcurrentHashMap<>();
     private final AuditRelayLeaderLock leaderLock;
 
-    // 기본 재시작은 같은 이름을 쓰고, 교체 인계 검증은 설정으로 A/B/C 이름을 명시한다.
     private final String consumerName;
 
     public AuditRelayWorker(
@@ -90,9 +78,9 @@ public class AuditRelayWorker {
         this.leaderLock = leaderLock;
     }
 
-    @Scheduled(fixedDelayString = "${events.relay.delay-ms:5000}")
+    @Scheduled(fixedDelayString = "${events.relay.delay-ms:5000}", scheduler = AuditRelaySchedulerConfig.SCHEDULER)
     public void relayAll() {
-        // 모든 인스턴스가 틱을 돌지만 락을 쥔 하나만 옮긴다. 리더보드별 순서는 활성 릴레이가 하나일 때만 지켜진다.
+        // 리더보드별 순서는 활성 릴레이가 하나일 때만 지켜지므로 락을 쥔 인스턴스만 옮긴다.
         if (!leaderLock.isLeader()) {
             log.debug("relay skipped not-leader consumer={}", consumerName);
             return;
@@ -100,8 +88,7 @@ public class AuditRelayWorker {
         for (UUID leaderboardId : leaderboardRepository.findAllIds()) {
             try {
                 relayOne(leaderboardId);
-            } catch (DataAccessException ex) {
-                // 한 스트림의 실패가 나머지 리더보드 처리를 막지 않게 격리한다. 다음 틱에 재시도된다.
+            } catch (RuntimeException ex) {
                 log.error("relay failed leaderboardId={}", leaderboardId, ex);
             }
         }
@@ -111,24 +98,19 @@ public class AuditRelayWorker {
         String streamKey = LeaderboardRedisKeyFactory.auditStreamKey(leaderboardId);
         ensureGroup(streamKey);
 
-        // 1) PEL 재처리: 받았지만 XACK 못 한 것(크래시로 멈춘 것)을 먼저 다시 보낸다.
-        //    ReadOffset "0" = 이 컨슈머의 PEL을 처음부터 재조회한다(새 기록이 아니라).
+        // XREADGROUP에 "0"을 주면 새 기록이 아니라 이 컨슈머의 PEL을 처음부터 돌려준다.
         int recovered = relayBatch(leaderboardId, streamKey, ReadOffset.from("0"), batchSize);
 
-        // 2) 다른 릴레이가 남긴 오래된 PEL을 현재 릴레이로 인계한다.
         int remainingRecoveryCapacity = batchSize - recovered;
         if (remainingRecoveryCapacity > 0) {
             relayClaimedBatch(leaderboardId, streamKey, remainingRecoveryCapacity);
         }
 
-        // 3) 새 기록: 빌 때까지 반복해서 읽는다. 한 번에 가져오는 수를 고정하면
-        //    유입이 그보다 많을 때 밀린 양이 줄지 않는다.
+        // 틱당 한 배치만 읽으면 유입이 배치보다 많을 때 밀린 양이 줄지 않아 빌 때까지 읽는다.
         while (relayBatch(leaderboardId, streamKey, ReadOffset.lastConsumed(), batchSize) > 0) {
-            // 계속 드레인
         }
     }
 
-    /** 한 배치를 읽어 모두 produce한 뒤, 성공한 것만 XACK 한다. 읽은 건수를 반환한다. */
     private int relayBatch(UUID leaderboardId, String streamKey, ReadOffset offset, int count) {
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
                 Consumer.from(GROUP, consumerName),
@@ -208,7 +190,7 @@ public class AuditRelayWorker {
             return 0;
         }
 
-        // 먼저 전부 보낸다(응답은 기다리지 않는다). key = leaderboardId → 같은 리더보드는 같은 파티션.
+        // key를 leaderboardId로 둬야 같은 리더보드가 한 파티션에 모여 순서가 지켜진다.
         String partitionKey = leaderboardId.toString();
         List<CompletableFuture<SendResult<String, String>>> futures = new ArrayList<>(records.size());
         for (AuditStreamRecord record : records) {
@@ -219,7 +201,7 @@ public class AuditRelayWorker {
         }
         kafkaTemplate.flush();
 
-        // 성공을 확인한 것만 XACK 한다. 실패한 것은 PEL에 남겨 다음 틱에 재시도한다.
+        // produce 성공을 확인한 것만 XACK한다. 먼저 XACK하면 produce 전에 죽었을 때 PEL에도 Kafka에도 없이 유실된다.
         List<String> acknowledged = new ArrayList<>(records.size());
         for (int i = 0; i < records.size(); i++) {
             try {
@@ -232,6 +214,11 @@ public class AuditRelayWorker {
         if (!acknowledged.isEmpty()) {
             redisTemplate.opsForStream().acknowledge(streamKey, GROUP, acknowledged.toArray(new String[0]));
         }
+        if (acknowledged.size() < records.size()) {
+            // 실패 뒤에도 계속 읽으면 장애 동안 틱이 유입이 멈출 때까지 끝나지 않으므로, 이 리더보드는 다음 틱에 PEL부터 다시 시도한다.
+            throw new IllegalStateException("relay batch publish failed streamKey=" + streamKey
+                    + " failed=" + (records.size() - acknowledged.size()) + "/" + records.size());
+        }
         return records.size();
     }
 
@@ -240,25 +227,22 @@ public class AuditRelayWorker {
 
     private void ensureGroup(String streamKey) {
         try {
-            // ReadOffset "0": 그룹 생성 전에 이미 쌓인 기록도 처음부터 배달받는다. latest()로 만들면 이전 것을 놓친다.
+            // latest()로 만들면 그룹 생성 전에 쌓인 기록을 놓치므로 "0"부터 받는다.
             redisTemplate.opsForStream().createGroup(streamKey, ReadOffset.from("0"), GROUP);
         } catch (DataAccessException ex) {
-            // 이미 그룹이 있으면(BUSYGROUP) 정상 흐름이다. 스트림이 아직 없으면 옮길 것도 없으니 다음 틱에 다시 시도한다.
+            // BUSYGROUP(이미 있음)과 스트림 없음은 정상이라 삼킨다. 스트림이 생기면 다음 틱에 만든다.
             log.debug("relay group ensure skipped streamKey={} ({})", streamKey, ex.getMessage());
         }
     }
 
     private String toJson(String eventId, Map<Object, Object> fields) {
-        // 스트림 필드는 문자열 쌍이다. 순서를 유지해 직렬화한다.
-        // eventId(스트림 엔트리 ID)를 함께 실어 컨슈머가 (leaderboardId, eventId)로 전송 중복을 걸러낸다.
-        // 엔트리 ID는 한 리더보드 스트림 안에서만 고유하므로 leaderboardId(=Kafka 키)와 짝으로만 유일하다.
+        // 엔트리 ID는 한 리더보드 스트림 안에서만 고유해 컨슈머는 leaderboardId(Kafka 키)와 짝으로 중복을 거른다.
         Map<String, String> ordered = new LinkedHashMap<>();
         ordered.put("eventId", eventId);
         fields.forEach((k, v) -> ordered.put(String.valueOf(k), String.valueOf(v)));
         try {
             return objectMapper.writeValueAsString(ordered);
         } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
-            // 필드가 문자열 맵이라 실질적으로 발생하지 않지만, 발생 시 이 기록은 배치를 막지 않도록 예외로 올린다.
             throw new IllegalStateException("failed to serialize audit record: " + ordered, ex);
         }
     }
