@@ -1,4 +1,4 @@
--- KEYS = idempotency, ranking(z), audit stream / ARGV = userId, deltaScore, ttlSeconds, idempotencyRecord, apiKeyId, idempotencyKey
+-- KEYS = idempotency, ranking(z), audit stream / ARGV = userId, deltaScore, ttlSeconds, idempotencyRecord, apiKeyId, idempotencyKey, auditStreamMaxLen
 
 local existing = redis.call('GET', KEYS[1])
 if existing then
@@ -9,7 +9,7 @@ if existing then
     if existingHash and incomingHash and existingHash ~= incomingHash then
         redis.call(
             'XADD', KEYS[3], 
-            'MAXLEN', '~', 100000, '*', 
+            'MAXLEN', '~', ARGV[7], '*', 
             'type', 'conflict', 
             'userId', ARGV[1], 
             'delta', ARGV[2], 
@@ -26,7 +26,7 @@ redis.call('SET', KEYS[1], ARGV[4], 'EX', tonumber(ARGV[3]))
 
 redis.call(
     'XADD', KEYS[3], 
-    'MAXLEN', '~', 100000, '*', 
+    'MAXLEN', '~', ARGV[7], '*', 
     'type', 'new', 
     'userId', ARGV[1], 
     'delta', ARGV[2], 
