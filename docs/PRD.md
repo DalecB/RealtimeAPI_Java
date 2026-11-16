@@ -297,7 +297,9 @@ rank = ZCOUNT(lb:{leaderboardId}:z, ({myScore}, +inf]) + 1
 
 ### 5.2 동점 내 정렬 (Tie-break)
 
-Redis ZSET은 동일 score에 대해 member 값의 **lex 오름차순**으로 정렬한다. member = userId이므로 동점 시 userId lex 오름차순이 tie-break 기준이 된다. 별도 "먼저 등록 순" tie-break는 구현하지 않는다.
+동점은 **userId 숫자 오름차순**으로 정렬한다. 별도 "먼저 등록 순" tie-break는 구현하지 않는다.
+
+Redis ZSET은 동점을 member 문자열 순서로 두고, `ZREVRANGE`는 그 역순으로 반환한다. member는 0으로 채우지 않은 userId 문자열이라 문자열 순서와 숫자 순서가 다르다(`"9"`가 `"10"`보다 뒤). 그래서 조회와 스냅샷 캡처는 페이지에 걸친 점수 구간을 동점 그룹째 읽어 userId 숫자 순으로 다시 정렬한다. 스냅샷 조회(`ORDER BY rank, user_id`)도 같은 순서라, Redis와 snapshot fallback이 같은 순서로 응답한다. 비용은 페이지 끝에 걸친 동점 그룹 크기에 비례한다.
 
 ### 5.3 deltaScore 정책
 

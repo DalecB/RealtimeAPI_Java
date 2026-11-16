@@ -4,14 +4,12 @@ import com.jake.realtimeapi.events.domain.model.TopRankItem;
 import com.jake.realtimeapi.events.domain.model.UserRankResult;
 import com.jake.realtimeapi.events.domain.repository.RankingQueryRepository;
 import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.support.redis.RankingPageReader;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -25,39 +23,9 @@ public class RankingQueryRepositoryAdapter implements RankingQueryRepository {
 
     @Override
     public List<TopRankItem> findTopByLeaderboardId(UUID leaderboardId, int offset, int limit) {
-        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
-        long end = (long) offset + limit - 1;
-
-        Set<ZSetOperations.TypedTuple<String>> tuples = redisTemplate.opsForZSet().reverseRangeWithScores(key, offset, end);
-        if (tuples == null || tuples.isEmpty()) {
-            return List.of();
-        }
-
-        List<TopRankItem> items = new ArrayList<>(tuples.size());
-        Double previousScore = null;
-        long currentRank = 0L;
-        int indexInPage = 0;
-
-        for (ZSetOperations.TypedTuple<String> tuple : tuples) {
-            if (tuple == null || tuple.getValue() == null || tuple.getScore() == null) {
-                continue;
-            }
-
-            long userId = UserIdCodec.parse(tuple.getValue());
-            double score = tuple.getScore();
-
-            if (indexInPage == 0) {
-                currentRank = computeCompetitionRank(key, score);
-            } else if (!scoreEquals(previousScore, score)) {
-                currentRank = (long) offset + indexInPage + 1;
-            }
-
-            items.add(new TopRankItem(Math.toIntExact(currentRank), userId, toLongScore(score)));
-            previousScore = score;
-            indexInPage++;
-        }
-
-        return items;
+        return RankingPageReader.read(redisTemplate, LeaderboardRedisKeyFactory.rankingKey(leaderboardId), offset, limit).stream()
+                .map(entry -> new TopRankItem(entry.rank(), entry.userId(), entry.score()))
+                .toList();
     }
 
     @Override
@@ -96,7 +64,4 @@ public class RankingQueryRepositoryAdapter implements RankingQueryRepository {
         return converted;
     }
 
-    private boolean scoreEquals(Double left, double right) {
-        return left != null && Double.compare(left, right) == 0;
-    }
 }

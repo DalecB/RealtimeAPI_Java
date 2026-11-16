@@ -41,54 +41,6 @@ class RankingQueryRepositoryAdapterTest {
     }
 
     @Test
-    void findTopByLeaderboardId_returnsCompetitionRanksUsingRedisSortedSet() {
-        UUID leaderboardId = UUID.randomUUID();
-        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
-
-        Set<ZSetOperations.TypedTuple<String>> tuples = new LinkedHashSet<>();
-        tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(10L), 1000.0));
-        tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(20L), 800.0));
-        tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(30L), 800.0));
-
-        when(zSetOperations.reverseRangeWithScores(key, 0, 2)).thenReturn(tuples);
-        when(zSetOperations.count(key, 1000.0, Double.POSITIVE_INFINITY)).thenReturn(1L);
-        when(zSetOperations.count(key, 1000.0, 1000.0)).thenReturn(1L);
-
-        List<TopRankItem> result = repository.findTopByLeaderboardId(leaderboardId, 0, 3);
-
-        assertEquals(
-                List.of(
-                        new TopRankItem(1, 10L, 1000L),
-                        new TopRankItem(2, 20L, 800L),
-                        new TopRankItem(2, 30L, 800L)
-                ),
-                result
-        );
-        verify(zSetOperations).reverseRangeWithScores(key, 0, 2);
-    }
-
-    @Test
-    void findTopByLeaderboardId_usesOffsetAndEndRangeFromLimit() {
-        UUID leaderboardId = UUID.randomUUID();
-        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
-
-        Set<ZSetOperations.TypedTuple<String>> tuples = new LinkedHashSet<>();
-        tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(40L), 700.0));
-        tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(50L), 650.0));
-
-        when(zSetOperations.reverseRangeWithScores(key, 3, 4)).thenReturn(tuples);
-        when(zSetOperations.count(key, 700.0, Double.POSITIVE_INFINITY)).thenReturn(4L);
-        when(zSetOperations.count(key, 700.0, 700.0)).thenReturn(1L);
-
-        List<TopRankItem> result = repository.findTopByLeaderboardId(leaderboardId, 3, 2);
-
-        assertEquals(2, result.size());
-        assertEquals(new TopRankItem(4, 40L, 700L), result.get(0));
-        assertEquals(new TopRankItem(5, 50L, 650L), result.get(1));
-        verify(zSetOperations).reverseRangeWithScores(key, 3, 4);
-    }
-
-    @Test
     void findUserRank_returnsNullRankAndZeroScoreWhenUserDoesNotExist() {
         UUID leaderboardId = UUID.randomUUID();
         String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
@@ -114,23 +66,5 @@ class RankingQueryRepositoryAdapterTest {
         UserRankResult result = repository.findUserRank(leaderboardId, 20L);
 
         assertEquals(new UserRankResult(20L, 800L, 2), result);
-    }
-
-    @Test
-    void findTopByLeaderboardId_rejectsNonIntegerScore() {
-        UUID leaderboardId = UUID.randomUUID();
-        String key = LeaderboardRedisKeyFactory.rankingKey(leaderboardId);
-
-        Set<ZSetOperations.TypedTuple<String>> tuples = new LinkedHashSet<>();
-        tuples.add(ZSetOperations.TypedTuple.of(UserIdCodec.format(10L), 1000.5));
-
-        when(zSetOperations.reverseRangeWithScores(key, 0, 0)).thenReturn(tuples);
-        when(zSetOperations.count(key, 1000.5, Double.POSITIVE_INFINITY)).thenReturn(1L);
-        when(zSetOperations.count(key, 1000.5, 1000.5)).thenReturn(1L);
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> repository.findTopByLeaderboardId(leaderboardId, 0, 1)
-        );
     }
 }
