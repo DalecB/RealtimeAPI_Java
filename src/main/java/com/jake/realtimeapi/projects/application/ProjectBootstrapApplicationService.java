@@ -28,7 +28,6 @@ public class ProjectBootstrapApplicationService implements CreateProjectWithDefa
 
     @Override
     public CreatedProjectWithApiKeyResult create(CreateProjectCommand command) {
-        // 프로젝트 생성 직후 바로 사용할 수 있도록 기본 API key 1개를 함께 부트스트랩한다.
         Project project = createProjectUseCase.create(command);
         IssuedApiKeyResult defaultApiKey = createApiKeyUseCase.create(
                 new CreateApiKeyCommand(project.id(), project.adminId(), null, null, null)

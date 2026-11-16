@@ -9,9 +9,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-/**
- * 관리자 계정은 이 시드로만 만든다. 비밀번호 설정이 없으면 아무 계정도 만들지 않는다.
- */
 @Component
 public class AdminBootstrapRunner implements ApplicationRunner {
 

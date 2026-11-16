@@ -22,10 +22,7 @@ public class AdminAuthenticationInterceptor implements HandlerInterceptor {
         this.authenticateAllRequests = authenticateAllRequests;
     }
 
-    /**
-     * 등록된 경로 패턴에 걸린 요청은 메서드·URI 문자열과 무관하게 모두 인증한다.
-     * 원본 URI 비교는 인코딩(%69nternal)이나 ;matrix 변형으로 우회될 수 있어 /internal/**에는 쓰지 않는다.
-     */
+    // 원본 URI 문자열 비교는 %69nternal·;matrix 변형으로 우회되므로 /internal/**에는 쓰지 않는다.
     public static AdminAuthenticationInterceptor forAllRequests(AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase) {
         return new AdminAuthenticationInterceptor(authenticateAdminJwtUseCase, true);
     }

@@ -41,8 +41,7 @@ public class UsageStatsRecorder {
     }
 
     public void recordIdempotencyConflict(long apiKeyId, Instant occurredAt) {
-        // Conflict requests passed auth/rate-limit and reached the Redis hot path,
-        // but did not mutate state because the payload hash mismatched an existing idempotency key.
+        // 충돌 요청은 인증·rate limit을 통과해 hot path까지 갔으므로 blocked가 아니라 allowed로 센다.
         record(apiKeyId, occurredAt, 1, 1, 0, 0, 0, 1);
     }
 

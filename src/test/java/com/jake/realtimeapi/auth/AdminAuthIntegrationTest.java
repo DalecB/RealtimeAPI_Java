@@ -20,7 +20,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 시드 관리자 + BCrypt 로그인 + /internal/** JWT 보호를 실제 서버(Tomcat)에 붙여 확인한다.
  * 우회 경로 검증은 원본 URI가 그대로 전달돼야 하므로 MockMvc 대신 HttpClient를 쓴다.
  */
 @Import(TestcontainersConfiguration.class)
@@ -109,8 +108,7 @@ class AdminAuthIntegrationTest {
 
     @Test
     void internal_cannotBeBypassedWithEncodedOrMatrixPath() throws Exception {
-        // 이 경로들은 Spring이 /internal/audit-events/count 핸들러로 라우팅한다(토큰이 있으면 200).
-        // 원본 URI 문자열 비교였다면 인증을 건너뛰었을 변형이다.
+        // 이 변형들도 Spring이 같은 핸들러로 라우팅하므로 토큰이 있으면 200이어야 한다.
         String authorization = "Bearer " + adminToken();
         for (String path : List.of(
                 "/%69nternal/audit-events/count",

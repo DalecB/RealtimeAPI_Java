@@ -18,7 +18,6 @@ public interface LeaderboardRepository {
 
     List<Leaderboard> findByProjectId(UUID projectId);
 
-    // Snapshot worker가 전체 leaderboard를 순회할 때 사용한다.
     List<UUID> findAllIds();
 
     long count();
