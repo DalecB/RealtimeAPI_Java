@@ -837,7 +837,7 @@ GET /internal/circuit-breaker/status
 ### Admin / Seed (테스트 자동화)
 
 ```
-POST /users                   → 테스트/관리용 유저 생성
+POST /users                   → 테스트/관리용 유저 생성 (admin JWT 필요)
 POST /auth/login              → 시드 관리자 externalId + 비밀번호(BCrypt 검증) → admin JWT 발급
 POST /projects                → 프로젝트 생성
 POST /leaderboards            → 리더보드 생성
@@ -846,7 +846,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 또는 Flyway seed SQL로 대체 가능.
 
-> **인증 스코프 메모**: 관리자 계정은 기동 시 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`로만 시드한다(`users.password_hash`가 있는 행이 관리자). 비밀번호 설정이 없으면 관리자를 만들지 않는다. `POST /users`로 만든 유저는 비밀번호가 없어 로그인할 수 없고, 계정 없음·비밀번호 누락·불일치는 같은 401로 응답한다. 관리 API와 `/internal/**` 전체가 같은 admin JWT를 요구하며 `/actuator/**`만 프로브용으로 열어 둔다. `/auth/login` 계약은 `externalId`를 유지하고 `password`만 추가했다.
+> **인증 스코프 메모**: 관리자 계정은 기동 시 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`로만 시드한다(`users.password_hash`가 있는 행이 관리자). 비밀번호 설정이 없으면 관리자를 만들지 않는다. `POST /users`로 만든 유저는 비밀번호가 없어 로그인할 수 없고, 계정 없음·비밀번호 누락·불일치는 같은 401로 응답한다. 관리 API(`POST /projects`, `POST /leaderboards`, `/admin/**`)와 `/users/**`, `/internal/**` 전체가 같은 admin JWT를 요구한다. 경로 판정은 인터셉터 경로 패턴으로 하므로 `;x=1`·퍼센트 인코딩 변형도 같은 규칙을 탄다. 랭킹·프로젝트·리더보드 조회(GET)와 `/actuator/**`(프로브용)는 열어 둔다. `/auth/login` 계약은 `externalId`를 유지하고 `password`만 추가했다.
 
 ---
 

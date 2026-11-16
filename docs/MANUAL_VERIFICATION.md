@@ -46,10 +46,41 @@ SPRING_PROFILES_ACTIVE=local SPRING_DATA_REDIS_PORT=6370 ./gradlew bootRun
 - Kafka: `localhost:29092`
 - local profile 기준으로 snapshot worker가 활성화된다.
 
-## 2. 유저 생성
+## 2. admin login
+
+관리자 계정은 앱 기동 시 `app.admin.bootstrap.username`/`app.admin.bootstrap.password`(환경 변수 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`)로만 만들어진다. local 프로필과 docker compose의 개발용 기본값은 `admin` / `local-admin-password`다. 비밀번호를 설정하지 않으면 관리자 계정이 생기지 않는다.
+
+```bash
+curl -s -X POST http://localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "externalId":"admin",
+    "password":"local-admin-password"
+  }'
+```
+
+기대 결과:
+- 응답에 `accessToken`이 생성된다.
+- 이후 관리 API(`POST /projects`, `POST /leaderboards`, `POST /admin/api-keys`)와 모든 `/users/**`, `/internal/**` 호출은 이 JWT를 `Authorization: Bearer ...`로 사용한다.
+- 3번에서 `POST /users`로 만드는 유저는 비밀번호가 없어 로그인할 수 없다. 비밀번호가 틀리거나 빠진 경우도 없는 계정과 똑같이 `401 INVALID_ADMIN_AUTH`(`admin login is invalid`)로 응답한다.
+
+예시 응답:
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "tokenType": "Bearer",
+  "expiresAt": "2026-03-19T02:00:00Z",
+  "userId": 1,
+  "externalId": "admin"
+}
+```
+
+## 3. 유저 생성
 
 ```bash
 curl -s -X POST http://localhost:8080/users \
+  -H "Authorization: Bearer <ADMIN_JWT>" \
   -H 'Content-Type: application/json' \
   -d '{
     "externalId":"manual-user-101"
@@ -67,36 +98,6 @@ curl -s -X POST http://localhost:8080/users \
   "id": 1,
   "externalId": "manual-user-101",
   "createdAt": "2026-03-19T01:00:00Z"
-}
-```
-
-## 3. admin login
-
-관리자 계정은 앱 기동 시 `app.admin.bootstrap.username`/`app.admin.bootstrap.password`(환경 변수 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`)로만 만들어진다. local 프로필과 docker compose의 개발용 기본값은 `admin` / `local-admin-password`다. 비밀번호를 설정하지 않으면 관리자 계정이 생기지 않는다.
-
-```bash
-curl -s -X POST http://localhost:8080/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "externalId":"admin",
-    "password":"local-admin-password"
-  }'
-```
-
-기대 결과:
-- 응답에 `accessToken`이 생성된다.
-- 이후 관리 API(`POST /projects`, `POST /leaderboards`, `POST /admin/api-keys`)와 모든 `/internal/**` 조회는 이 JWT를 `Authorization: Bearer ...`로 사용한다.
-- 2번에서 `POST /users`로 만든 유저는 비밀번호가 없어 로그인할 수 없다. 비밀번호가 틀리거나 빠진 경우도 없는 계정과 똑같이 `401 INVALID_ADMIN_AUTH`(`admin login is invalid`)로 응답한다.
-
-예시 응답:
-
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "tokenType": "Bearer",
-  "expiresAt": "2026-03-19T02:00:00Z",
-  "userId": 1,
-  "externalId": "admin"
 }
 ```
 
@@ -334,6 +335,20 @@ curl -i -X POST http://localhost:8080/projects \
 
 기대 결과:
 - `401 INVALID_ADMIN_AUTH`
+
+### 경로 변형으로 관리자 인증 우회 시도
+
+```bash
+curl -i -X POST 'http://localhost:8080/projects;x=1' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name":"bypass-project"
+  }'
+curl -i 'http://localhost:8080/%75sers'
+```
+
+기대 결과:
+- 둘 다 `401 INVALID_ADMIN_AUTH`(500이 아니다). 관리자 경로는 인터셉터 경로 패턴으로 판정하므로 `;x=1`·퍼센트 인코딩 변형도 원래 경로와 같은 인증을 탄다.
 
 ### API key 없이 호출
 
