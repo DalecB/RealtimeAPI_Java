@@ -101,7 +101,7 @@ Lua의 4연산 원자성을 유지하되, 스트림의 역할을 **최종 저장
 
 멱등키가 존재하는 재요청은 정상적인 클라이언트 재시도이며 이상 탐지 신호로서 값이 낮다. 건수는 `idempotency_hit_total`로 이미 계측되고 있으므로 추세 파악은 가능하다.
 
-현재 Lua는 멱등키가 존재하면 XADD 전에 early return 하므로 **이 동작은 기존 코드 그대로다**(`process_event.lua:10-16`, `ProcessEventConcurrencyTest`가 동시 50건에 `XLEN = 1`을 단언).
+현재 Lua는 멱등키가 존재하면 XADD 전에 early return 하므로 **이 동작은 기존 코드 그대로다**(`process_event.lua`의 멱등키 조회 분기, `ProcessEventConcurrencyTest`가 동시 50건에 `XLEN = 1`을 단언).
 
 ### 409(멱등키 재사용 충돌): Lua에서 기록
 
