@@ -14,9 +14,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class UsageStatsRecorder {
@@ -25,8 +23,7 @@ public class UsageStatsRecorder {
     private static final Logger log = LoggerFactory.getLogger(UsageStatsRecorder.class);
 
     private final UsageStatsRepository usageStatsRepository;
-    private final AtomicReference<ConcurrentHashMap<UsageStatsKey, UsageStatsDelta>> pendingDeltas =
-            new AtomicReference<>(new ConcurrentHashMap<>());
+    private final ConcurrentHashMap<UsageStatsKey, UsageStatsDelta> pendingDeltas = new ConcurrentHashMap<>();
 
     public UsageStatsRecorder(UsageStatsRepository usageStatsRepository) {
         this.usageStatsRepository = usageStatsRepository;
@@ -67,7 +64,7 @@ public class UsageStatsRecorder {
                     idempotencyMissCount,
                     idempotencyConflictCount
             );
-            pendingDeltas.get().merge(keyOf(delta), delta, UsageStatsRecorder::merge);
+            pendingDeltas.merge(keyOf(delta), delta, UsageStatsRecorder::merge);
         }
     }
 
@@ -76,23 +73,23 @@ public class UsageStatsRecorder {
             initialDelayString = "${app.usage-stats.flush-initial-delay-ms:1000}"
     )
     public void flushPending() {
-        Map<UsageStatsKey, UsageStatsDelta> snapshot = pendingDeltas.getAndSet(new ConcurrentHashMap<>());
-        if (snapshot.isEmpty()) {
-            return;
-        }
-
-        for (Map.Entry<UsageStatsKey, UsageStatsDelta> entry : snapshot.entrySet()) {
+        // 실패해 다시 넣은 엔트리를 같은 순회에서 또 만나면 DB 장애 동안 끝나지 않으므로 키 사본을 순회한다.
+        for (UsageStatsKey key : List.copyOf(pendingDeltas.keySet())) {
+            UsageStatsDelta delta = pendingDeltas.remove(key);
+            if (delta == null) {
+                continue;
+            }
             try {
-                usageStatsRepository.increment(entry.getValue());
+                usageStatsRepository.increment(delta);
             } catch (RuntimeException exception) {
                 log.warn(
                         "usage-stats.flush failed apiKeyId={} bucketType={} bucketStart={}",
-                        entry.getKey().apiKeyId(),
-                        entry.getKey().bucketType(),
-                        entry.getKey().bucketStart(),
+                        key.apiKeyId(),
+                        key.bucketType(),
+                        key.bucketStart(),
                         exception
                 );
-                pendingDeltas.get().merge(entry.getKey(), entry.getValue(), UsageStatsRecorder::merge);
+                pendingDeltas.merge(key, delta, UsageStatsRecorder::merge);
             }
         }
     }
