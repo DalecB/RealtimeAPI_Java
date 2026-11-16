@@ -127,7 +127,7 @@ PRD `7.2 Lua 제약 조건`의 반복문 금지를 지키기 위해, 구분자 �
 
 워터마크는 현재 단일 릴레이에서도 **그룹 전체** 기준으로 계산한다. 이 기준은 향후 릴레이가 여러 개가 되어도 한 인스턴스의 진행 지점만 보고 다른 인스턴스가 처리 중인 엔트리를 지우지 않게 한다. 단, 트림의 다중 인스턴스 안전성과 중단된 릴레이가 남긴 미처리 메시지 인계는 별개다. 후자는 Phase 2에서 지원하지 않는다.
 
-기존 `MAXLEN ~ 100000`은 그대로 둔다. 릴레이가 영구히 멈췄을 때 무한 증식을 막는 최후 방어선이다.
+`MAXLEN ~`은 릴레이가 오래 멈췄을 때 무한 증식을 막는 최후 방어선으로 남긴다. 값은 `events.audit-stream.max-len=1000000`이고 릴레이 최악 중단 시간에 맞췄다. 교체 릴레이는 `min-idle-time` 10분 뒤에 인계하므로 피크 1,000/s 단일 스트림이면 60만 건이 쌓인다. 여기에 여유를 더해 100만 건(피크 기준 약 16분, 스트림당 약 69MB)으로 잡았다. 이전 값 10만 건은 피크 기준 약 100초라 PostgreSQL·Kafka 단기 장애에서도 미전달 기록이 지워졌다(2026-11-16 변경). 16분을 넘는 중단에서는 여전히 오래된 미전달 기록부터 지워진다. `AuditStreamMaxLenTest`가 상한 아래 무손실과 상한 초과 시 오래된 기록 삭제를 고정한다.
 
 ### 릴레이 구성값
 
@@ -269,7 +269,7 @@ PostgreSQL 재시도는 10초부터 시작해 기준 간격을 2배씩 늘리고
 5~10초 → 10~20초 → 20~40초 → 40~80초 → 80~160초 → 150~300초 → 이후 150~300초
 ```
 
-**DB 장애 중에는 릴레이도 멈춘다.** 릴레이는 매 틱 시작 시 PostgreSQL에서 리더보드 목록(`findAllIds()`)을 읽고 리더 락을 확인하므로, PostgreSQL에 연결할 수 없으면 해당 틱에서 아무것도 옮기지 않는다. 장애 동안 새 감사 기록은 Redis Stream에 쌓이고, 이미 Kafka에 있던 메시지는 Kafka 컨슈머 지연으로 남는다. DB가 복구되면 릴레이는 Stream 적체를 옮기고, 컨슈머는 미커밋 배치부터 재개한다. 적체가 `MAXLEN ~ 100000`을 넘으면 옮기지 못한 오래된 기록부터 지워진다(피크 1,000/s 기준 약 100초). PostgreSQL pause/unpause 통합 테스트(`postgresOutage_keepsAssignmentAndOffset_thenStoresSameBatchAfterRecovery`)는 Kafka에 직접 발행한 메시지로 컨슈머만 검증했고 릴레이는 실행하지 않았다.
+**DB 장애 중에는 릴레이도 멈춘다.** 릴레이는 매 틱 시작 시 PostgreSQL에서 리더보드 목록(`findAllIds()`)을 읽고 리더 락을 확인하므로, PostgreSQL에 연결할 수 없으면 해당 틱에서 아무것도 옮기지 않는다. 장애 동안 새 감사 기록은 Redis Stream에 쌓이고, 이미 Kafka에 있던 메시지는 Kafka 컨슈머 지연으로 남는다. DB가 복구되면 릴레이는 Stream 적체를 옮기고, 컨슈머는 미커밋 배치부터 재개한다. 적체가 `events.audit-stream.max-len`(100만 건)을 넘으면 옮기지 못한 오래된 기록부터 지워진다(피크 1,000/s 기준 약 16분). PostgreSQL pause/unpause 통합 테스트(`postgresOutage_keepsAssignmentAndOffset_thenStoresSameBatchAfterRecovery`)는 Kafka에 직접 발행한 메시지로 컨슈머만 검증했고 릴레이는 실행하지 않았다.
 
 무기한 재시도는 자동 복구를 100% 보장한다는 뜻이 아니다. 방화벽·DNS·자격 증명 오류가 연결 예외로 나타나면 운영자 조치 전까지 계속 실패할 수 있다. 이 정책의 목적은 재시도가 안전한 동안 오프셋을 보존하고, DB가 복구됐을 때 별도 데이터 이동 없이 자동 재개하는 것이다. `(leaderboard_id, event_id)` 고유 제약과 `ON CONFLICT DO NOTHING`이 같은 배치의 중복 저장을 흡수한다.
 
@@ -341,6 +341,19 @@ PostgreSQL 재시도는 10초부터 시작해 기준 간격을 2배씩 늘리고
 Redis Stream에서 아직 읽지 않은 항목은 `XINFO GROUPS`의 `lag`, 읽었지만 XACK하지 않은 항목은 `XPENDING`으로 확인한다. 릴레이가 읽기 전에 멈추면 XPENDING 건수는 늘지 않으므로 두 값을 함께 봐야 한다.
 
 현재 `/internal/streams/status`는 릴레이 미수신 건수(`consumerGroupLag`), 미확인 건수(`pendingEntries`), 전체 길이(`streamLength`)를 제공한다. Prometheus에는 `stream_consumer_group_lag`와 `stream_pending_entries`가 등록되어 있다. Kafka 컨슈머 지연은 `/internal/kafka/audit-topic/status`와 Ops Console에서 커밋 오프셋 기준으로 확인한다. Prometheus에도 Spring Boot가 자동 등록하는 Kafka 클라이언트 메트릭 `kafka_consumer_fetch_manager_records_lag`가 있지만, fetch할 때만 갱신되므로 DB 재시도 중이거나 컨슈머가 멈추면 실제 지연을 반영하지 못한다. `streamLength`에는 이미 처리했지만 아직 트림하지 않은 항목도 포함되므로 적체량으로 사용하지 않는다.
+
+### Redis 메모리 예산 (2026-11-16)
+
+Redis는 `noeviction`이라 `maxmemory`에 닿으면 Lua의 SET·XADD가 OOM으로 거부되고 쓰기 API가 실패한다. 필요 메모리는 아래 식으로 잡는다. 285B·69B는 `artifacts/README.md` 실측값이다.
+
+```text
+Redis 필요 메모리 ≈ 멱등 TTL(86,400s) × 평균 TPS × 285B + 스트림 적체 × 69B
+```
+
+- 멱등 TTL 24시간은 클라이언트 재시도 계약이라 줄이지 않는다.
+- 평균 1,000 TPS가 하루 내내 이어지면 멱등 키만 약 24.6GB다. 적체가 `max-len` 100만 건까지 차면 스트림당 약 69MB가 더해진다.
+- 벤치마크의 256MB는 5분 측정용 조건이다. 1,000 TPS면 약 16분 만에 가득 차므로 운영 용량 기준으로 쓰지 않는다.
+- 사용률은 `redis_used_memory_bytes / redis_maxmemory_bytes`로 본다. 80%를 5분 넘기면 `RedisMemoryHigh`가 뜨고, `maxmemory`가 0(무제한)이면 제외한다.
 
 ### 감사 기록 스키마
 
