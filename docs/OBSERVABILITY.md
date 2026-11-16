@@ -55,6 +55,10 @@ docker compose up -d postgres redis kafka app prometheus grafana
 - `audit_consumer_db_permanent_failure_total`: 영구 DB 오류로 컨슈머를 중단한 횟수
 - `/actuator/health/readiness`: DB 재시도가 10분을 넘거나 영구 DB 오류가 발생하면 `DOWN`, 정상 배치 처리 후 `UP`
 
+### Kafka Client (Spring Boot 자동 등록)
+- `kafka_consumer_fetch_manager_records_lag{topic="lb-audit-events",partition="..."}`: 파티션별 컨슈머 지연. fetch할 때만 갱신되므로 DB 재시도 중이거나 컨슈머가 멈추면 실제 지연과 다를 수 있다. 커밋 오프셋 기준 지연은 `/internal/kafka/audit-topic/status`에서 본다
+- `kafka_producer_topic_record_send_total{topic="lb-audit-events.DLT"}`: DLT로 보낸 레코드 수. 첫 DLT 전송 뒤에 시리즈가 생긴다
+
 ## 3. Grafana 대시보드
 
 기본 대시보드는 compose 시작 시 자동 프로비저닝됩니다.

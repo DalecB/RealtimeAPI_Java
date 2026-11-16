@@ -340,7 +340,7 @@ PostgreSQL 재시도는 10초부터 시작해 기준 간격을 2배씩 늘리고
 
 Redis Stream에서 아직 읽지 않은 항목은 `XINFO GROUPS`의 `lag`, 읽었지만 XACK하지 않은 항목은 `XPENDING`으로 확인한다. 릴레이가 읽기 전에 멈추면 XPENDING 건수는 늘지 않으므로 두 값을 함께 봐야 한다.
 
-현재 `/internal/streams/status`는 릴레이 미수신 건수(`consumerGroupLag`), 미확인 건수(`pendingEntries`), 전체 길이(`streamLength`)를 제공한다. Prometheus에는 `stream_consumer_group_lag`와 `stream_pending_entries`가 등록되어 있다. Kafka 컨슈머 지연은 `/internal/kafka/audit-topic/status`와 Ops Console에서 확인한다. `streamLength`에는 이미 처리했지만 아직 트림하지 않은 항목도 포함되므로 적체량으로 사용하지 않는다.
+현재 `/internal/streams/status`는 릴레이 미수신 건수(`consumerGroupLag`), 미확인 건수(`pendingEntries`), 전체 길이(`streamLength`)를 제공한다. Prometheus에는 `stream_consumer_group_lag`와 `stream_pending_entries`가 등록되어 있다. Kafka 컨슈머 지연은 `/internal/kafka/audit-topic/status`와 Ops Console에서 커밋 오프셋 기준으로 확인한다. Prometheus에도 Spring Boot가 자동 등록하는 Kafka 클라이언트 메트릭 `kafka_consumer_fetch_manager_records_lag`가 있지만, fetch할 때만 갱신되므로 DB 재시도 중이거나 컨슈머가 멈추면 실제 지연을 반영하지 못한다. `streamLength`에는 이미 처리했지만 아직 트림하지 않은 항목도 포함되므로 적체량으로 사용하지 않는다.
 
 ### 감사 기록 스키마
 
@@ -380,7 +380,7 @@ Redis Stream에서 아직 읽지 않은 항목은 `XINFO GROUPS`의 `lag`, 읽�
 | 8   | Phase 2 범위 확정 | 내구성               | 로컬은 단일 브로커·복제 계수 1이다. `KAFKA_LOG_DIRS=/var/lib/kafka/data`로 named volume과 실제 로그 경로를 일치시켰고, 컨테이너 강제 재생성 후에도 토픽 오프셋과 메시지가 유지되는 것을 확인했다. 다중 브로커 실측은 하지 않았다 |
 | 9   | Phase 3 구현·검증 | 처리 불가 메시지·DB 장애 | 파싱·검증 실패는 총 3회 처리한 뒤 해당 레코드만 DLT로 보낸다. 일시 DB 오류는 equal jitter를 적용해 poll을 유지하며 같은 배치를 무기한 재시도하고, 영구 DB 오류는 미커밋 상태로 컨슈머를 중단한다. PostgreSQL pause/unpause 및 2-consumer 동시 장애 통합 테스트로 할당 유지, 미커밋, 재시도 분산, 복구 후 저장·커밋을 검증했다. |
 | 10  | Phase 2 완료      | 스키마 관리          | JSON 본문과 Kafka 헤더 버전을 사용한다. Schema Registry는 현재 범위에서 도입하지 않으며 실제 필드 확장 시 호환성 테스트를 추가한다                                      |
-| 11  | Phase 2 완료      | 처리 지연 관측       | Redis 미수신·미확인 건수는 내부 API와 Prometheus에서, Kafka 컨슈머 지연은 내부 API와 Ops Console에서 확인한다. 별도 exporter는 도입하지 않았다                          |
+| 11  | Phase 2 완료      | 처리 지연 관측       | Redis 미수신·미확인 건수는 내부 API와 Prometheus에서, Kafka 컨슈머 지연은 내부 API·Ops Console(커밋 오프셋 기준)과 Prometheus 클라이언트 메트릭(fetch 기준)에서 확인한다. 별도 exporter는 도입하지 않았다                          |
 
 전달과 처리를 분리한 구간에서는 중복이 정상적으로 발생할 수 있다. Phase 2에서는 중복 저장 방지를 검증했다. Phase 3에서는 PEL 인계, 반환 커서 기반 후속 배치 처리와 중복 저장 방지를 자동화 테스트로 검증하고, Compose에서 운영값 10분과 실제 프로세스 강제 종료까지 검증했다. 처리할 수 없는 메시지는 DLT로 격리하도록 구현·검증했다.
 
