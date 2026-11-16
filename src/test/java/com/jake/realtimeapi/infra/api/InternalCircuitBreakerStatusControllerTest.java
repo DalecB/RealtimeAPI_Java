@@ -1,9 +1,11 @@
 package com.jake.realtimeapi.infra.api;
 
 import com.jake.realtimeapi.auth.application.usecase.AuthenticateAdminJwtUseCase;
+import com.jake.realtimeapi.auth.domain.model.AuthenticatedAdminUser;
 import com.jake.realtimeapi.infra.circuitbreaker.CircuitBreakerStatus;
 import com.jake.realtimeapi.infra.circuitbreaker.RedisHotPathCircuitBreaker;
 import com.jake.realtimeapi.infra.error.GlobalExceptionHandler;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -11,6 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,6 +32,13 @@ class InternalCircuitBreakerStatusControllerTest {
 
     @MockitoBean
     private AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase;
+
+    // /internal/** 인증 자체는 InternalEndpointAuthenticationTest가 검증한다. 여기서는 응답 계약만 본다.
+    @BeforeEach
+    void authenticateAsAdmin() {
+        when(authenticateAdminJwtUseCase.authenticate(any()))
+                .thenReturn(new AuthenticatedAdminUser(1L, "admin"));
+    }
 
     @Test
     void getStatus_returnsCurrentBreakerStateAndFailureRate() throws Exception {

@@ -1,9 +1,11 @@
 package com.jake.realtimeapi.snapshots.api;
 
 import com.jake.realtimeapi.auth.application.usecase.AuthenticateAdminJwtUseCase;
+import com.jake.realtimeapi.auth.domain.model.AuthenticatedAdminUser;
 import com.jake.realtimeapi.infra.error.GlobalExceptionHandler;
 import com.jake.realtimeapi.snapshots.application.model.SnapshotStatus;
 import com.jake.realtimeapi.snapshots.application.usecase.GetSnapshotStatusUseCase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -13,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,6 +34,13 @@ class InternalSnapshotStatusControllerTest {
 
     @MockitoBean
     private AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase;
+
+    // /internal/** 인증 자체는 InternalEndpointAuthenticationTest가 검증한다. 여기서는 응답 계약만 본다.
+    @BeforeEach
+    void authenticateAsAdmin() {
+        when(authenticateAdminJwtUseCase.authenticate(any()))
+                .thenReturn(new AuthenticatedAdminUser(1L, "admin"));
+    }
 
     @Test
     void getStatus_returnsLastSuccessfulSnapshotAtAndLagSeconds() throws Exception {

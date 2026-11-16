@@ -1,12 +1,14 @@
 package com.jake.realtimeapi.snapshots.api;
 
 import com.jake.realtimeapi.auth.application.usecase.AuthenticateAdminJwtUseCase;
+import com.jake.realtimeapi.auth.domain.model.AuthenticatedAdminUser;
 import com.jake.realtimeapi.infra.error.GlobalExceptionHandler;
 import com.jake.realtimeapi.snapshots.application.model.SnapshotEntriesResult;
 import com.jake.realtimeapi.snapshots.application.model.SnapshotEntryResult;
 import com.jake.realtimeapi.snapshots.application.query.GetSnapshotEntriesQuery;
 import com.jake.realtimeapi.snapshots.application.usecase.GetSnapshotEntriesUseCase;
 import com.jake.realtimeapi.snapshots.domain.exception.SnapshotNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -18,6 +20,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,6 +39,13 @@ class InternalSnapshotEntriesControllerTest {
 
     @MockitoBean
     private AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase;
+
+    // /internal/** 인증 자체는 InternalEndpointAuthenticationTest가 검증한다. 여기서는 응답 계약만 본다.
+    @BeforeEach
+    void authenticateAsAdmin() {
+        when(authenticateAdminJwtUseCase.authenticate(any()))
+                .thenReturn(new AuthenticatedAdminUser(1L, "admin"));
+    }
 
     @Test
     void getSnapshotEntries_returnsLatestSnapshotWhenSnapshotAtIsAbsent() throws Exception {

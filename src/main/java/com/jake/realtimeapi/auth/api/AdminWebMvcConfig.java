@@ -32,6 +32,8 @@ public class AdminWebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(adminAuthenticationInterceptor())
                 .addPathPatterns("/projects", "/leaderboards", "/admin/**");
+        registry.addInterceptor(AdminAuthenticationInterceptor.forAllRequests(authenticateAdminJwtUseCase))
+                .addPathPatterns("/internal/**");
     }
 
     @Override
