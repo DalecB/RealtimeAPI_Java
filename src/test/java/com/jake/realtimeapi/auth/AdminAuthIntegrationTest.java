@@ -81,7 +81,7 @@ class AdminAuthIntegrationTest {
     @Test
     void login_rejectsPlayerCreatedThroughUsersApi() throws Exception {
         String externalId = "player-" + System.nanoTime();
-        HttpResponse<String> created = post("/users", "{\"externalId\":\"" + externalId + "\"}", null);
+        HttpResponse<String> created = post("/users", "{\"externalId\":\"" + externalId + "\"}", "Bearer " + adminToken());
         assertThat(created.statusCode()).isEqualTo(201);
 
         assertThat(login(externalId, null).statusCode()).isEqualTo(401);
@@ -121,8 +121,125 @@ class AdminAuthIntegrationTest {
     }
 
     @Test
+    void adminPosts_requireAdminJwtEvenWithEncodedOrMatrixPath() throws Exception {
+        String projectBody = "{\"name\":\"bypass-" + System.nanoTime() + "\"}";
+        String leaderboardBody = "{\"projectId\":\"" + UUID.randomUUID() + "\",\"name\":\"bypass\"}";
+        String apiKeyBody = "{\"projectId\":\"" + UUID.randomUUID() + "\"}";
+        Map<String, String> requests = Map.of(
+                "/projects", projectBody,
+                "/projects;x=1", projectBody,
+                "/%70rojects", projectBody,
+                "/leaderboards", leaderboardBody,
+                "/leaderboards;x=1", leaderboardBody,
+                "/%6Ceaderboards", leaderboardBody,
+                "/admin/api-keys", apiKeyBody,
+                "/admin;x=1/api-keys", apiKeyBody,
+                "/admin/api-keys;x=1", apiKeyBody,
+                "/%61dmin/api-keys", apiKeyBody
+        );
+
+        for (Map.Entry<String, String> request : requests.entrySet()) {
+            String path = request.getKey();
+            assertThat(post(path, request.getValue(), null).statusCode()).as(path).isEqualTo(401);
+            assertThat(post(path, request.getValue(), "Bearer not-a-jwt").statusCode()).as(path).isEqualTo(401);
+        }
+    }
+
+    @Test
+    void adminPosts_succeedWithAdminJwtOnEveryPathVariant() throws Exception {
+        String authorization = "Bearer " + adminToken();
+
+        for (String path : List.of("/projects", "/projects;x=1", "/%70rojects")) {
+            String projectId = createProject(path, authorization);
+
+            for (String leaderboardPath : List.of("/leaderboards", "/leaderboards;x=1", "/%6Ceaderboards")) {
+                String body = "{\"projectId\":\"" + projectId + "\",\"name\":\"board-" + System.nanoTime() + "\"}";
+                assertThat(post(leaderboardPath, body, authorization).statusCode()).as(leaderboardPath).isEqualTo(201);
+            }
+            for (String apiKeyPath : List.of("/admin/api-keys", "/admin;x=1/api-keys", "/admin/api-keys;x=1", "/%61dmin/api-keys")) {
+                String body = "{\"projectId\":\"" + projectId + "\"}";
+                assertThat(post(apiKeyPath, body, authorization).statusCode()).as(apiKeyPath).isEqualTo(201);
+            }
+        }
+    }
+
+    @Test
+    void users_requireAdminJwtEvenWithEncodedOrMatrixPath() throws Exception {
+        String authorization = "Bearer " + adminToken();
+        String externalId = "player-" + System.nanoTime();
+        String userId = createUser("/users", externalId, authorization);
+
+        for (String path : List.of("/users", "/users;x=1", "/%75sers")) {
+            String body = "{\"externalId\":\"player-" + System.nanoTime() + "\"}";
+            assertThat(post(path, body, null).statusCode()).as("POST " + path).isEqualTo(401);
+            assertThat(post(path, body, "Bearer not-a-jwt").statusCode()).as("POST " + path).isEqualTo(401);
+        }
+        for (String path : List.of(
+                "/users", "/users;x=1", "/%75sers",
+                "/users/" + userId, "/users;x=1/" + userId, "/%75sers/" + userId,
+                "/users/external/" + ADMIN_USERNAME, "/users/external;x=1/" + ADMIN_USERNAME, "/%75sers/external/" + ADMIN_USERNAME
+        )) {
+            assertThat(get(path, null).statusCode()).as("GET " + path).isEqualTo(401);
+            assertThat(get(path, "Bearer not-a-jwt").statusCode()).as("GET " + path).isEqualTo(401);
+        }
+    }
+
+    @Test
+    void users_succeedWithAdminJwtOnEveryPathVariant() throws Exception {
+        String authorization = "Bearer " + adminToken();
+        String userId = null;
+
+        for (String path : List.of("/users", "/users;x=1", "/%75sers")) {
+            userId = createUser(path, "player-" + System.nanoTime(), authorization);
+        }
+        for (String path : List.of(
+                "/users", "/users;x=1", "/%75sers",
+                "/users/" + userId, "/users;x=1/" + userId, "/%75sers/" + userId,
+                "/users/external/" + ADMIN_USERNAME, "/%75sers/external/" + ADMIN_USERNAME
+        )) {
+            assertThat(get(path, authorization).statusCode()).as("GET " + path).isEqualTo(200);
+        }
+    }
+
+    @Test
+    void projectAndLeaderboardReadsStayOpen() throws Exception {
+        String authorization = "Bearer " + adminToken();
+        String projectId = createProject("/projects", authorization);
+        HttpResponse<String> leaderboard = post(
+                "/leaderboards",
+                "{\"projectId\":\"" + projectId + "\",\"name\":\"open-read\"}",
+                authorization
+        );
+        assertThat(leaderboard.statusCode()).isEqualTo(201);
+        String leaderboardId = objectMapper.readTree(leaderboard.body()).path("id").asText();
+
+        for (String path : List.of(
+                "/projects",
+                "/projects/" + projectId,
+                "/leaderboards?projectId=" + projectId,
+                "/leaderboards/" + leaderboardId,
+                "/leaderboards/" + leaderboardId + "/tops",
+                "/leaderboards/" + leaderboardId + "/users/1"
+        )) {
+            assertThat(get(path, null).statusCode()).as(path).isEqualTo(200);
+        }
+    }
+
+    @Test
     void actuatorHealthStaysOpen() throws Exception {
         assertThat(get("/actuator/health/liveness", null).statusCode()).isEqualTo(200);
+    }
+
+    private String createProject(String path, String authorization) throws Exception {
+        HttpResponse<String> response = post(path, "{\"name\":\"auth-" + System.nanoTime() + "\"}", authorization);
+        assertThat(response.statusCode()).as(path).isEqualTo(201);
+        return objectMapper.readTree(response.body()).path("id").asText();
+    }
+
+    private String createUser(String path, String externalId, String authorization) throws Exception {
+        HttpResponse<String> response = post(path, "{\"externalId\":\"" + externalId + "\"}", authorization);
+        assertThat(response.statusCode()).as(path).isEqualTo(201);
+        return objectMapper.readTree(response.body()).path("id").asText();
     }
 
     private String adminToken() throws Exception {

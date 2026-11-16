@@ -11,25 +11,25 @@ public class AdminAuthenticationInterceptor implements HandlerInterceptor {
     public static final String CURRENT_ADMIN_USER_ATTRIBUTE = "currentAdminUser";
 
     private final AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase;
-    private final boolean authenticateAllRequests;
+    private final boolean postOnly;
 
-    public AdminAuthenticationInterceptor(AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase) {
-        this(authenticateAdminJwtUseCase, false);
-    }
-
-    private AdminAuthenticationInterceptor(AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase, boolean authenticateAllRequests) {
+    private AdminAuthenticationInterceptor(AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase, boolean postOnly) {
         this.authenticateAdminJwtUseCase = authenticateAdminJwtUseCase;
-        this.authenticateAllRequests = authenticateAllRequests;
+        this.postOnly = postOnly;
     }
 
-    // 원본 URI 문자열 비교는 %69nternal·;matrix 변형으로 우회되므로 /internal/**에는 쓰지 않는다.
+    // 경로 판정은 등록 패턴(디코딩·;matrix 제거 후 매칭)에만 맡긴다. 원본 URI 문자열 비교는 %70rojects·;x=1 변형으로 우회된다.
     public static AdminAuthenticationInterceptor forAllRequests(AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase) {
+        return new AdminAuthenticationInterceptor(authenticateAdminJwtUseCase, false);
+    }
+
+    public static AdminAuthenticationInterceptor forPostRequests(AuthenticateAdminJwtUseCase authenticateAdminJwtUseCase) {
         return new AdminAuthenticationInterceptor(authenticateAdminJwtUseCase, true);
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (!authenticateAllRequests && !requiresAuthentication(request)) {
+        if (postOnly && !"POST".equals(request.getMethod())) {
             return true;
         }
 
@@ -39,18 +39,5 @@ public class AdminAuthenticationInterceptor implements HandlerInterceptor {
         }
         request.setAttribute(CURRENT_ADMIN_USER_ATTRIBUTE, authenticatedUser);
         return true;
-    }
-
-    private boolean requiresAuthentication(HttpServletRequest request) {
-        String method = request.getMethod();
-        String uri = request.getRequestURI();
-
-        if ("POST".equals(method) && "/projects".equals(uri)) {
-            return true;
-        }
-        if ("POST".equals(method) && "/leaderboards".equals(uri)) {
-            return true;
-        }
-        return "POST".equals(method) && "/admin/api-keys".equals(uri);
     }
 }
