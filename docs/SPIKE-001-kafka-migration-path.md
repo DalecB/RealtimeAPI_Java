@@ -4,8 +4,9 @@
 
 - Phase 2: 단일 릴레이, 토픽, 트림, PostgreSQL 적재 컨슈머, Testcontainers 왕복, 컨슈머 재시작과 2인스턴스 재할당 검증을 완료했다. 2026-07-27에 작성해 2026-08-12에 완료했다.
 - Phase 3: 릴레이 자동 인계, DLT 격리, PostgreSQL 장애 처리, 다중 컨슈머 재시도 분산을 구현·검증했다. Testcontainers 조건 검증에 더해 Compose에서 실제 `SIGKILL`과 운영 `min-idle-time` 10분 인계를 검증했다.
+- 릴레이 리더 선출: 여러 인스턴스가 릴레이를 띄우고 PostgreSQL advisory lock을 쥔 하나만 활성화한다. Testcontainers로 검증했다(2026-11-16).
 - Phase 3 남은 범위: 없음.
-- 최종 갱신일: 2026-09-18
+- 최종 갱신일: 2026-11-16
 
 **관련 결정:** [PRD ADR-009](PRD.md): Audit Log 소비 도입 여부와 전송 계층 선택
 
@@ -177,13 +178,14 @@ D-010에서는 "릴레이가 마지막으로 Kafka에 발행한 엔트리 ID"를
 
 ### 현재 운용 경계와 Phase 3 정책
 
-**Phase 2 완료 당시에는 단일 릴레이 + 고정 컨슈머 이름으로 제한했다.** `docker-compose.yml`의 `hostname: realtime-api`를 유지하고, 재시작한 릴레이가 `XREADGROUP ... 0`으로 자신의 PEL을 재처리했다. Phase 3 구현은 다른 이름의 교체 릴레이가 오래된 PEL을 인계하는 코드 경로를 추가했지만, 정상 상태의 동시 다중 릴레이 구성은 여전히 보장하지 않는다.
+**Phase 2 완료 당시에는 단일 릴레이 + 고정 컨슈머 이름으로 제한했다.** `docker-compose.yml`의 `hostname: realtime-api`를 유지하고, 재시작한 릴레이가 `XREADGROUP ... 0`으로 자신의 PEL을 재처리했다. Phase 3 구현은 다른 이름의 교체 릴레이가 오래된 PEL을 인계하는 코드 경로를 추가했고, 이후 리더 선출로 여러 인스턴스 실행을 지원한다. 단, **활성 릴레이는 항상 하나다.**
 
 #### Phase 3 범위
 
-Phase 3는 **다른 이름의 단일 릴레이로 교체되는 상황**을 지원한다. 정상 상태에서 여러 릴레이를 동시에 실행하는 구성은 범위 밖이다.
+Phase 3는 **다른 이름의 릴레이로 교체되는 상황**과 **여러 인스턴스가 동시에 떠 있는 구성**을 지원한다. 모든 인스턴스가 릴레이 틱을 돌지만 PostgreSQL advisory lock을 쥔 인스턴스만 옮기고, 나머지는 틱을 건너뛴다. 여러 릴레이가 동시에 옮기는 구성은 여전히 범위 밖이다. 리더보드별 순서가 깨지기 때문이다.
 
-- 컨슈머 이름은 인스턴스가 실행되는 동안 유지하고, 교체된 인스턴스마다 다르게 부여한다.
+- 컨슈머 이름은 인스턴스가 실행되는 동안 유지하고, 인스턴스마다 다르게 부여한다.
+- 리더가 죽으면 세션이 끊겨 락이 풀리고, 다른 인스턴스가 다음 틱에 락을 잡아 새 메시지를 옮긴다.
 - 이전 릴레이가 남긴 PEL은 새 릴레이가 `XAUTOCLAIM`으로 인계한다.
 - 전달 방식은 최소 한 번 전달이다. 중복 발행은 허용하고 `(leaderboard_id, event_id)` 고유 제약으로 중복 저장을 막는다.
 - 새 릴레이도 XACK 전에 종료되면 다음 릴레이가 같은 방식으로 다시 인계한다.
@@ -221,9 +223,33 @@ Testcontainers 통합 테스트는 다음 경계를 검증한다.
 - `replacementRelay_isClaimedAgainAfterItStopsBeforeAck`: A가 읽은 항목을 B가 인계한 뒤 B도 XACK하지 않은 상태에서 C가 다시 인계해 PostgreSQL에 1행만 저장한다.
 - `kafkaPublishedBeforeCrash_isDeduplicatedWhenPendingMessageIsRelayedAgain`: Kafka 발행 후 XACK 전 상태를 만들고 같은 이벤트가 재발행돼도 PostgreSQL에는 1행만 남으며 PEL이 해소되는지 확인한다.
 
-500건을 초과하는 PEL과 A → B → C 연속 인계는 Testcontainers로 검증했다. 2026-09-10에는 `scripts/verify-relay-handoff-10m.sh`로 Kafka를 중단해 Relay A가 PEL을 소유하게 한 뒤 A를 실제 `SIGKILL`하고, Kafka 복구 후 Relay B를 기동했다. 590,883ms까지 소유자가 A로 유지됐고 운영값 600,000ms 이후 B가 인계해 PEL 0건, PostgreSQL 1행으로 종료됐다. 정상 상태의 여러 릴레이 동시 실행은 지원 범위가 아니다.
+500건을 초과하는 PEL과 A → B → C 연속 인계는 Testcontainers로 검증했다. 2026-09-10에는 `scripts/verify-relay-handoff-10m.sh`로 Kafka를 중단해 Relay A가 PEL을 소유하게 한 뒤 A를 실제 `SIGKILL`하고, Kafka 복구 후 Relay B를 기동했다. 590,883ms까지 소유자가 A로 유지됐고 운영값 600,000ms 이후 B가 인계해 PEL 0건, PostgreSQL 1행으로 종료됐다. 여러 인스턴스 중 활성 릴레이를 하나로 제한하는 방식은 아래 리더 선출에서 다룬다.
 
 500건 발행·XACK의 로컬 측정값 41~59ms는 초당 약 8,500건 이상으로 현재 목표 1,000/s보다 높다. 따라서 새 메시지의 주기당 처리 상한은 추가하지 않고 스트림이 빌 때까지 드레인하는 현재 방식을 유지한다. 실제 Compose 반복 측정에서 처리량이 목표 이하로 내려가거나 다른 리더보드가 굶으면 상한을 재검토한다.
+
+#### 릴레이 리더 선출 (2026-11-16)
+
+모든 인스턴스가 `AuditRelayWorker` 틱을 돌고, 틱 시작에서 `AuditRelayLeaderLock.isLeader()`가 참인 인스턴스만 옮긴다. 기존 PEL 인계(`XAUTOCLAIM`, 10분)는 그대로 둔다.
+
+| 항목      | 결정                                                         | 근거                                                                                                                                                                                                                         |
+| --------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 락 범위   | 세션 락 `pg_try_advisory_lock`, **풀 밖의 전용 연결**에 보관 | 리더가 바뀌지 않고 유지된다. 트랜잭션 락은 틱마다 다시 경쟁해 리더가 바뀔 수 있고, 그동안 풀 연결과 열린 트랜잭션을 Kafka 발행 대기(최대 120초) 내내 잡는다. Hikari 연결에 세션 락을 잡으면 `close()`가 세션을 살려 둔 채 풀로 돌려줘 락이 남는다 |
+| 해제      | 연결 종료                                                    | 프로세스가 죽으면 연결이 끊기고 PostgreSQL이 세션 락을 푼다. 정상 종료 시에는 `@PreDestroy`에서 연결을 닫는다                                                                                                                  |
+| 생존 확인 | 매 틱 `isValid(1)`                                           | 세션이 살아 있으면 락도 살아 있다. 끊겼으면 새 연결에서 다시 시도한다. 세션 락은 재진입되므로 쥔 동안에는 다시 호출하지 않는다                                                                                                  |
+| 키        | 두 int 키 `(1, 1)`                                           | 스냅샷 락은 bigint 키를 쓴다. PostgreSQL은 bigint 키와 두 int 키의 공간을 분리하므로(`pg_locks.objsubid` 1 vs 2) 어떤 리더보드 UUID와도 겹치지 않는다                                                                         |
+| 트림      | 리더에서만 실행                                              | 워터마크를 `XPENDING`과 `XINFO GROUPS` 두 번에 나눠 읽는다. 그 사이 다른 인스턴스의 릴레이가 새 기록을 읽으면 아직 XACK되지 않은 구간까지 자를 수 있다. 리더에서만 돌리면 릴레이와 같은 스케줄러 스레드에서 순서대로 실행된다 |
+| 관측      | `audit_relay_leader` 게이지(1/0)                             | 인스턴스별로 리더 여부를 본다. 리더가 아닌 틱은 debug 로그만 남긴다                                                                                                                                                          |
+
+Testcontainers 검증(`KafkaAuditRoundTripTest`):
+
+- `twoRelayInstances_onlyLockHolderRelays_andStoresOnce`: 같은 Redis·Kafka·PostgreSQL에서 컨슈머 이름이 다른 릴레이 2개를 돌린다. 락이 없는 B는 메시지를 읽지 않고(미수신 3건 유지), A만 옮겨 PostgreSQL에 3행, `eventId` 중복 0건으로 저장된다.
+- `leaderConnectionDies_otherInstanceTakesOverRelay`: A의 세션을 `pg_terminate_backend`로 끊어 크래시를 재현한다. B가 다음 틱에 락을 잡아 새 메시지를 옮기고, 다시 연결한 A는 락을 얻지 못해 옮기지 않는다. 최종 4행, 중복 0건, PEL 0건이다.
+
+한계:
+
+- advisory lock은 fencing token이 아니다. 리더 세션이 틱 도중에 끊기면 이전 리더는 그 틱을 끝까지 실행하고, 새 리더는 다음 틱부터 옮긴다. 최대 한 틱 동안 두 릴레이가 겹쳐 리더보드별 순서가 바뀔 수 있다. 유실은 없고 중복은 고유 제약이 흡수한다.
+- 프로세스가 아니라 호스트나 네트워크가 끊기면 PostgreSQL이 죽은 연결을 감지할 때까지 락이 풀리지 않는다. 감지 시간은 서버의 `tcp_keepalives_*` 설정을 따르며 지금은 기본값이다.
+- 실제 Compose에서 2인스턴스 `SIGKILL` 인계는 측정하지 않았다.
 
 #### Kafka 컨슈머 실패 처리
 
@@ -243,7 +269,7 @@ PostgreSQL 재시도는 10초부터 시작해 기준 간격을 2배씩 늘리고
 5~10초 → 10~20초 → 20~40초 → 40~80초 → 80~160초 → 150~300초 → 이후 150~300초
 ```
 
-DB 장애 중에도 릴레이는 Redis Stream의 메시지를 Kafka로 계속 전달한다. Redis 적체 대신 Kafka 컨슈머 지연이 증가하고, DB가 복구되면 같은 배치부터 처리를 재개한다.
+**DB 장애 중에는 릴레이도 멈춘다.** 릴레이는 매 틱 시작 시 PostgreSQL에서 리더보드 목록(`findAllIds()`)을 읽고 리더 락을 확인하므로, PostgreSQL에 연결할 수 없으면 해당 틱에서 아무것도 옮기지 않는다. 장애 동안 새 감사 기록은 Redis Stream에 쌓이고, 이미 Kafka에 있던 메시지는 Kafka 컨슈머 지연으로 남는다. DB가 복구되면 릴레이는 Stream 적체를 옮기고, 컨슈머는 미커밋 배치부터 재개한다. 적체가 `MAXLEN ~ 100000`을 넘으면 옮기지 못한 오래된 기록부터 지워진다(피크 1,000/s 기준 약 100초). PostgreSQL pause/unpause 통합 테스트(`postgresOutage_keepsAssignmentAndOffset_thenStoresSameBatchAfterRecovery`)는 Kafka에 직접 발행한 메시지로 컨슈머만 검증했고 릴레이는 실행하지 않았다.
 
 무기한 재시도는 자동 복구를 100% 보장한다는 뜻이 아니다. 방화벽·DNS·자격 증명 오류가 연결 예외로 나타나면 운영자 조치 전까지 계속 실패할 수 있다. 이 정책의 목적은 재시도가 안전한 동안 오프셋을 보존하고, DB가 복구됐을 때 별도 데이터 이동 없이 자동 재개하는 것이다. `(leaderboard_id, event_id)` 고유 제약과 `ON CONFLICT DO NOTHING`이 같은 배치의 중복 저장을 흡수한다.
 
@@ -255,6 +281,8 @@ DB 장애 중에도 릴레이는 Redis Stream의 메시지를 Kafka로 계속 �
 - 릴레이 A가 Kafka 발행 후 XACK 전에 종료되면 중복 발행이 발생해도 PostgreSQL에는 1행만 남는다.
 - 릴레이 B도 XACK 전에 종료되면 다음 릴레이가 다시 인계한다.
 - PEL이 500건을 넘으면 다음 릴레이 주기에서 이전 커서부터 처리한다.
+- 릴레이 인스턴스 2개 중 advisory lock을 쥔 하나만 옮기고, PostgreSQL에는 이벤트당 1행만 남는다.
+- 리더의 세션이 끊기면 다른 인스턴스가 다음 틱에 락을 잡아 새 메시지를 옮긴다.
 - 파싱 실패 레코드는 3초 간격으로 총 3회 실패한 뒤 해당 레코드만 DLQ에 저장한다.
 - DLQ 발행에 실패하면 원본 오프셋을 커밋하지 않는다.
 - PostgreSQL 장애 중 컨슈머 그룹 할당을 유지하고 Kafka 컨슈머 지연이 증가한다.
