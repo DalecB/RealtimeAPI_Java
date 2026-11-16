@@ -127,7 +127,7 @@ services:
       - "9090:9090"
 
   renderer:
-    image: grafana/grafana-image-renderer:latest
+    image: grafana/grafana-image-renderer:v5.12.11
     container_name: realtime-grafana-renderer
     environment:
       AUTH_TOKEN: local-renderer-token
