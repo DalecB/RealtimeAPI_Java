@@ -108,6 +108,9 @@ services:
       SNAPSHOTS_WORKER_ENABLED: "true"
       EVENTS_RELAY_ENABLED: "true"
       EVENTS_RELAY_CONSUMER_NAME: ${EVENTS_RELAY_CONSUMER_NAME:-realtime-api}
+      # 로컬 스택 전용 관리자 시드. 콘솔·k6·scripts 기본값과 같다.
+      APP_ADMIN_BOOTSTRAP_USERNAME: ${APP_ADMIN_BOOTSTRAP_USERNAME:-admin}
+      APP_ADMIN_BOOTSTRAP_PASSWORD: ${APP_ADMIN_BOOTSTRAP_PASSWORD:-local-admin-password}
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx512m -Xlog:gc*:stdout:time,uptime,level,tags"
     ports:
       - "8080:8080"

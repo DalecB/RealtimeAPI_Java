@@ -2,7 +2,9 @@ package com.jake.realtimeapi.auth.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jake.realtimeapi.auth.api.dto.AdminLoginRequest;
+import com.jake.realtimeapi.auth.application.command.AdminLoginCommand;
 import com.jake.realtimeapi.auth.application.model.AdminLoginResult;
+import com.jake.realtimeapi.auth.domain.exception.AdminAuthenticationException;
 import com.jake.realtimeapi.auth.application.usecase.AuthenticateAdminJwtUseCase;
 import com.jake.realtimeapi.auth.application.usecase.AdminLoginUseCase;
 import com.jake.realtimeapi.infra.error.GlobalExceptionHandler;
@@ -47,7 +49,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/auth/login")
                         .contentType(APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AdminLoginRequest("admin-user"))))
+                        .content(objectMapper.writeValueAsString(new AdminLoginRequest("admin-user", "admin-password"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("jwt-token"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -55,6 +57,18 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.externalId").value("admin-user"))
                 .andExpect(jsonPath("$.expiresAt").value(expiresAt.toString()));
 
-        verify(adminLoginUseCase).login(any());
+        verify(adminLoginUseCase).login(new AdminLoginCommand("admin-user", "admin-password"));
+    }
+
+    @Test
+    void login_invalidCredentials_returns401WithGenericMessage() throws Exception {
+        when(adminLoginUseCase.login(any())).thenThrow(new AdminAuthenticationException("admin login is invalid"));
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"externalId\":\"admin-user\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_ADMIN_AUTH"))
+                .andExpect(jsonPath("$.message").value("admin login is invalid"));
     }
 }

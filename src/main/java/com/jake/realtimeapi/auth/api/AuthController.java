@@ -23,8 +23,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public AdminLoginResponse login(@Valid @RequestBody AdminLoginRequest request) {
-        // TODO: Keep this endpoint contract stable so password/OAuth can replace the current externalId login without changing callers.
-        AdminLoginResult result = adminLoginUseCase.login(new AdminLoginCommand(request.externalId()));
+        AdminLoginResult result = adminLoginUseCase.login(new AdminLoginCommand(request.externalId(), request.password()));
         return new AdminLoginResponse(
                 result.accessToken(),
                 result.tokenType(),
