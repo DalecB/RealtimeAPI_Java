@@ -224,7 +224,7 @@ Kafka consumer group: audit-trend
           └── UNIQUE (leaderboard_id, event_id)로 중복 저장 방지
 ```
 
-Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이름만 지원했다. 후속 Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했다. Testcontainers에서는 1,001건 PEL의 500건 단위 후속 처리, A → B → C 연속 인계, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했다. Compose에서는 Relay A를 실제 `SIGKILL`한 뒤 운영값 10분이 지나 Relay B가 PEL을 인계해 PostgreSQL에 1행을 저장하는 흐름을 검증했다. 여러 릴레이의 동시 실행은 지원 범위가 아니다. 처리할 수 없는 메시지는 총 3회 처리한 뒤 `lb-audit-events.DLT`에 격리한다. PostgreSQL 연결·자원·일시 오류는 poll을 유지하면서 `5~10 → 10~20 → 20~40 → 40~80 → 80~160 → 150~300초` equal jitter 간격으로 같은 배치를 무기한 재시도하고, 그 밖의 DB 오류는 미커밋 상태로 컨슈머를 중단한다.
+Phase 2 완료 당시 릴레이는 단일 인스턴스와 고정 컨슈머 이름만 지원했다. 후속 Phase 3에서는 다른 이름의 교체 릴레이가 오래된 PEL을 `XAUTOCLAIM`으로 인계하도록 구현했다. Testcontainers에서는 1,001건 PEL의 500건 단위 후속 처리, A → B → C 연속 인계, Kafka 발행 후 XACK 전 중복과 PostgreSQL 멱등 저장을 검증했다. Compose에서는 Relay A를 실제 `SIGKILL`한 뒤 운영값 10분이 지나 Relay B가 PEL을 인계해 PostgreSQL에 1행을 저장하는 흐름을 검증했다. 이후 모든 인스턴스가 릴레이를 실행하되 PostgreSQL advisory lock을 잡은 한 인스턴스만 활성으로 두는 리더 선출을 추가했다. 활성 릴레이를 여러 개 동시에 두는 구성은 지원하지 않는다. 처리할 수 없는 메시지는 총 3회 처리한 뒤 `lb-audit-events.DLT`에 격리한다. PostgreSQL 연결·자원·일시 오류는 poll을 유지하면서 `5~10 → 10~20 → 20~40 → 40~80 → 80~160 → 150~300초` equal jitter 간격으로 같은 배치를 무기한 재시도하고, 그 밖의 DB 오류는 미커밋 상태로 컨슈머를 중단한다.
 
 ### 4.3 Read Flow (랭킹 조회)
 
