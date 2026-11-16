@@ -90,18 +90,24 @@ export async function ensureUsers(session: Session, n: number): Promise<Session>
   return { ...session, userIds: [...session.userIds, ...created] }
 }
 
-// 데모 세션 부트스트랩: smoke 스크립트와 동일한 체인 (user → login → project → leaderboard)
+// 관리자 JWT는 메모리에만 둔다(새로고침하면 다시 로그인). /internal/** 와 관리 API에 Bearer로 붙인다.
+let adminToken = ''
+
+export async function login(externalId: string, password: string): Promise<void> {
+  const res = await fetch('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ externalId, password }),
+  })
+  adminToken = (await json<{ accessToken: string }>(res)).accessToken
+}
+
+const adminGet = (url: string) => fetch(url, { headers: { Authorization: `Bearer ${adminToken}` } })
+
+// 데모 세션 부트스트랩: smoke 스크립트와 동일한 체인 (player user → project → leaderboard), 관리자 로그인은 LoginGate에서 끝낸 상태
 export async function bootstrapSession(): Promise<Session> {
-  const externalId = `console-${Date.now()}`
-  const userId = await createUser(externalId)
-  const login = await json<{ accessToken: string }>(
-    await fetch('/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ externalId }),
-    }),
-  )
-  const auth = { Authorization: `Bearer ${login.accessToken}`, 'Content-Type': 'application/json' }
+  const userId = await createUser(`console-${Date.now()}`)
+  const auth = { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' }
   const project = await json<{ id: string; defaultApiKey: { rawKey: string } }>(
     await fetch('/projects', { method: 'POST', headers: auth, body: JSON.stringify({ name: `console-${Date.now()}` }) }),
   )
@@ -114,7 +120,7 @@ export async function bootstrapSession(): Promise<Session> {
   )
   return {
     userIds: [userId],
-    jwt: login.accessToken,
+    jwt: adminToken,
     projectId: project.id,
     apiKey: project.defaultApiKey.rawKey,
     leaderboardId: leaderboard.id,
@@ -160,27 +166,27 @@ export async function fireEvent(
 }
 
 export const getBreakerStatus = () =>
-  fetch('/internal/circuit-breaker/status').then((r) => json<BreakerStatus>(r))
+  adminGet('/internal/circuit-breaker/status').then((r) => json<BreakerStatus>(r))
 
 export const getStreamsStatus = () =>
-  fetch('/internal/streams/status').then((r) => json<StreamsStatus>(r))
+  adminGet('/internal/streams/status').then((r) => json<StreamsStatus>(r))
 
 export const getAuditTopicStatus = () =>
-  fetch('/internal/kafka/audit-topic/status').then((r) => json<AuditTopicStatus>(r))
+  adminGet('/internal/kafka/audit-topic/status').then((r) => json<AuditTopicStatus>(r))
 
 export const getAuditEventCount = () =>
-  fetch('/internal/audit-events/count').then((r) => json<{ count: number }>(r))
+  adminGet('/internal/audit-events/count').then((r) => json<{ count: number }>(r))
 
 export const getRecentAuditEvents = (leaderboardId: string, limit = 20) =>
-  fetch(`/internal/audit-events/recent?leaderboardId=${leaderboardId}&limit=${limit}`).then((r) =>
+  adminGet(`/internal/audit-events/recent?leaderboardId=${leaderboardId}&limit=${limit}`).then((r) =>
     json<AuditEventItem[]>(r),
   )
 
 export const getAuditLeaderboards = () =>
-  fetch('/internal/audit-events/leaderboards').then((r) => json<string[]>(r))
+  adminGet('/internal/audit-events/leaderboards').then((r) => json<string[]>(r))
 
 export const getScoreTrend = (leaderboardId: string, from: string, to: string, bucket: string) =>
-  fetch(`/internal/audit-events/trend?leaderboardId=${leaderboardId}&from=${from}&to=${to}&bucket=${bucket}`).then(
+  adminGet(`/internal/audit-events/trend?leaderboardId=${leaderboardId}&from=${from}&to=${to}&bucket=${bucket}`).then(
     (r) => json<TrendBucket[]>(r),
   )
 
@@ -201,10 +207,10 @@ export interface SnapshotStatus {
 }
 
 export const getSnapshotEntries = (leaderboardId: string) =>
-  fetch(`/internal/snapshots/${leaderboardId}/entries`).then((r) => json<SnapshotEntries>(r))
+  adminGet(`/internal/snapshots/${leaderboardId}/entries`).then((r) => json<SnapshotEntries>(r))
 
 export const getSnapshotStatus = () =>
-  fetch('/internal/snapshot/status').then((r) => json<SnapshotStatus>(r))
+  adminGet('/internal/snapshot/status').then((r) => json<SnapshotStatus>(r))
 
 export interface DepsHealth {
   redis: boolean

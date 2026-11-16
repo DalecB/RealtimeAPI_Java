@@ -29,7 +29,8 @@ Redis 핫패스와 PostgreSQL 콜드패스를 분리하고, 감사 이벤트를 
 - Phase 2는 **단일 릴레이 + 고정 컨슈머 이름**, Kafka 단일 브로커, PostgreSQL 멱등 저장, Kafka 컨슈머 재시작·2인스턴스 재할당 검증까지 완료했습니다.
 - Phase 3에서는 교체 릴레이의 오래된 PEL 인계, 처리 불가 Kafka 레코드의 DLT 격리, PostgreSQL 장애 처리를 구현했습니다. 일시 DB 오류는 poll을 유지하며 equal jitter로 분산해 같은 배치를 무기한 재시도하고, 영구 DB 오류는 오프셋을 커밋하지 않은 채 컨슈머를 중단합니다.
 - Snapshot worker 기본 주기는 `30초`입니다. T8 비교를 위해 `5분` 주기로도 재기동해 측정했습니다.
-- 관리용 JWT 로그인은 현재 범위에서 `users.externalId` 기반 demo auth를 사용합니다.
+- 관리자 계정은 기동 시 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`로만 시드하고, `POST /auth/login`은 BCrypt 비밀번호를 검증한 뒤 JWT를 발급합니다. `POST /users`로 만든 플레이어는 로그인할 수 없습니다. 로컬 개발용 기본값은 `admin` / `local-admin-password`이며, 비밀번호를 설정하지 않으면 관리자를 만들지 않습니다.
+- `/internal/**`는 관리 API와 같은 관리자 JWT가 필요합니다. `/actuator/**`는 프로브용으로 열려 있습니다.
 - `/internal/streams/status`의 `consumerGroupLag`는 릴레이가 아직 읽지 않은 건수, `pendingEntries`는 읽었지만 XACK하지 않은 건수(XPENDING)입니다. `streamLength`는 이미 처리된 항목까지 포함한 감사 스트림의 전체 길이(XLEN)입니다.
 
 ## Quick Start

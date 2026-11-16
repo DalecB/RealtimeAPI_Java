@@ -801,6 +801,8 @@ Response:
 
 ### Internal / Debug API (운영/정합성 검증)
 
+모든 `/internal/**`는 `Authorization: Bearer {adminJwt}`가 필요하다.
+
 ```
 GET /internal/snapshot/status
   → { "lastSuccessfulSnapshotAt": "ISO8601", "snapshotLagSeconds": number }
@@ -825,7 +827,7 @@ GET /internal/circuit-breaker/status
 
 ```
 POST /users                   → 테스트/관리용 유저 생성
-POST /auth/login              → 기존 user externalId 기반 demo admin JWT 발급
+POST /auth/login              → 시드 관리자 externalId + 비밀번호(BCrypt 검증) → admin JWT 발급
 POST /projects                → 프로젝트 생성
 POST /leaderboards            → 리더보드 생성
 POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
@@ -833,7 +835,7 @@ POST /admin/api-keys          → API Key 발급 (quota 설정 포함)
 
 또는 Flyway seed SQL로 대체 가능.
 
-> **인증 스코프 메모**: 현재 구현의 admin auth는 본 프로젝트 범위상 password/OAuth 없이 `externalId` 기반 JWT 발급을 사용한다. 추후 auth scope 확장 시 교체 가능하도록 `/auth/login` 계약만 유지한다.
+> **인증 스코프 메모**: 관리자 계정은 기동 시 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`로만 시드한다(`users.password_hash`가 있는 행이 관리자). 비밀번호 설정이 없으면 관리자를 만들지 않는다. `POST /users`로 만든 유저는 비밀번호가 없어 로그인할 수 없고, 계정 없음·비밀번호 누락·불일치는 같은 401로 응답한다. 관리 API와 `/internal/**` 전체가 같은 admin JWT를 요구하며 `/actuator/**`만 프로브용으로 열어 둔다. `/auth/login` 계약은 `externalId`를 유지하고 `password`만 추가했다.
 
 ---
 

@@ -72,17 +72,21 @@ curl -s -X POST http://localhost:8080/users \
 
 ## 3. admin login
 
+관리자 계정은 앱 기동 시 `app.admin.bootstrap.username`/`app.admin.bootstrap.password`(환경 변수 `APP_ADMIN_BOOTSTRAP_USERNAME`/`APP_ADMIN_BOOTSTRAP_PASSWORD`)로만 만들어진다. local 프로필과 docker compose의 개발용 기본값은 `admin` / `local-admin-password`다. 비밀번호를 설정하지 않으면 관리자 계정이 생기지 않는다.
+
 ```bash
 curl -s -X POST http://localhost:8080/auth/login \
   -H 'Content-Type: application/json' \
   -d '{
-    "externalId":"manual-user-101"
+    "externalId":"admin",
+    "password":"local-admin-password"
   }'
 ```
 
 기대 결과:
 - 응답에 `accessToken`이 생성된다.
-- 이후 관리 API(`POST /projects`, `POST /leaderboards`, `POST /admin/api-keys`)는 이 JWT를 `Authorization: Bearer ...`로 사용한다.
+- 이후 관리 API(`POST /projects`, `POST /leaderboards`, `POST /admin/api-keys`)와 모든 `/internal/**` 조회는 이 JWT를 `Authorization: Bearer ...`로 사용한다.
+- 2번에서 `POST /users`로 만든 유저는 비밀번호가 없어 로그인할 수 없다. 비밀번호가 틀리거나 빠진 경우도 없는 계정과 똑같이 `401 INVALID_ADMIN_AUTH`(`admin login is invalid`)로 응답한다.
 
 예시 응답:
 
@@ -92,7 +96,7 @@ curl -s -X POST http://localhost:8080/auth/login \
   "tokenType": "Bearer",
   "expiresAt": "2026-03-19T02:00:00Z",
   "userId": 1,
-  "externalId": "manual-user-101"
+  "externalId": "admin"
 }
 ```
 
@@ -213,7 +217,8 @@ local profile에서는 worker가 주기적으로 snapshot을 잡는다.
 ### 내부 상태 API
 
 ```bash
-curl -s http://localhost:8080/internal/snapshot/status
+curl -s http://localhost:8080/internal/snapshot/status \
+  -H "Authorization: Bearer <ADMIN_JWT>"
 ```
 
 기대 결과:
@@ -223,7 +228,8 @@ curl -s http://localhost:8080/internal/snapshot/status
 ### Cold Path snapshot 조회
 
 ```bash
-curl -s "http://localhost:8080/internal/snapshots/<LEADERBOARD_ID>/entries?offset=0&limit=10"
+curl -s "http://localhost:8080/internal/snapshots/<LEADERBOARD_ID>/entries?offset=0&limit=10" \
+  -H "Authorization: Bearer <ADMIN_JWT>"
 ```
 
 기대 결과:
@@ -233,7 +239,8 @@ curl -s "http://localhost:8080/internal/snapshots/<LEADERBOARD_ID>/entries?offse
 ## 9. Streams 상태 검증
 
 ```bash
-curl -s http://localhost:8080/internal/streams/status
+curl -s http://localhost:8080/internal/streams/status \
+  -H "Authorization: Bearer <ADMIN_JWT>"
 ```
 
 기대 결과:

@@ -4,6 +4,8 @@ import { uuidv4 } from './uuid.js';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const USER_COUNT = Number(__ENV.USER_COUNT || 200);
+const ADMIN_USERNAME = __ENV.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD = __ENV.ADMIN_PASSWORD || 'local-admin-password';
 const BENCHMARK_RATE_LIMIT_PER_SEC = positiveIntEnv('BENCHMARK_RATE_LIMIT_PER_SEC', 1_000_000);
 const BENCHMARK_DAILY_QUOTA = positiveIntEnv('BENCHMARK_DAILY_QUOTA', 2_000_000_000);
 const BOOTSTRAP_READY_TIMEOUT_MS = positiveIntEnv('BOOTSTRAP_READY_TIMEOUT_MS', 60_000);
@@ -59,11 +61,12 @@ export function bootstrap() {
   waitForBaseUrlReady();
 
   const seed = Date.now();
-  const adminExternalId = `k6-admin-${seed}`;
-  const adminUser = http.post(`${BASE_URL}/users`, JSON.stringify({ externalId: adminExternalId }), jsonHeaders());
-  ensure(adminUser, 201, 'create admin user');
-
-  const login = http.post(`${BASE_URL}/auth/login`, JSON.stringify({ externalId: adminExternalId }), jsonHeaders());
+  // 관리자는 서버 기동 시 시드된 계정만 로그인할 수 있다. 기본값은 docker-compose/local 프로필의 개발용 관리자다.
+  const login = http.post(
+    `${BASE_URL}/auth/login`,
+    JSON.stringify({ externalId: ADMIN_USERNAME, password: ADMIN_PASSWORD }),
+    jsonHeaders()
+  );
   ensure(login, 200, 'admin login');
   const loginBody = JSON.parse(login.body);
   const adminJwt = loginBody.accessToken;

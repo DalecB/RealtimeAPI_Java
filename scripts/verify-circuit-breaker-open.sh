@@ -8,6 +8,10 @@ USER_EXTERNAL_ID="${USER_EXTERNAL_ID:-breaker-user-$(date +%s)}"
 ATTEMPTS="${ATTEMPTS:-11}"
 REQUEST_TIMEOUT_SECONDS="${REQUEST_TIMEOUT_SECONDS:-8}"
 
+# 서버 기동 시 시드된 관리자 계정. 기본값은 docker-compose/local 프로필의 개발용 관리자다.
+ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-local-admin-password}"
+
 require_cmd() {
   local cmd="$1"
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -59,14 +63,13 @@ echo "$USER_RESPONSE" | jq
 USER_ID="$(echo "$USER_RESPONSE" | jq -r '.id')"
 
 print_section "2. admin login"
-LOGIN_RESPONSE="$(json_request POST /auth/login "$(cat <<JSON
-{
-  "externalId":"$USER_EXTERNAL_ID"
-}
-JSON
-)")"
+LOGIN_RESPONSE="$(json_request POST /auth/login "$(jq -n --arg u "$ADMIN_USERNAME" --arg p "$ADMIN_PASSWORD" '{externalId: $u, password: $p}')")"
 echo "$LOGIN_RESPONSE" | jq
 ADMIN_JWT="$(echo "$LOGIN_RESPONSE" | jq -r '.accessToken')"
+if [[ -z "$ADMIN_JWT" || "$ADMIN_JWT" == "null" ]]; then
+  echo "[breaker] admin login failed: ADMIN_USERNAME/ADMIN_PASSWORD가 서버 시드 관리자와 같은지 확인하세요" >&2
+  exit 1
+fi
 
 print_section "3. create project and leaderboard"
 PROJECT_RESPONSE="$(json_request POST /projects "$(cat <<JSON
@@ -139,7 +142,7 @@ JSON
 done
 
 print_section "7. breaker status"
-json_request GET /internal/circuit-breaker/status "" | jq
+json_request GET /internal/circuit-breaker/status "" -H "Authorization: Bearer $ADMIN_JWT" | jq
 
 print_section "expected"
 cat <<SUMMARY

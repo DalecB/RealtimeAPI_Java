@@ -38,8 +38,10 @@ DELETE FROM projects
 WHERE id = '${PROJECT_ID}';
 
 -- 데모 전용 user range도 매번 비워서 이전 실행 흔적이 남지 않게 한다.
+-- 시드 관리자(password_hash 보유)가 이 id 범위에 있어도 지우지 않는다.
 DELETE FROM users
-WHERE id BETWEEN 101 AND 110;
+WHERE id BETWEEN 101 AND 110
+  AND password_hash IS NULL;
 SQL
 
 echo "[seed] PostgreSQL에 users / project / leaderboards 데이터를 넣습니다..."
@@ -57,7 +59,8 @@ INSERT INTO users (id, external_id) VALUES
   (109, 'seed-user-109'),
   (110, 'seed-user-110')
 ON CONFLICT (id) DO UPDATE
-SET external_id = EXCLUDED.external_id;
+SET external_id = EXCLUDED.external_id
+WHERE users.password_hash IS NULL;
 
 SELECT setval(
   pg_get_serial_sequence('users', 'id'),
@@ -107,7 +110,7 @@ leaderboardId(empty)=${EMPTY_LEADERBOARD_ID}
 1. SPRING_PROFILES_ACTIVE=local SPRING_DATA_REDIS_PORT=6370 ./gradlew bootRun
 2. bash scripts/seed-snapshot-demo.sh
 3. local profile로 worker 활성화 상태 확인
-4. snapshot_batches / snapshot_entries / /internal/snapshot/status 확인
+4. snapshot_batches / snapshot_entries / /internal/snapshot/status 확인 (/internal/**는 POST /auth/login으로 받은 관리자 JWT 필요)
 
 수동 API 검증 흐름:
 - POST /projects -> defaultApiKey 사용 기준 흐름은 docs/MANUAL_VERIFICATION.md 참고
