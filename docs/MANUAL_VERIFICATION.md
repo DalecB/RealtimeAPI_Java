@@ -2,7 +2,7 @@
 
 적용한 PRD 기준:
 - `POST /events`는 API key 인증 + rate limit/quota를 통과해야 한다.
-- 관리 API는 JWT 인증을 통과해야 한다. 현재 데모 인증에서는 별도의 신원 확인 없이 기존 `users.externalId`를 받아 JWT를 발급한다.
+- 관리 API는 JWT 인증을 통과해야 한다. JWT는 기동 시 `app.admin.bootstrap.*`로 시드한 관리자 계정의 `externalId`와 비밀번호로 `POST /auth/login`을 호출해 받는다. 비밀번호가 없는 일반 유저는 로그인할 수 없다.
 - `POST /projects`로 프로젝트를 만들면 현재 로그인한 유저 id가 `adminId`로 저장되고, 바로 사용할 기본 API key가 함께 발급된다.
 - 랭킹 읽기는 Hot Path(Redis), 스냅샷은 Cold Path(PostgreSQL)로 검증한다.
 
