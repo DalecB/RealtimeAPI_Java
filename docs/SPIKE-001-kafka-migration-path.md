@@ -398,7 +398,7 @@ Redis Stream에서 아직 읽지 않은 항목은 `XINFO GROUPS`의 `lag`, 읽�
 
 **원본 적재를 고른 이유**: 추이 집계 결과만 저장하면 데이터 크기는 작지만, 이상 탐지와 아카이브에는 원본이 필요하다. 원본을 저장하면 추이 집계, 이상 탐지와 아카이브가 같은 데이터를 재사용할 수 있다. 추이는 `date_bin`을 사용한 5분 버킷으로 집계하고, 이상 탐지와 아카이브는 원본을 사용한다. 현재 데모 규모에서는 집계 쿼리의 응답 시간이 문제가 되지 않는다. 데이터가 증가해 집계 쿼리가 병목이 되면 롤업 요약 테이블을 추가한다.
 
-**멱등은 DB가 맡는다**: 릴레이의 재전송이나 Kafka 컨슈머의 재처리로 같은 이벤트가 두 번 올 수 있다. `UNIQUE (leaderboard_id, event_id)` + `ON CONFLICT DO NOTHING`으로 중복을 집계 전에 제외한다. 집계가 두 번 반영되면 유저가 이상 탐지 등에서 불이익을 받는다. **엔트리 ID는 한 리더보드 스트림 안에서만 고유**하므로 `leaderboard_id`와 함께 유일성 조건을 구성한다. 릴레이는 메시지에 엔트리 ID(`eventId`)를 포함한다.
+**멱등은 DB가 맡는다**: 릴레이의 재전송이나 Kafka 컨슈머의 재처리로 같은 이벤트가 두 번 올 수 있다. `UNIQUE (leaderboard_id, event_id)` + `ON CONFLICT DO NOTHING`으로 중복을 집계 전에 제외한다. 집계가 두 번 반영되면 유저가 이상 탐지 등에서 불이익을 받는다. **엔트리 ID는 한 리더보드 스트림 안에서만 고유**하므로 `leaderboard_id`와 함께 유일성 조건을 구성한다. 릴레이는 메시지에 엔트리 ID(`eventId`)를 포함한다. V7 파티셔닝 이후 실제 제약은 `UNIQUE (leaderboard_id, event_id, event_time)`이다. 파티션 테이블의 UNIQUE는 파티션 키를 포함해야 하기 때문이다. `event_time`은 `event_id`의 ms 부분에서만 계산하므로 같은 이벤트는 항상 같은 `event_time`, 같은 파티션에 들어가고 중복 판정은 그대로다.
 
 **오프셋은 처리 후 커밋**: 배치 리스너 + `auto-commit=false`. 컨테이너가 배치를 적재한 뒤에만 오프셋을 커밋한다(릴레이의 XACK와 같은 규칙). 배치 크기는 `max-poll-records`(개수)와 poll 주기(시간) 중 먼저 걸리는 쪽이다.
 
@@ -412,6 +412,21 @@ Redis Stream에서 아직 읽지 않은 항목은 `XINFO GROUPS`의 `lag`, 읽�
 객체 스토리지는 저장 비용보다 다운로드 비용이 상대적으로 크므로, 자주 조회하지 않는 원본을 보관할 때 적합하다. 자주 조회하는 추이 집계는 PostgreSQL에 유지한다.
 
 로컬 데모에 객체 스토리지를 붙이는 것은 비목표다. 티어링 설계를 문서로 남기는 것이 목적.
+
+#### hot 보관 구현: 일 단위 파티션 + DROP (2026-11-16)
+
+아카이브는 비목표로 두고 hot 30일만 구현했다. 30일이 지난 원본은 아카이브 없이 지운다.
+
+- `V7__partition_audit_events_by_day.sql`: `audit_events`를 `event_time` 기준 UTC 일 단위 범위 파티션 테이블로 바꿨다. PG는 기존 테이블을 파티션 테이블로 ALTER할 수 없어서 새 테이블 생성 → 기존 행이 걸친 날짜의 파티션 생성 → 행 복사 → 기존 테이블 DROP → 이름 변경을 한 트랜잭션으로 한다. PK는 `(id, event_time)`, UNIQUE는 `(leaderboard_id, event_id, event_time)`이다.
+- `AuditEventPartitionJob`: 기동 시 한 번, 이후 매시 정각(UTC)에 오늘과 그 뒤 3일의 파티션을 `CREATE TABLE IF NOT EXISTS ... PARTITION OF`로 만들고, 날짜가 `오늘 - 30일`보다 이른 파티션을 `DROP TABLE IF EXISTS`로 지운다. 설정은 `events.consumer.partition-retention-days=30`, `events.consumer.partition-ahead-days=3` 두 개뿐이다. 3일을 미리 만들어 두면 잡이 주말 내내 실패해도 적재가 멈추지 않는다.
+- 다중 인스턴스: 한 트랜잭션 안에서 `pg_advisory_xact_lock`을 잡고 실행한다. 늦게 온 인스턴스는 기다렸다가 할 일이 없는 상태로 끝난다. 락이 없으면 `IF NOT EXISTS` 확인과 생성 사이에 다른 세션이 끼어들어 카탈로그 중복 키 오류가 날 수 있다.
+- DELETE 대신 DROP: 파티션 하나를 통째로 지우므로 dead tuple·VACUUM 부담이 없다. 추이 조회는 `event_time` 조건으로 해당 날짜 파티션만 스캔한다. prepared statement의 generic plan에서도 실행 시점 pruning(`Subplans Removed`)이 동작한다.
+- DEFAULT 파티션은 두지 않는다. DEFAULT 파티션에 어떤 날짜의 행이 들어가 있으면 그 날짜의 파티션을 나중에 만들 때 실패하고, 잘못 들어온 행이 보관 정책 밖에 계속 남는다.
+
+알려진 경계(필터링 로직은 추가하지 않았다):
+
+1. 파티션이 없는 날짜의 INSERT는 SQLSTATE `23514`(`no partition of relation found for row`)로 실패한다. Spring은 이를 `DataIntegrityViolationException`으로 바꾸고, 컨슈머 에러 핸들러는 일시 장애(`DataAccessResourceFailureException`, `TransientDataAccessException`)가 아니므로 **영구 오류로 분류해 컨슈머를 중단한다.** 오프셋은 커밋하지 않으므로 유실은 없고, 해당 날짜의 파티션을 만든 뒤 컨슈머를 재시작하면 같은 배치부터 다시 처리한다. 파티션 잡이 3일 넘게 실패하거나 Redis 서버 시계가 3일 넘게 앞서면 이 경로를 탄다.
+2. Kafka 보관 기간도 30일이고, 세그먼트 단위로 지우므로 30일을 조금 넘긴 레코드가 남아 있을 수 있다. 오프셋을 `earliest`로 되감으면 PG에서 이미 DROP한 날짜의 이벤트가 다시 올 수 있고, 1번과 같이 컨슈머가 중단된다. 되감기는 30일 경계 안쪽 시점으로 지정해야 한다.
 
 ### 이상 탐지: 필드 확장 선행
 
