@@ -786,18 +786,6 @@ class KafkaAuditRoundTripTest {
         Fixture second = createFixture();
         long now = Instant.now().toEpochMilli();
         listener.setCommonErrorHandler(errorHandler);
-        kafkaTemplate.send(
-                AuditTopicConfig.AUDIT_TOPIC,
-                0,
-                first.leaderboardId().toString(),
-                eventJson(first, now + "-0", UUID.randomUUID())
-        ).get();
-        kafkaTemplate.send(
-                AuditTopicConfig.AUDIT_TOPIC,
-                2,
-                second.leaderboardId().toString(),
-                eventJson(second, now + "-1", UUID.randomUUID())
-        ).get();
 
         setAuditDatabaseOutage(true);
         listener.start();
@@ -807,6 +795,19 @@ class KafkaAuditRoundTripTest {
                     assertEquals(2, listener.getAssignmentsByClientId().values().stream()
                             .filter(partitions -> !partitions.isEmpty())
                             .count()));
+            // 할당 전에 보내면 먼저 붙은 컨슈머가 두 레코드를 한 배치로 재시도해 편차가 0이 된다.
+            kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    0,
+                    first.leaderboardId().toString(),
+                    eventJson(first, now + "-0", UUID.randomUUID())
+            ).get();
+            kafkaTemplate.send(
+                    AuditTopicConfig.AUDIT_TOPIC,
+                    2,
+                    second.leaderboardId().toString(),
+                    eventJson(second, now + "-1", UUID.randomUUID())
+            ).get();
             await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
                 assertTrue(attempts.getOrDefault(first.leaderboardId(), List.of()).size() >= 6);
                 assertTrue(attempts.getOrDefault(second.leaderboardId(), List.of()).size() >= 6);
