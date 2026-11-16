@@ -88,7 +88,7 @@ public class AuditRelayWorker {
         for (UUID leaderboardId : leaderboardRepository.findAllIds()) {
             try {
                 relayOne(leaderboardId);
-            } catch (DataAccessException ex) {
+            } catch (RuntimeException ex) {
                 log.error("relay failed leaderboardId={}", leaderboardId, ex);
             }
         }

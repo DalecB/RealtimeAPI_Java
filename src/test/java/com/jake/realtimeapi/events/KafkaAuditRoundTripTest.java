@@ -24,7 +24,9 @@ import com.jake.realtimeapi.users.domain.repository.UserRepository;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.junit.jupiter.api.Test;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +43,7 @@ import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -64,13 +67,18 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "events.relay.enabled=true",
@@ -750,6 +758,56 @@ class KafkaAuditRoundTripTest {
             lockA.release();
             lockB.release();
         }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void immediateSendFailure_onOneLeaderboard_doesNotStarveNextLeaderboard() {
+        Fixture blocked = createFixture();
+        Fixture healthy = createFixture();
+        processEvents(blocked, 1);
+        processEvents(healthy, 1);
+        String blockedStream = LeaderboardRedisKeyFactory.auditStreamKey(blocked.leaderboardId());
+        String healthyStream = LeaderboardRedisKeyFactory.auditStreamKey(healthy.leaderboardId());
+
+        LeaderboardRepository blockedFirst = mock(LeaderboardRepository.class);
+        when(blockedFirst.findAllIds()).thenReturn(List.of(blocked.leaderboardId(), healthy.leaderboardId()));
+        AtomicBoolean metadataUnavailable = new AtomicBoolean(true);
+        KafkaTemplate<String, String> failingKafka = spy(kafkaTemplate);
+        // KafkaTemplate은 max.block.ms 초과 같은 즉시 실패를 future가 아니라 send에서 KafkaException으로 던진다.
+        doAnswer(invocation -> {
+            ProducerRecord<String, String> record = invocation.getArgument(0);
+            if (metadataUnavailable.get() && blocked.leaderboardId().toString().equals(record.key())) {
+                throw new KafkaException("Send failed", new TimeoutException("not present in metadata after 60000 ms"));
+            }
+            return invocation.callRealMethod();
+        }).when(failingKafka).send(any(ProducerRecord.class));
+        AuditRelayWorker relay = new AuditRelayWorker(
+                blockedFirst,
+                redisTemplate,
+                failingKafka,
+                objectMapper,
+                500,
+                600_000,
+                "relay-" + UUID.randomUUID(),
+                auditRelayLeaderLock
+        );
+
+        relay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertEquals(1, findAuditRows(healthy.leaderboardId()).size()));
+        assertEquals(0, pendingCount(healthyStream));
+        assertEquals(0, findAuditRows(blocked.leaderboardId()).size());
+        assertEquals(1, pendingCount(blockedStream));
+
+        metadataUnavailable.set(false);
+        relay.relayAll();
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(1, findAuditRows(blocked.leaderboardId()).size());
+            assertEquals(0, pendingCount(blockedStream));
+        });
     }
 
     private String eventJson(Fixture fixture, String eventId, UUID idempotencyKey) throws Exception {
