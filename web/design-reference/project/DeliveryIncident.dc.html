@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Delivery, circuit open, operator view</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="lc {{labelsClass}} {{fieldsClass}}">
+<a class="SkipLink" href="#content">Skip to content</a>
+<div class="AppShell" style="min-height: 1350px">
+
+<aside class="SidebarNav c-in" data-c="SidebarNav">
+<div class="SidebarNav-brand"><span class="SidebarNav-mark" aria-hidden="true"><i></i><i></i><i></i></span>RealtimeAPI</div>
+<button class="SidebarNav-project" type="button" aria-label="Project arena-prod, production. Switch project">arena-prod<span class="EnvTag is-prod">prod</span></button>
+<nav class="SidebarNav-group" aria-label="Project">
+<a class="SidebarNav-item" href="Overview.dc.html">Overview</a>
+<a class="SidebarNav-item" href="LeaderboardLive.dc.html">Leaderboards</a>
+<a class="SidebarNav-item is-active" href="#content" aria-current="page">Delivery</a>
+<a class="SidebarNav-item" href="#">Incidents<span class="SidebarNav-count is-fail">2</span></a>
+</nav>
+<nav class="SidebarNav-group" aria-label="Build">
+<div class="SidebarNav-label">Build</div>
+<a class="SidebarNav-item" href="#">API keys</a>
+<a class="SidebarNav-item" href="#">Sandbox</a>
+</nav>
+<div class="SidebarNav-foot"><a href="#">Documentation</a><span>Signed in as admin</span></div>
+</aside>
+
+<div class="AppShell-main">
+<div class="TopBar c-in" data-c="TopBar">
+<div class="TopBar-crumbs"><span>arena-prod</span><span>/</span><b>Delivery</b></div>
+<div class="TopBar-meta"><span class="RoleChip is-operator">Operator</span><span class="mono">polled 2s ago</span><span class="mono">2026-11-16 14:42:07 UTC · 23:42:07 local</span></div>
+</div>
+
+<nav class="PipelineStrip" data-c="PipelineStrip" aria-label="Pipeline status">
+<span class="PS-origin">POST /events</span><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="#write-path" aria-label="Breaker: OPEN · 503"><i class="glyph is-fail"></i><span class="PS-name">Breaker</span><span class="PS-val">OPEN · 503</span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="#stream" aria-label="Stream: unreachable. Last known at 14:41:16 UTC: 1,001 unacked"><i class="glyph is-fail"></i><span class="PS-name">Stream</span><span class="PS-val">unreachable<span class="StaleValue"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg>1,001</span></span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node is-warn" href="#relay" aria-label="Relay: ack retry"><i class="glyph is-warn"></i><span class="PS-name">Relay</span><span class="PS-val">ack retry</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#healthy-hops" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#healthy-hops" aria-label="Consumer: RUNNING"><i class="glyph is-ok"></i><span class="PS-name">Consumer</span><span class="PS-val">RUNNING</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#healthy-hops" aria-label="PostgreSQL: 301,002 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">301,002 stored</span><span class="PS-compact">301.0k stored</span></span></a>
+<a class="PS-node is-warn is-aside" href="#dlt" aria-label="DLT: 2 to review"><i class="glyph is-warn"></i><span class="PS-name">DLT</span><span class="PS-val">2 to review</span></a>
+</nav>
+
+<main class="AppShell-page" id="content">
+<div class="DevNote"><b>illustrative state data</b>unacked 1,001, Kafka 301,004, PostgreSQL 301,002, the unacked series, outcome counts, clock times, DLT 2. Real: 50% of last 10 calls, 503, Retry-After: 10, 3 trial calls. Read behavior is read from code, not from a test.</div>
+
+<div class="PageHeader" data-c="PageHeader">
+<div>
+<h1 class="PageHeader-title">Delivery</h1>
+<div class="PageHeader-meta"><span>Write path and audit pipeline for every leaderboard in arena-prod</span><span class="StatusBadge is-quiet is-fail"><i class="glyph is-fail"></i>Writes blocked</span></div>
+</div>
+<div class="PageHeader-actions"><button class="Button" type="button" aria-pressed="{{fieldsPressed}}" data-op>Show API fields</button></div>
+</div>
+
+<div class="IncidentBanner" data-c="IncidentBanner" aria-live="polite">
+<div class="IncidentBanner-main"><i class="glyph is-fail"></i><div>
+<div class="IncidentBanner-title">Circuit open · Redis is not responding</div>
+<dl class="IncidentBanner-impact">
+<dt>Writes</dt><dd>POST /events returns 503 with Retry-After: 10. No score is partially applied.</dd>
+<dt>Reads</dt><dd>GET tops and user rank read Redis directly, outside the breaker. They return errors, not the fast 503.</dd>
+<dt>Audit</dt><dd>Events already in Kafka are still being stored.</dd>
+</dl>
+<p class="IncidentBanner-next" data-op><b>Action needed:</b> restore Redis. The breaker closes by itself once 3 trial calls succeed. Next trial in <b>1 s</b> <span class="muted">(14:42:08 UTC · 23:42:08 local)</span></p>
+<div class="IncidentBanner-facts"><span>opened 14:41:18 UTC · 23:41:18 local</span><span>49 s ago</span><span>failure rate 50% · 5 of last 10 calls</span></div>
+</div></div>
+<div class="IncidentBanner-actions"><a class="Button is-ghost" href="#" data-op>Runbook: Redis outage</a><a class="Button" href="#">View incident</a></div>
+</div>
+
+<div class="Reconcile" data-op data-c="Reconcile · operator only" aria-label="Reconciliation: 301,004 published equals 301,002 stored plus 2 in the dead-letter topic. 0 unaccounted. 1,001 unacked in Redis will be re-sent on recovery.">
+<span>301,004<small>published</small></span><span class="Reconcile-op">=</span><span>301,002<small>stored</small></span><span class="Reconcile-op">+</span><span>2<small>in DLT</small></span>
+<span class="Reconcile-result"><span class="StatusBadge">0 unaccounted between Kafka and PostgreSQL</span></span>
+<span class="Reconcile-extra"><span class="StaleValue is-warn"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>1,001</span> unacked in Redis. They are already in Kafka and are re-sent on recovery; duplicates are ignored.</span>
+</div>
+
+<section class="Panel" aria-labelledby="p-attn" data-c="Panel">
+<div class="Panel-head"><h2 class="Panel-title" id="p-attn">Needs attention</h2><div class="Panel-meta"><span>3 of 6 hops · in pipeline order</span></div></div>
+<div class="HopGroups" data-c="HopGroups"><div class="HopGroup">Cause<span>Redis is not responding</span></div><div class="HopGroup is-effects">Downstream effects<span>caused by Redis; they clear when it returns</span></div></div>
+<div class="PipelineHops is-three">
+<section class="PipelineHop n-left" id="write-path" data-c="PipelineHop" data-need="GET /internal/events/outcomes?last=50">
+<div class="PH-rail"><i class="PH-in is-blocked"></i><i class="glyph is-fail"></i><i class="PH-out is-blocked"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">00</span>Write path</h3><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>OPEN · 503</span></div>
+<div class="PH-res">circuit breaker</div>
+<dl class="KeyValueList">
+<dt>State<code>state</code></dt><dd class="is-strong t-fail">OPEN</dd>
+<dt>Failure rate<code>failureRate</code></dt><dd>50% · 5 of 10</dd>
+<dt>Opens at</dt><dd>50%</dd>
+<dt>Window</dt><dd>10 calls</dd>
+<dt>While open</dt><dd>503</dd>
+<dt>Retry-After</dt><dd>10 s</dd>
+<dt>Failed fast since open</dt><dd class="is-strong">25 of 25</dd>
+</dl>
+<div class="PH-block" data-c="OutcomeBreakdown">
+<div class="Sparkline-caption">Last 50 POST /events</div>
+<div class="OutcomeBreakdown"><div class="OutcomeBreakdown-bar"><i class="is-new" style="width: 38%"></i><i class="is-replay" style="width: 2%"></i><i class="is-error" style="width: 10%"></i><i class="is-blocked" style="width: 50%"></i></div>
+<div class="OutcomeBreakdown-rows"><span class="is-tag"><span class="OutcomeTag is-blocked">503 BLOCKED</span></span><span>25</span><span class="muted">50%</span><span class="is-tag"><span class="OutcomeTag is-error">ERROR</span></span><span>5</span><span class="muted">10%</span><span class="is-tag"><span class="OutcomeTag is-new">NEW</span></span><span>19</span><span class="muted">38%</span><span class="is-tag"><span class="OutcomeTag is-replay">REPLAY</span></span><span>1</span><span class="muted">2%</span></div></div>
+</div>
+</section>
+<section class="PipelineHop" id="stream">
+<div class="PH-rail"><i class="PH-in is-blocked"></i><i class="glyph is-fail"></i><i class="PH-out is-blocked"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">01</span>Redis Stream</h3><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>unreachable</span><span class="PH-cause">caused by Redis</span></div>
+<div class="PH-res">audit outbox · last read 14:41:16 UTC</div>
+<dl class="KeyValueList">
+<dt>Unread<code>consumerGroupLag</code></dt><dd><span class="StaleValue"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>0</span></dd>
+<dt>Unacked<code>pendingEntries</code></dt><dd class="is-strong"><span class="StaleValue is-warn"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>1,001</span><small>re-sent on recovery</small></dd>
+<dt>Length<code>streamLength</code></dt><dd><span class="StaleValue"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>301,004</span></dd>
+</dl>
+<div class="PH-block c-in" data-c="Sparkline">
+<svg class="Sparkline is-warn" viewBox="0 0 96 24" role="img" aria-label="Unacked entries rising from 0 to 1,001 over the last 8 successful polls"><polyline points="2,22 15.1,22 28.3,22 41.4,19.6 54.6,15.2 67.7,9.8 80.9,4.4 94,2"></polyline><circle cx="94" cy="2" r="2"></circle></svg>
+<span class="Sparkline-caption">Unacked, last 8 successful polls</span>
+</div>
+<p class="PH-note">The clock marks values last read before Redis stopped answering. The 1,001 unacked entries are already in Kafka; the relay sends them again on recovery and PostgreSQL keeps one row each.</p>
+</section>
+<section class="PipelineHop n-left c-in" id="relay" data-op data-c="operator only" data-need="GET /internal/relay/status">
+<div class="PH-rail"><i class="PH-in is-blocked"></i><i class="glyph is-warn"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">02</span>Relay</h3><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>ack retry</span><span class="PH-cause">caused by Redis</span></div>
+<div class="PH-res">one active instance</div>
+<dl class="KeyValueList">
+<dt>Leader</dt><dd class="is-strong">app-1</dd>
+<dt>Leader lock</dt><dd>held</dd>
+<dt>Standby</dt><dd>app-2</dd>
+<dt>Handoff</dt><dd>10 min idle</dd>
+</dl>
+<p class="PH-note">The relay cannot confirm entries to Redis (XACK), so they stay unacked. It retries on every tick. The leader keeps its lock because PostgreSQL is healthy.</p>
+</section>
+</div>
+
+<details class="CollapsedHops" id="healthy-hops" data-c="CollapsedHops">
+<summary>
+<span class="CollapsedHops-title">Healthy · 3 hops</span>
+<span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>03 Kafka</b><span>lag 0</span></span>
+<span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>04 Consumer</b><span>RUNNING</span></span>
+<span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>05 PostgreSQL</b><span>301,002 stored</span></span>
+<span class="CollapsedHops-toggle"><span class="when-closed">Show details</span><span class="when-open">Hide details</span></span>
+</summary>
+<div class="PipelineHops is-three">
+<section class="PipelineHop" id="kafka">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">03</span>Kafka</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>lag 0</span></div>
+<div class="PH-res">lb-audit-events</div>
+<dl class="KeyValueList">
+<dt>Messages<code>totalMessages</code></dt><dd>301,004</dd>
+<dt>Lag<code>consumerLag</code></dt><dd class="is-strong">0</dd>
+</dl>
+<div class="PH-block">
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p0</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-1</span></div>
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p1</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-1</span></div>
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p2</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-2</span></div>
+</div>
+</section>
+<section class="PipelineHop" id="consumer">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">04</span>Consumer</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>RUNNING</span></div>
+<div class="PH-res">group audit-trend</div>
+<dl class="KeyValueList">
+<dt>State<code>consumerState</code></dt><dd class="is-strong">RUNNING</dd>
+<dt>Ready<code>consumerReady</code></dt><dd>true</dd>
+<dt>Retries<code>retryAttempts</code></dt><dd>0</dd>
+<dt>Members</dt><dd>app-1 · app-2</dd>
+</dl>
+</section>
+<section class="PipelineHop" id="postgres">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out is-none"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">05</span>PostgreSQL</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>301,002 stored</span></div>
+<div class="PH-res">audit_events</div>
+<dl class="KeyValueList">
+<dt>Rows<code>count</code></dt><dd class="is-strong">301,002</dd>
+<dt>Duplicates</dt><dd>ignored</dd>
+</dl>
+</section>
+</div>
+</details>
+</section>
+
+<section class="Panel" id="dlt" aria-labelledby="p-dlt" data-op data-c="Panel · DataTable · operator only" data-need="GET …/audit-topic/dlt?limit=20 · POST …/dlt/{partition}/{offset}/replay | discard | review · POST …/dlt/bulk">
+<div class="Panel-head"><h2 class="Panel-title" id="p-dlt">Dead-letter topic</h2><div class="Panel-meta"><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>2 to review</span><span class="BulkBar"><span>0 selected</span><button class="Button is-small" type="button" disabled>Replay</button><button class="Button is-small" type="button" disabled>Discard…</button><button class="Button is-small" type="button" disabled>Mark reviewed</button></span></div></div>
+<div class="Panel-scroll"><table class="DataTable">
+<thead><tr><th class="is-check"><input class="Check" type="checkbox" aria-label="Select all records"></th><th>Quarantined</th><th>Source</th><th>Event ID</th><th>Failure reason</th><th>Review</th><th><span class="sr">Actions</span></th></tr></thead>
+<tbody>
+<tr><td class="is-check"><input class="Check" type="checkbox" aria-label="Select record at p1 · 61,204"></td><td class="mono">14:07:52 UTC</td><td class="mono">p1 · 61,204</td><td><span class="muted">no ID: payload unreadable</span></td><td class="mono">malformed audit event json</td><td><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>To review</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button><button class="Button is-small" type="button">Mark reviewed</button></td></tr>
+<tr><td class="is-check"><input class="Check" type="checkbox" aria-label="Select record at p2 · 83,551"></td><td class="mono">14:19:26 UTC</td><td class="mono">p2 · 83,551</td><td><span class="IdCell"><span class="mono">1794838763118-0</span><button class="CopyButton" type="button" aria-label="Copy event ID 1794838763118-0"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="mono">unsupported audit event type: adjust</td><td><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>To review</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button><button class="Button is-small" type="button">Mark reviewed</button></td></tr>
+</tbody></table></div>
+<div class="Panel-foot"><span>A record lands here after 3 failed processing attempts. Replay publishes the record to lb-audit-events again; if it now parses it is stored and leaves this list. Discard deletes it and asks for a reason; retained goes down by one. Mark reviewed keeps the record and clears the warning: the strip then reads DLT 2 retained.</span></div>
+</section>
+</main>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showLabels":{"editor":"boolean","default":true},"showApiFields":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1350}}'>
+class Component extends DCLogic {
+renderVals() {
+return { fieldsPressed: (this.props.showApiFields ?? false) ? 'true' : 'false', labelsClass: (this.props.showLabels ?? true) ? '' : 'lc-nolabels', fieldsClass: (this.props.showApiFields ?? false) ? 'lc-fields' : '' };
+}
+}
+</script>
+</body>
+</html>

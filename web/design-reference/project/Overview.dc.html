@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Overview</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="lc {{labelsClass}}">
+<a class="SkipLink" href="#content">Skip to content</a>
+<div class="AppShell" style="min-height: 1280px">
+
+<aside class="SidebarNav c-in" data-c="SidebarNav">
+<div class="SidebarNav-brand"><span class="SidebarNav-mark" aria-hidden="true"><i></i><i></i><i></i></span>RealtimeAPI</div>
+<button class="SidebarNav-project" type="button" aria-label="Project arena-prod, production. Switch project">arena-prod<span class="EnvTag is-prod">prod</span></button>
+<nav class="SidebarNav-group" aria-label="Project">
+<a class="SidebarNav-item is-active" href="Overview.dc.html" aria-current="page">Overview</a>
+<a class="SidebarNav-item" href="LeaderboardLive.dc.html">Leaderboards</a>
+<a class="SidebarNav-item" href="DeliveryHealthy.dc.html">Delivery</a>
+<a class="SidebarNav-item" href="#">Incidents<span class="SidebarNav-count">1</span></a>
+</nav>
+<nav class="SidebarNav-group" aria-label="Build">
+<div class="SidebarNav-label">Build</div>
+<a class="SidebarNav-item" href="#">API keys</a>
+<a class="SidebarNav-item" href="#">Sandbox</a>
+</nav>
+<div class="SidebarNav-foot"><a href="#">Documentation</a><span>Signed in as admin</span></div>
+</aside>
+
+<div class="AppShell-main">
+<div class="TopBar c-in" data-c="TopBar">
+<div class="TopBar-crumbs"><span>arena-prod</span><span>/</span><b>Overview</b></div>
+<div class="TopBar-meta"><span class="RoleChip is-operator c-up" data-c="RoleChip">Operator</span><span class="mono">polled 2s ago</span><span class="mono">2026-11-16 14:32:07 UTC · 23:32:07 local</span></div>
+</div>
+
+<nav class="PipelineStrip" data-c="PipelineStrip" aria-label="Pipeline status">
+<span class="PS-origin">POST /events</span><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#write-path" aria-label="Breaker: CLOSED"><i class="glyph is-ok"></i><span class="PS-name">Breaker</span><span class="PS-val">CLOSED</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#stream" aria-label="Stream: 0 unread · 0 unacked"><i class="glyph is-ok"></i><span class="PS-name">Stream</span><span class="PS-val">0 unread · 0 unacked</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#relay" aria-label="Relay: leader app-1"><i class="glyph is-ok"></i><span class="PS-name">Relay</span><span class="PS-val">leader app-1</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#kafka" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#consumer" aria-label="Consumer: RUNNING"><i class="glyph is-ok"></i><span class="PS-name">Consumer</span><span class="PS-val">RUNNING</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#postgres" aria-label="PostgreSQL: 300,001 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">300,001 stored</span><span class="PS-compact">300.0k stored</span></span></a>
+<a class="PS-node is-warn is-aside" href="DeliveryHealthy.dc.html" data-anchor="#dlt" aria-label="DLT: 2 to review"><i class="glyph is-warn"></i><span class="PS-name">DLT</span><span class="PS-val">2 to review</span></a>
+</nav>
+
+<main class="AppShell-page" id="content">
+<div class="DevNote"><b>illustrative state data</b>DLT 2 and the incident row, leaderboard names, participants, top scores, per-row snapshot age. Measured: release evidence rows, 300,001 stored, lag 0.</div>
+
+<div class="PageHeader" data-c="PageHeader">
+<div>
+<h1 class="PageHeader-title">Overview</h1>
+<div class="PageHeader-meta"><span class="IdCell"><span class="mono">3f6c1e0a-8b7d-4c1e-9a52-6d0e4b7f21c8</span><button class="CopyButton c-up" data-c="CopyButton" type="button" aria-label="Copy project ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span><span>4 leaderboards</span><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>2 live objectives within SLO</span><span class="StatusBadge is-quiet"><i class="glyph is-idle"></i>1 not measured</span></div>
+</div>
+<div class="PageHeader-actions"><a class="Button" href="#">Send test event in Sandbox</a><a class="Button is-primary" href="#">New leaderboard</a></div>
+</div>
+
+<section class="Panel" aria-labelledby="pn1" data-c="Panel">
+<div class="Panel-head"><h2 class="Panel-title" id="pn1">Live objectives</h2><div class="Panel-meta"><span>Measured now, against each limit</span></div></div>
+
+<div class="SloBudget" data-c="SloBudget">
+<div><div class="SloBudget-name">Snapshot lag</div><div class="SloBudget-objective">snapshot_lag_seconds &lt; 45 s</div><div class="SloBudget-source">last success 14:31:40 UTC</div></div>
+<div><div class="SloBudget-value">27 s</div><div class="SloBudget-sub">interval 30 s</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 60%"></i></div><div class="SloBudget-scale"><span><b>60%</b> of budget used</span><span>limit 45 s</span></div></div>
+<div class="SloBudget-history"><span>live value</span></div>
+<div class="SloBudget-status"><span class="StatusBadge is-ok c-up" data-c="StatusBadge"><i class="glyph is-ok"></i>Within SLO</span></div>
+</div>
+
+<div class="SloBudget">
+<div><div class="SloBudget-name">Write path</div><div class="SloBudget-objective">breaker failure rate &lt; 50%</div><div class="SloBudget-source">last 10 calls to Redis</div></div>
+<div><div class="SloBudget-value">0%</div><div class="SloBudget-sub">breaker CLOSED</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 0%"></i></div><div class="SloBudget-scale"><span><b>0 of 10</b> calls failed</span><span>opens at 50%</span></div></div>
+<div class="SloBudget-history"><span>live value</span></div>
+<div class="SloBudget-status"><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>Within SLO</span></div>
+</div>
+
+<div class="SloBudget n-left" data-need="GET /internal/events/error-rate?window=5m">
+<div><div class="SloBudget-name">Write error rate</div><div class="SloBudget-objective">POST /events errors &lt; 0.1%</div><div class="SloBudget-source">no live source yet</div></div>
+<div><div class="SloBudget-value muted">no data</div><div class="SloBudget-sub">last 5 min</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 0%"></i></div><div class="SloBudget-scale"><span>not measured</span><span>limit 0.1%</span></div></div>
+<div class="SloBudget-history"><span>no series</span></div>
+<div class="SloBudget-status"><span class="StatusBadge"><i class="glyph is-idle"></i>Not measured</span></div>
+</div>
+</section>
+
+<section class="Panel" aria-labelledby="pn3" data-c="Panel · DataTable" data-need="GET /internal/incidents?status=open">
+<div class="Panel-head"><h2 class="Panel-title" id="pn3">Open incidents</h2><div class="Panel-meta"><span>1 open · none affect writes or rankings</span></div></div>
+<div class="Panel-scroll"><table class="DataTable">
+<thead><tr><th>Severity</th><th>Incident</th><th>Affects</th><th>Opened</th><th class="num">Open for</th><th><span class="sr">Actions</span></th></tr></thead>
+<tbody>
+<tr><td><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>Warning</span></td><td>2 records quarantined in <span class="mono">lb-audit-events.DLT</span></td><td class="muted">Audit delivery only</td><td class="mono">14:07:52 UTC</td><td class="num">24m 15s</td><td class="is-end"><a href="DeliveryHealthy.dc.html">View incident</a></td></tr>
+</tbody></table></div>
+</section>
+
+<section class="Panel" aria-labelledby="pn4" data-c="Panel · DataTable" data-need="GET /leaderboards?projectId={projectId}">
+<div class="Panel-head"><h2 class="Panel-title" id="pn4">Leaderboards</h2><div class="Panel-meta"><span>4</span></div></div>
+<div class="Panel-scroll"><table class="DataTable">
+<thead><tr><th>Name</th><th>Leaderboard ID</th><th class="num">Participants</th><th class="num">Top score</th><th>Snapshot</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><a href="LeaderboardLive.dc.html" class="DataTable-link">season-12-global</a></td><td><span class="IdCell"><span class="mono muted">7c9e6679-7425-40de-944b-e07fc1f90ae7</span><button class="CopyButton" type="button" aria-label="Copy ID of season-12-global"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="num">1,000</td><td class="num">48,210</td><td><span class="FreshnessIndicator c-up" data-c="FreshnessIndicator"><span class="FreshnessIndicator-meter"><i style="width: 60%"></i></span>snapshot <b>27s</b> ago</span></td><td><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Active</span></td></tr>
+<tr><td><a href="#" class="DataTable-link">weekly-clan-war</a></td><td><span class="IdCell"><span class="mono muted">2b1f8c54-6a0e-4d37-b9c2-51e4a7d08f13</span><button class="CopyButton" type="button" aria-label="Copy ID of weekly-clan-war"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="num">500</td><td class="num">31,775</td><td><span class="FreshnessIndicator"><span class="FreshnessIndicator-meter"><i style="width: 60%"></i></span>snapshot <b>27s</b> ago</span></td><td><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Active</span></td></tr>
+<tr><td><a href="#" class="DataTable-link">daily-sprint</a></td><td><span class="IdCell"><span class="mono muted">e4a0d9b6-13c7-4f58-8e21-9b6f2c7a5d40</span><button class="CopyButton" type="button" aria-label="Copy ID of daily-sprint"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="num">300</td><td class="num">9,460</td><td><span class="FreshnessIndicator"><span class="FreshnessIndicator-meter"><i style="width: 60%"></i></span>snapshot <b>27s</b> ago</span></td><td><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Active</span></td></tr>
+<tr><td><a href="#" class="DataTable-link">beta-ladder</a></td><td><span class="IdCell"><span class="mono muted">90c3f7a2-d5e8-4b16-a47c-0f3e8d1b6c59</span><button class="CopyButton" type="button" aria-label="Copy ID of beta-ladder"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="num">0</td><td class="num muted">none</td><td><span class="FreshnessIndicator is-idle"><span class="FreshnessIndicator-meter"><i style="width: 0%"></i></span><b>no snapshot yet</b></span></td><td><span class="StatusBadge is-quiet"><i class="glyph is-idle"></i>Empty</span></td></tr>
+</tbody></table></div>
+<div class="Panel-foot"><span>Participants is the live count in Redis. Snapshots cover the top 1,000 of each leaderboard; an empty leaderboard is never snapshotted.</span></div>
+</section>
+
+<section class="Panel" aria-labelledby="pn2" data-op data-c="Panel · operator only">
+<div class="Panel-head"><h2 class="Panel-title" id="pn2">Release evidence</h2><div class="Panel-meta"><span>k6 load tests on Redis 256 MB · latest run 27b5b47 on 2026-11-16 · not live</span></div></div>
+
+<div class="SloBudget is-evidence" data-c="SloBudget · evidence">
+<div><div class="SloBudget-name">Write latency</div><div class="SloBudget-objective">POST /events p99 &lt; 50 ms</div><div class="SloBudget-source">T1 Kafka E2E · 27b5b47 · 991.11 RPS · 5 min</div></div>
+<div><div class="SloBudget-value">11.82 ms</div><div class="SloBudget-sub">0 failed / 301,007</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 23.6%"></i></div><div class="SloBudget-scale"><span><b>23.6%</b> of budget used</span><span>limit 50 ms</span></div></div>
+<div class="SloBudget-history c-up" data-c="Sparkline"><svg class="Sparkline" viewBox="0 0 96 24" role="img" aria-label="Write p99 by run, in ms: T1 300 users 4.15, T1 500 users 27.09, T1 1000 users 20.92, T1 Kafka E2E phase 2 3.99, T3 1.47, T8 30 s 1.36, T8 5 min 1.67, T1 Kafka E2E 27b5b47 11.82. Limit 50."><line x1="0" y1="2" x2="96" y2="2"></line><polyline points="2,20.3 15.1,11.2 28.3,13.6 41.4,20.4 54.6,21.4 67.7,21.5 80.9,21.3 94,17.3"></polyline><circle cx="94" cy="17.3" r="2"></circle></svg><span>8 runs to 27b5b47</span></div>
+<div class="SloBudget-status"><span class="StatusBadge">Passed</span></div>
+</div>
+
+<div class="SloBudget is-evidence">
+<div><div class="SloBudget-name">Read latency</div><div class="SloBudget-objective">GET tops p99 &lt; 20 ms</div><div class="SloBudget-source">T3 mixed read and write · 5 min</div></div>
+<div><div class="SloBudget-value">1.65 ms</div><div class="SloBudget-sub">19 failed / 601,014</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 8.3%"></i></div><div class="SloBudget-scale"><span><b>8.3%</b> of budget used</span><span>limit 20 ms</span></div></div>
+<div class="SloBudget-history"><svg class="Sparkline" viewBox="0 0 96 24" role="img" aria-label="Read p99 by run, in ms: T3 1.65, T8 30 s 1.63, T8 5 min 1.99. Limit 20."><line x1="0" y1="2" x2="96" y2="2"></line><polyline points="2,20.4 48,20.4 94,20"></polyline><circle cx="94" cy="20" r="2"></circle></svg><span>3 runs</span></div>
+<div class="SloBudget-status"><span class="StatusBadge">Passed</span></div>
+</div>
+
+<div class="SloBudget is-evidence">
+<div><div class="SloBudget-name">Idempotency</div><div class="SloBudget-objective">duplicate-key score changes = 0</div><div class="SloBudget-source">T4 · 50 concurrent requests, one key</div></div>
+<div><div class="SloBudget-value">0</div><div class="SloBudget-sub">1 applied · 49 replayed</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 0%"></i></div><div class="SloBudget-scale"><span><b>0</b> contaminated · 0 errors</span><span>limit 0</span></div></div>
+<div class="SloBudget-history"><span>single run</span></div>
+<div class="SloBudget-status"><span class="StatusBadge">Passed</span></div>
+</div>
+</section>
+
+</main>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showLabels":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":1280}}'>
+class Component extends DCLogic {
+renderVals() {
+return { labelsClass: (this.props.showLabels ?? true) ? '' : 'lc-nolabels' };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,529 @@
+/* Leaderboard Console — shared tokens and components.
+   One class per component, named exactly as on the Foundations sheet.
+   Status is always carried by glyph shape + label, never by hue alone. */
+
+/* ---------- Tokens ---------- */
+.lc {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-2: #F0F0ED;
+  --border: #E2E2DD;
+  --border-strong: #C6C6C0;
+  --text: #16181B;
+  --text-2: #4D5157;
+  --text-3: #666A71;
+  --accent: #2348C9;
+  --accent-bg: #EBEFFC;
+  --accent-text: #1D3CA8;
+  --ok: #116A42;
+  --ok-solid: #1F9D63;
+  --ok-bg: #E6F4EC;
+  --warn: #855300;
+  --warn-solid: #B07500;
+  --warn-bg: #FBF1DA;
+  --fail: #B4261D;
+  --fail-solid: #D5382D;
+  --fail-bg: #FCEAE8;
+  --on-solid: #FFFFFF;
+  --track: #BDBDB6;
+  --focus: #2348C9;
+
+  --font-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r-1: 3px;
+  --r-2: 4px;
+  --r-3: 6px;
+
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  width: 100%;
+  position: relative;
+}
+.lc-dark {
+  --bg: #0F1113;
+  --surface: #16191C;
+  --surface-2: #1E2226;
+  --border: #2A2F35;
+  --border-strong: #454C55;
+  --text: #ECEDEE;
+  --text-2: #B6BBC2;
+  --text-3: #979DA5;
+  --accent: #8FA6FF;
+  --accent-bg: #1B2550;
+  --accent-text: #B4C3FF;
+  --ok: #6AD7A2;
+  --ok-solid: #34B57A;
+  --ok-bg: #12301F;
+  --warn: #F0BE55;
+  --warn-solid: #D99A1A;
+  --warn-bg: #3A2A08;
+  --fail: #FF9A91;
+  --fail-solid: #E5534A;
+  --fail-bg: #3D1512;
+  --on-solid: #0F1113;
+  --track: #4A515A;
+  --focus: #B4C3FF;
+  color: var(--text);
+  background: var(--surface);
+}
+.lc *, .lc *::before, .lc *::after { box-sizing: border-box; }
+.lc h1, .lc h2, .lc h3, .lc p, .lc dl, .lc dd, .lc dt, .lc ul, .lc ol { margin: 0; padding: 0; }
+.lc ul, .lc ol { list-style: none; }
+.lc a { color: var(--accent-text); text-decoration: none; }
+.lc a:hover { text-decoration: underline; }
+.lc .mono, .lc .num { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.lc .num { text-align: right; }
+.lc .muted { color: var(--text-3); }
+.lc .t-ok { color: var(--ok); }
+.lc .t-warn { color: var(--warn); }
+.lc .t-fail { color: var(--fail); }
+.lc .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.lc ::selection { background: var(--accent-bg); color: var(--text); }
+
+/* ---------- Focus: one ring for every interactive element ---------- */
+.lc :is(a, button, summary, [tabindex]):focus-visible,
+.lc .is-focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-2); }
+.lc .TextField input:focus-visible,
+.lc .TextField.is-focus input { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+
+/* ---------- SkipLink ---------- */
+.lc .SkipLink { position: absolute; left: -9999px; top: 0; }
+.lc .SkipLink:focus-visible, .lc .SkipLink.is-focus-visible { position: absolute; left: 8px; top: 8px; z-index: 10; display: inline-flex; align-items: center; height: 28px; padding: 0 10px; background: var(--surface); color: var(--accent-text); font-weight: 500; }
+.lc .SkipLink.is-demo { position: static; align-self: flex-start; }
+
+/* ---------- RoleChip · EnvTag ---------- */
+.lc .RoleChip { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--border-strong); border-radius: var(--r-1); font: 500 11px var(--font-ui); color: var(--text-2); }
+.lc .RoleChip.is-operator { border-color: var(--text); color: var(--text); }
+.lc .EnvTag { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid var(--border-strong); border-radius: var(--r-1); font: 500 11px var(--font-mono); color: var(--text-2); background: var(--surface); }
+.lc .EnvTag.is-prod { border-color: var(--fail-solid); color: var(--fail); }
+
+/* ---------- OperatorOnly: data-op marks a region rendered only for the operator role.
+   It has no look of its own in the product; the dashed outline belongs to the developer layer. ---------- */
+.lc:not(.lc-nolabels) [data-op] { outline: 1px dashed #9C1150; outline-offset: -2px; }
+
+/* ---------- StaleValue: a last-known number from a source that is not answering ---------- */
+.lc .StaleValue { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); font-weight: 400; }
+.lc .StaleValue-glyph { width: 11px; height: 11px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
+.lc .StaleValue.is-warn { color: var(--warn); }
+
+/* ---------- CopyButton ---------- */
+.lc .CopyButton { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 24px; height: 24px; padding: 0 4px; border: 0; border-radius: var(--r-2); background: transparent; color: var(--text-3); font: 500 11px var(--font-ui); cursor: pointer; vertical-align: middle; }
+.lc .CopyButton svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.3; }
+.lc .CopyButton:hover, .lc .CopyButton.is-hover { background: var(--surface-2); color: var(--text); }
+.lc .CopyButton.is-copied { color: var(--ok); }
+.lc .CopyButton[disabled] { color: var(--border-strong); cursor: not-allowed; background: transparent; }
+.lc .IdCell { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ---------- Status glyph (shape encodes status) ---------- */
+.lc .glyph { display: inline-block; flex: none; width: 8px; height: 8px; }
+.lc .glyph.is-ok { background: var(--ok-solid); border-radius: 50%; }
+.lc .glyph.is-warn { background: var(--warn-solid); width: 9px; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.lc .glyph.is-fail { background: var(--fail-solid); border-radius: 1px; }
+.lc .glyph.is-idle { background: transparent; border: 1.5px solid var(--text-3); border-radius: 50%; }
+
+/* ---------- Developer labels (annotation layer, toggled by the artboard tweak) ---------- */
+.lc [data-c] { position: relative; }
+.lc [data-c]::before {
+  content: attr(data-c);
+  position: absolute; top: -8px; right: 8px; z-index: 3;
+  font: 500 9px/14px var(--font-mono);
+  color: #9C1150; background: #FFF1F7; border: 1px solid #F0B4CE; border-radius: 2px;
+  padding: 0 4px; white-space: nowrap; letter-spacing: 0; text-transform: none;
+}
+.lc [data-c].c-in::before { top: 3px; right: 4px; }
+.lc [data-c].c-left::before { right: auto; left: 8px; }
+.lc [data-c].c-up::before { top: -16px; right: 0; }
+.lc.lc-nolabels [data-c]::before { display: none; }
+/* needs-endpoint tag: the component is designed, the API is not there yet */
+.lc [data-need] { position: relative; }
+.lc [data-need]::after {
+  content: "needs endpoint: " attr(data-need);
+  position: absolute; bottom: -8px; right: 8px; z-index: 3;
+  font: 500 9px/14px var(--font-mono);
+  color: #FFFFFF; background: #9C1150; border: 1px solid #9C1150; border-radius: 2px;
+  padding: 0 4px; white-space: nowrap; letter-spacing: 0; text-transform: none;
+}
+.lc [data-need].n-left::after { right: auto; left: 8px; }
+.lc.lc-nolabels [data-need]::after { display: none; }
+/* DevNote: says which numbers on the artboard are illustrative, not measured */
+.lc .DevNote { position: absolute; top: 4px; left: 32px; right: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 9px/14px var(--font-mono); color: #9C1150; }
+.lc .DevNote b { font-weight: 500; color: #FFFFFF; background: #9C1150; border-radius: 2px; padding: 0 4px; margin-right: 6px; }
+.lc.lc-nolabels .DevNote { display: none; }
+
+/* ---------- AppShell: SidebarNav + TopBar ---------- */
+.lc .AppShell { display: flex; flex-wrap: wrap; align-items: stretch; }
+.lc .SidebarNav { flex: 1 1 224px; max-width: 224px; background: var(--bg); border-right: 1px solid var(--border); padding: 16px 12px; display: flex; flex-direction: column; gap: 20px; }
+.lc .SidebarNav-brand { display: flex; align-items: center; gap: 8px; padding: 0 8px; font-weight: 600; font-size: 14px; }
+.lc .SidebarNav-mark { display: flex; flex-direction: column; gap: 2px; width: 14px; }
+.lc .SidebarNav-mark i { display: block; height: 3px; background: var(--text); border-radius: 1px; }
+.lc .SidebarNav-mark i:nth-child(2) { width: 70%; }
+.lc .SidebarNav-mark i:nth-child(3) { width: 40%; }
+.lc .SidebarNav-project { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 36px; padding: 0 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); font: 500 13px var(--font-ui); color: var(--text); cursor: pointer; }
+.lc .SidebarNav-group { display: flex; flex-direction: column; gap: 2px; }
+.lc .SidebarNav-label { padding: 0 8px 4px; font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.lc .SidebarNav-item { display: flex; align-items: center; justify-content: space-between; height: 30px; padding: 0 8px; border-radius: var(--r-2); color: var(--text-2); font-weight: 500; }
+.lc a.SidebarNav-item { color: var(--text-2); }
+.lc a.SidebarNav-item:hover { background: var(--surface-2); text-decoration: none; }
+.lc a.SidebarNav-item.is-active { background: var(--surface-2); color: var(--text); font-weight: 600; }
+.lc .SidebarNav-count { font: 500 11px/16px var(--font-mono); padding: 0 5px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); }
+.lc .SidebarNav-count.is-fail { background: var(--fail-bg); color: var(--fail); }
+.lc .SidebarNav-foot { margin-top: auto; padding: 0 8px; font-size: 12px; color: var(--text-3); display: flex; flex-direction: column; gap: 4px; }
+
+.lc .AppShell-main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; background: var(--surface); }
+.lc .TopBar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; min-height: 48px; padding: 0 24px; border-bottom: 1px solid var(--border); }
+.lc .TopBar-crumbs { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
+.lc .TopBar-crumbs b { color: var(--text); font-weight: 500; }
+.lc .TopBar-meta { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-3); }
+.lc .AppShell-page { position: relative; padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 20px; }
+
+/* ---------- PipelineStrip (signature; lives in layout.tsx) ---------- */
+.lc .PipelineStrip { display: flex; align-items: center; height: 40px; padding: 0 20px 0 24px; border-bottom: 1px solid var(--border); background: var(--bg); font-size: 12px; white-space: nowrap; }
+/* Overflow rules, in order:
+   1. Nodes shrink before the rail does; a value that does not fit is cut with an ellipsis. The node's aria-label always
+      carries the full text, and hover or keyboard focus expands the node in place (.is-expanded).
+   2. A value is never wider than 24ch. Below 1100px of strip width the cap is 12ch and counts of 100,000 or more
+      switch to the compact form (300.0k), still tabular.
+   3. The origin label shows only from 1180px of strip width. Below 960px the cap is 8ch. Below 860px the strip scrolls sideways. */
+.lc .PipelineStrip { container-type: inline-size; min-width: 0; }
+.lc .PS-origin { flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.lc .PS-compact { display: none; }
+@container (max-width: 1180px) {
+  .lc .PS-origin, .lc .PS-origin + .PS-link { display: none; }
+}
+@container (max-width: 1100px) {
+  .lc .PipelineStrip .PS-val { max-width: 12ch; }
+  .lc .PS-full { display: none; }
+  .lc .PS-compact { display: inline; }
+}
+@container (max-width: 960px) {
+  .lc .PipelineStrip .PS-val { max-width: 8ch; }
+}
+.lc .PS-node { display: inline-flex; flex: 0 1 auto; min-width: 72px; max-width: 280px; overflow: hidden; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); color: var(--text); }
+.lc a.PS-node { color: var(--text); }
+.lc a.PS-node:hover { border-color: var(--border-strong); text-decoration: none; }
+.lc .PS-name { flex: none; font-weight: 500; }
+.lc .PS-val { min-width: 0; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.lc .PS-node.is-warn { border-color: var(--warn-solid); }
+.lc .PS-node.is-warn .PS-val { color: var(--warn); }
+.lc .PS-node.is-fail { border-color: var(--fail-solid); background: var(--fail-bg); }
+.lc .PS-node.is-fail .PS-val { color: var(--fail); font-weight: 500; }
+.lc .PS-node.is-aside { margin-left: 12px; }
+.lc .PS-node:is(:hover, :focus-visible, .is-expanded) { flex-shrink: 0; max-width: none; overflow: visible; }
+.lc .PipelineStrip .PS-node:is(:hover, :focus-visible, .is-expanded) .PS-val { max-width: none; overflow: visible; }
+.lc .PS-node.is-fail .StaleValue { color: var(--text-2); }
+.lc .PS-val .StaleValue { display: inline; margin-left: 6px; }
+.lc .PS-val .StaleValue-glyph { vertical-align: -1px; margin-right: 3px; }
+.lc .PS-link { flex: 1 1 10px; min-width: 10px; height: 0; border-top: 2px solid var(--border-strong); position: relative; }
+.lc .PS-link::after { content: ""; position: absolute; right: -1px; top: -5px; border-left: 5px solid var(--border-strong); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.lc .PS-link.is-blocked { border-top: 2px dashed var(--fail-solid); }
+.lc .PS-link.is-blocked::after { border-left-color: var(--fail-solid); }
+.lc .PS-link.is-branch { border-top: 2px dotted var(--border-strong); flex: 0 0 28px; }
+
+/* ---------- PageHeader ---------- */
+.lc .PageHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.lc .PageHeader-title { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -.01em; }
+.lc .PageHeader-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; color: var(--text-2); }
+.lc .PageHeader-actions { display: flex; align-items: center; gap: 8px; }
+
+/* ---------- Button ---------- */
+.lc .Button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--r-2); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font: 500 13px var(--font-ui); cursor: pointer; white-space: nowrap; }
+.lc a.Button { color: var(--text); }
+.lc .Button:hover { background: var(--surface-2); text-decoration: none; }
+.lc .Button.is-primary { background: var(--accent); border-color: var(--accent); color: var(--on-solid); }
+.lc .Button.is-ghost { border-color: transparent; background: transparent; color: var(--accent-text); padding: 0 8px; }
+.lc .Button.is-small { height: 26px; padding: 0 8px; font-size: 12px; }
+.lc .Button.is-danger { border-color: var(--fail-solid); color: var(--fail); }
+.lc .Button[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-text); }
+.lc .Button[disabled] { color: var(--text-3); background: var(--surface-2); border-color: var(--border); cursor: not-allowed; }
+
+/* ---------- TextField ---------- */
+.lc .TextField { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lc .TextField label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.lc .TextField input { height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--r-2); background: var(--surface); color: var(--text); font: 400 12px var(--font-mono); width: 100%; }
+.lc .TextField input::placeholder { color: var(--text-3); }
+.lc .TextField.is-error input { border-color: var(--fail-solid); }
+.lc .TextField-hint { font-size: 12px; color: var(--text-3); }
+.lc .TextField.is-error .TextField-hint { color: var(--fail); }
+
+/* ---------- Tabs ---------- */
+.lc .Tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); }
+.lc .Tabs a { display: inline-flex; align-items: center; gap: 6px; height: 36px; color: var(--text-2); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.lc .Tabs a:hover { color: var(--text); text-decoration: none; }
+.lc .Tabs a.is-active { color: var(--text); border-bottom-color: var(--accent); }
+
+/* ---------- Panel ---------- */
+.lc .Panel { border: 1px solid var(--border); border-radius: var(--r-3); background: var(--surface); min-width: 0; }
+.lc .Panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 44px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.lc .Panel-title { font-size: 13px; line-height: 20px; font-weight: 600; }
+.lc .Panel-meta { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-3); }
+.lc .Panel-body { padding: 16px; }
+.lc .Panel-body.is-stack { display: flex; flex-direction: column; gap: 16px; }
+.lc .Panel-section { padding-top: 14px; border-top: 1px solid var(--border); }
+.lc .Panel-caption { font-size: 12px; line-height: 17px; color: var(--text-3); margin-bottom: 8px; }
+.lc .Panel-scroll.is-divided { border-top: 1px solid var(--border); }
+.lc .Panel-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-3); }
+.lc .Panel-scroll { overflow-x: auto; }
+
+/* ---------- StatusBadge ---------- */
+.lc .StatusBadge { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--r-2); font-size: 12px; font-weight: 500; white-space: nowrap; background: var(--surface-2); color: var(--text-2); }
+.lc .StatusBadge.is-ok { background: var(--ok-bg); color: var(--ok); }
+.lc .StatusBadge.is-warn { background: var(--warn-bg); color: var(--warn); }
+.lc .StatusBadge.is-fail { background: var(--fail-bg); color: var(--fail); }
+.lc .StatusBadge.is-quiet { background: transparent; padding: 0; height: 20px; }
+
+/* ---------- OutcomeTag ---------- */
+.lc .OutcomeTag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: var(--r-1); border: 1px solid transparent; font: 500 11px var(--font-mono); white-space: nowrap; }
+.lc .OutcomeTag.is-new { background: var(--ok-bg); color: var(--ok); }
+.lc .OutcomeTag.is-replay { background: var(--accent-bg); color: var(--accent-text); }
+.lc .OutcomeTag.is-conflict { background: var(--warn-bg); color: var(--warn); }
+.lc .OutcomeTag.is-limited { background: var(--surface); color: var(--warn); border-color: var(--warn-solid); }
+.lc .OutcomeTag.is-blocked { background: var(--surface); color: var(--fail); border-color: var(--fail); font-weight: 600; }
+.lc .OutcomeTag.is-error { background: var(--surface); color: var(--fail); border: 1px dashed var(--fail-solid); }
+
+/* ---------- DataTable ---------- */
+.lc .DataTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lc .DataTable th { height: 32px; padding: 0 12px; text-align: left; font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.lc .DataTable td { height: 36px; padding: 0 12px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+.lc .DataTable th:first-child, .lc .DataTable td:first-child { padding-left: 16px; }
+.lc .DataTable th:last-child, .lc .DataTable td:last-child { padding-right: 16px; }
+.lc .DataTable tr:last-child td { border-bottom: 0; }
+.lc .DataTable th.num { text-align: right; font-family: var(--font-ui); font-size: 11px; }
+.lc .DataTable td.wrap { white-space: normal; }
+.lc .DataTable tr.is-hover td { background: var(--bg); }
+.lc .DataTable tr.is-selected td { background: var(--accent-bg); }
+.lc .DataTable td.DataTable-empty { height: 72px; text-align: center; color: var(--text-3); }
+.lc .DataTable.is-fixed { table-layout: fixed; }
+.lc .DataTable.is-fixed th:first-child { width: 104px; }
+.lc .DataTable a.DataTable-link { font-weight: 500; }
+.lc .DataTable td.is-end { text-align: right; }
+.lc .DataTable td.is-actions { text-align: right; }
+.lc .DataTable td.is-actions .Button + .Button { margin-left: 4px; }
+.lc .DataTable th.is-check, .lc .DataTable td.is-check { width: 40px; padding-right: 0; }
+.lc .Check { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); vertical-align: middle; }
+.lc .BulkBar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lc .DataTable-cell { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ---------- RankRow (a DataTable row) ---------- */
+.lc .RankRow .RankRow-rank { font-family: var(--font-mono); font-size: 13px; font-weight: 500; width: 88px; }
+.lc .RankRow-tie { margin-left: 8px; padding: 0 4px; border: 1px solid var(--border-strong); border-radius: var(--r-1); font: 500 11px/14px var(--font-mono); color: var(--text-2); }
+.lc .RankRow-user { font-weight: 500; }
+.lc .RankRow td.is-up { color: var(--text); font-weight: 500; }
+.lc .RankRow td.is-zero { color: var(--text-3); }
+.lc .RankRow.is-unranked td { color: var(--text-3); }
+
+/* ---------- KeyValueList ---------- */
+.lc .KeyValueList { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; font-size: 12px; line-height: 18px; }
+.lc .KeyValueList.is-narrow { max-width: 380px; }
+.lc .KeyValueList dt { color: var(--text-3); min-width: 0; }
+.lc .KeyValueList dt code { font: 400 11px var(--font-mono); color: var(--text-3); display: none; line-height: 14px; }
+.lc.lc-fields .KeyValueList dt code { display: block; }
+.lc .KeyValueList dd { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--text); }
+.lc .KeyValueList dd.is-strong { font-weight: 500; font-size: 13px; }
+.lc .KeyValueList dd.t-ok { color: var(--ok); }
+.lc .KeyValueList dd.t-warn { color: var(--warn); }
+.lc .KeyValueList dd.t-fail { color: var(--fail); }
+.lc .KeyValueList dd.muted { color: var(--text-3); }
+.lc .KeyValueList dd small { display: block; font: 400 11px/14px var(--font-ui); color: var(--text-3); }
+
+/* ---------- PipelineHop ---------- */
+.lc .PipelineHops { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.lc .PipelineHop { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; border-right: 1px solid var(--border); }
+.lc .PipelineHop:last-child { border-right: 0; }
+.lc .PipelineHops.is-six, .lc .PipelineBranch.is-six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.lc .PipelineHops.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lc .PipelineBranch.is-six .PipelineBranch-recon { grid-column: 1 / span 4; }
+.lc .PipelineBranch.is-six .PipelineHop { grid-column: 5 / span 2; }
+.lc .PipelineHop:target { background: var(--accent-bg); }
+
+/* ---------- CollapsedHops: healthy hops folded into one row during an incident ---------- */
+.lc .CollapsedHops { border-top: 1px solid var(--border); }
+.lc .CollapsedHops > summary { display: flex; align-items: center; gap: 8px 20px; flex-wrap: wrap; min-height: 44px; padding: 6px 16px; background: var(--bg); cursor: pointer; list-style: none; }
+.lc .CollapsedHops > summary::-webkit-details-marker { display: none; }
+.lc .CollapsedHops[open] > summary { border-bottom: 1px solid var(--border); }
+.lc .CollapsedHops-title { font-weight: 600; }
+.lc .CollapsedHops-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.lc .CollapsedHops-item b { font-weight: 500; }
+.lc .CollapsedHops-item span { font-family: var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.lc .CollapsedHops-toggle { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--accent-text); }
+.lc .CollapsedHops .when-open, .lc .CollapsedHops[open] .when-closed { display: none; }
+.lc .CollapsedHops[open] .when-open { display: inline; }
+.lc .PH-rail { display: flex; align-items: center; height: 28px; background: var(--bg); border-bottom: 1px solid var(--border); }
+.lc .PH-rail .glyph { width: 10px; height: 10px; margin: 0 6px; }
+.lc .PH-rail .glyph.is-warn { width: 11px; }
+.lc .PH-in { flex: 0 0 10px; height: 0; border-top: 2px solid var(--border-strong); }
+.lc .PH-out { flex: 1; height: 0; border-top: 2px solid var(--border-strong); position: relative; }
+.lc .PH-out::after { content: ""; position: absolute; right: 12px; top: -5px; border-left: 5px solid var(--border-strong); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.lc .PH-in.is-none, .lc .PH-out.is-none { border-top-color: transparent; }
+.lc .PH-out.is-none::after { display: none; }
+.lc .PH-in.is-blocked, .lc .PH-out.is-blocked { border-top: 2px dashed var(--fail-solid); }
+.lc .PH-out.is-blocked::after { border-left-color: var(--fail-solid); }
+.lc .PH-in.is-branch { border-top: 2px dotted var(--border-strong); flex-basis: 16px; }
+.lc .PH-railnote { font: 400 11px var(--font-mono); color: var(--text-3); }
+.lc .PH-head { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 2px 16px 0; }
+.lc .PH-title { font-size: 13px; font-weight: 600; line-height: 20px; }
+.lc .PH-step { font: 400 11px var(--font-mono); color: var(--text-3); margin-right: 6px; }
+.lc .PH-res { padding: 0 16px; font: 400 12px/17px var(--font-mono); color: var(--text-3); overflow-wrap: anywhere; }
+.lc .PipelineHop > .KeyValueList, .lc .PipelineHop > .PH-block { margin: 0 16px; }
+.lc .PH-block { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+.lc .PipelineBranch-recon .PH-title { margin-bottom: 10px; }
+.lc .OutcomeBreakdown-rows span.is-tag { text-align: left; }
+.lc .PH-cause { font-size: 12px; color: var(--text-3); }
+.lc .HopGroups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--border); }
+.lc .HopGroup { padding: 8px 16px; font-size: 12px; font-weight: 600; }
+.lc .HopGroup.is-effects { grid-column: span 2; border-left: 1px solid var(--border); }
+.lc .HopGroup span { margin-left: 6px; font-weight: 400; color: var(--text-3); }
+
+/* ---------- Reconcile: the one answer on /delivery ---------- */
+.lc .Reconcile { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--r-3); font: 500 15px/22px var(--font-mono); font-variant-numeric: tabular-nums; }
+.lc .Reconcile small { margin-left: 5px; font: 400 12px var(--font-ui); color: var(--text-2); }
+.lc .Reconcile-op { color: var(--text-3); font-weight: 400; }
+.lc .Reconcile-result { margin-left: auto; align-self: center; }
+.lc .Reconcile-extra { flex-basis: 100%; font: 400 12px/18px var(--font-ui); color: var(--warn); }
+
+/* ---------- ConfirmDialog ---------- */
+.lc .ConfirmDialog { width: 460px; max-width: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-3); background: var(--surface); box-shadow: 0 8px 24px rgba(22, 24, 27, .14); }
+.lc .ConfirmDialog-head { padding: 14px 16px 0; font-size: 14px; font-weight: 600; }
+.lc .ConfirmDialog-body { display: flex; flex-direction: column; gap: 12px; padding: 8px 16px 14px; color: var(--text-2); }
+.lc .ConfirmDialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--bg); border-radius: 0 0 var(--r-3) var(--r-3); }
+.lc .PH-note { padding: 0 16px; font-size: 12px; line-height: 17px; color: var(--text-3); }
+.lc .PipelineBranch { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--border); }
+.lc .PipelineBranch-recon { grid-column: 1 / span 3; padding: 14px 16px 16px; border-right: 1px solid var(--border); }
+.lc .PipelineBranch .PipelineHop { grid-column: 4 / span 2; border-right: 0; }
+
+/* ---------- PartitionLagBar ---------- */
+.lc .PartitionLagBar { display: grid; grid-template-columns: 20px minmax(20px, 1fr) 36px 40px; align-items: center; gap: 8px; font: 400 11px/16px var(--font-mono); font-variant-numeric: tabular-nums; }
+.lc .PartitionLagBar-id { color: var(--text-2); }
+.lc .PartitionLagBar-track { height: 6px; background: var(--track); border-radius: 1px; overflow: hidden; }
+.lc .PartitionLagBar-fill { display: block; height: 100%; background: var(--ok-solid); }
+.lc .PartitionLagBar.is-warn .PartitionLagBar-fill { background: var(--warn-solid); }
+.lc .PartitionLagBar.is-fail .PartitionLagBar-fill { background: var(--fail-solid); }
+.lc .PartitionLagBar-lag { text-align: right; color: var(--text); }
+.lc .PartitionLagBar.is-warn .PartitionLagBar-lag { color: var(--warn); }
+.lc .PartitionLagBar.is-fail .PartitionLagBar-lag { color: var(--fail); }
+.lc .PartitionLagBar-owner { color: var(--text-3); text-align: right; }
+
+/* ---------- SloBudget ---------- */
+.lc .SloBudget { display: grid; grid-template-columns: minmax(200px, 1.5fr) minmax(170px, .8fr) minmax(220px, 2fr) 132px 110px; align-items: center; gap: 8px 24px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.lc .SloBudget:last-child { border-bottom: 0; }
+.lc .SloBudget-name { font-weight: 600; }
+.lc .SloBudget-objective { font: 400 12px/17px var(--font-mono); color: var(--text-2); }
+.lc .SloBudget-source { font-size: 12px; line-height: 17px; color: var(--text-3); }
+.lc .SloBudget-value { font: 500 15px/20px var(--font-mono); font-variant-numeric: tabular-nums; }
+.lc .SloBudget-sub { font: 400 11px/16px var(--font-mono); color: var(--text-3); }
+.lc .SloBudget-bar { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lc .SloBudget-track { position: relative; height: 8px; background: var(--track); border-radius: 1px; border-right: 2px solid var(--text); }
+.lc .SloBudget-fill { display: block; height: 100%; background: var(--ok-solid); max-width: 100%; }
+.lc .SloBudget.is-warn .SloBudget-fill { background: var(--warn-solid); }
+.lc .SloBudget.is-fail .SloBudget-fill { background: var(--fail-solid); }
+.lc .SloBudget.is-fail .SloBudget-track { border-right-color: var(--fail); }
+.lc .SloBudget-scale { display: flex; justify-content: space-between; gap: 8px; font: 400 11px/14px var(--font-mono); color: var(--text-3); }
+.lc .SloBudget-scale b { font-weight: 500; color: var(--text-2); }
+.lc .SloBudget.is-fail .SloBudget-scale b { color: var(--fail); }
+.lc .SloBudget-history { display: flex; flex-direction: column; gap: 2px; font: 400 11px/14px var(--font-mono); color: var(--text-3); }
+.lc .SloBudget.is-evidence .SloBudget-fill { background: var(--text-2); }
+.lc .SloBudget-status { justify-self: end; }
+
+/* ---------- Sparkline ---------- */
+.lc .Sparkline { display: block; width: 96px; height: 24px; color: var(--text-2); overflow: visible; }
+.lc .Sparkline polyline { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.lc .Sparkline circle { fill: currentColor; }
+.lc .Sparkline line { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 2 3; }
+.lc .Sparkline-caption { font-size: 11px; line-height: 15px; color: var(--text-3); }
+.lc .Sparkline.is-fail { color: var(--fail-solid); }
+.lc .Sparkline.is-warn { color: var(--warn-solid); }
+.lc .Sparkline.is-empty polyline { stroke: var(--border-strong); stroke-dasharray: 2 3; }
+
+/* ---------- FreshnessIndicator ---------- */
+.lc .FreshnessIndicator { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.lc .FreshnessIndicator-meter { width: 45px; height: 4px; background: var(--track); border-radius: 1px; position: relative; flex: none; }
+.lc .FreshnessIndicator-meter i { display: block; height: 100%; background: var(--ok-solid); max-width: 100%; }
+.lc .FreshnessIndicator-meter::after { content: ""; position: absolute; left: 30px; top: -2px; width: 1px; height: 8px; background: var(--text-3); }
+.lc .FreshnessIndicator b { font: 500 12px var(--font-mono); color: var(--text); }
+.lc .FreshnessIndicator.is-warn .FreshnessIndicator-meter i { background: var(--warn-solid); }
+.lc .FreshnessIndicator.is-warn b { color: var(--warn); }
+.lc .FreshnessIndicator.is-fail .FreshnessIndicator-meter i { background: var(--fail-solid); }
+.lc .FreshnessIndicator.is-fail b { color: var(--fail); }
+.lc .FreshnessIndicator.is-idle b { color: var(--text-3); font-weight: 400; }
+
+/* ---------- IncidentBanner ---------- */
+.lc .IncidentBanner { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--fail-solid); border-radius: var(--r-3); background: var(--fail-bg); }
+.lc .IncidentBanner-main { display: flex; gap: 10px; min-width: 0; flex: 1 1 420px; }
+.lc .IncidentBanner-main .glyph { width: 10px; height: 10px; margin-top: 5px; }
+.lc .IncidentBanner-title { font-weight: 600; color: var(--fail); }
+.lc .IncidentBanner-body { color: var(--text); max-width: 880px; text-wrap: pretty; }
+.lc .IncidentBanner-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font: 400 11px/16px var(--font-mono); color: var(--text-2); }
+.lc .IncidentBanner-actions { display: flex; align-items: center; gap: 8px; }
+.lc .IncidentBanner-next { margin-top: 6px; color: var(--text); }
+.lc .IncidentBanner-next b { font-weight: 600; }
+.lc .IncidentBanner-impact { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin-top: 8px; font-size: 12px; line-height: 18px; color: var(--text); max-width: 880px; }
+.lc .IncidentBanner-impact dt { font-weight: 600; }
+.lc .IncidentBanner.is-warn { border-color: var(--warn-solid); background: var(--warn-bg); }
+.lc .IncidentBanner.is-warn .IncidentBanner-title { color: var(--warn); }
+.lc .IncidentBanner.is-ok { border-color: var(--ok-solid); background: var(--ok-bg); }
+.lc .IncidentBanner.is-ok .IncidentBanner-title { color: var(--ok); }
+
+/* ---------- OutcomeBreakdown ---------- */
+.lc .OutcomeBreakdown { display: flex; flex-direction: column; gap: 10px; }
+.lc .OutcomeBreakdown-bar { display: flex; height: 8px; gap: 2px; }
+.lc .OutcomeBreakdown-bar i { display: block; height: 100%; border-radius: 1px; min-width: 2px; }
+.lc .OutcomeBreakdown-bar .is-new { background: var(--ok-solid); }
+.lc .OutcomeBreakdown-bar .is-replay { background: var(--accent); }
+.lc .OutcomeBreakdown-bar .is-conflict { background: var(--warn-solid); }
+.lc .OutcomeBreakdown-bar .is-error { background: var(--surface); border: 1.5px solid var(--fail-solid); }
+.lc .OutcomeBreakdown-bar .is-blocked { background: var(--fail); }
+.lc .OutcomeBreakdown-rows { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 16px; align-items: center; font: 400 12px var(--font-mono); font-variant-numeric: tabular-nums; }
+.lc .OutcomeBreakdown-rows span { text-align: right; }
+.lc .OutcomeBreakdown-rows .muted { color: var(--text-3); }
+
+/* ---------- Layout helpers used by screens ---------- */
+.lc .Stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.lc .Split { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.lc .Split > .is-wide { flex: 2 1 640px; min-width: 0; }
+.lc .Split > .is-narrow { flex: 1 1 300px; min-width: 0; }
+.lc .Inline { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.lc .Inline.is-center { align-items: center; }
+.lc .Inline > .is-field { flex: 0 1 320px; }
+
+/* ---------- Foundations sheet only ---------- */
+.lc .Sheet { padding: 40px 48px 64px; display: flex; flex-direction: column; gap: 40px; }
+.lc .Sheet-title { font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -.01em; }
+.lc .Sheet-h { font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-bottom: 8px; border-bottom: 1px solid var(--text); }
+.lc .Sheet-section { display: flex; flex-direction: column; }
+.lc .Swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 16px 0 4px; }
+.lc .Swatch { display: flex; flex-direction: column; gap: 4px; font: 400 11px/15px var(--font-mono); color: var(--text-2); }
+.lc .Swatch i { display: block; height: 36px; border: 1px solid var(--border); border-radius: var(--r-2); }
+.lc .Swatch b { font-weight: 500; color: var(--text); }
+.lc .Spec { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px 32px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.lc .Spec-name { font: 500 14px/20px var(--font-mono); }
+.lc .Spec-purpose { margin-top: 4px; color: var(--text-2); font-size: 12px; line-height: 18px; }
+.lc .Spec-props { margin-top: 8px; font: 400 11px/16px var(--font-mono); color: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+.lc .Spec-demos { display: flex; flex-wrap: wrap; gap: 20px 28px; align-items: flex-start; min-width: 0; }
+.lc .Spec-state { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.lc .Spec-state.is-full { flex: 1 1 100%; }
+.lc .Spec-cap { font: 400 11px/14px var(--font-mono); color: var(--text-3); }
+.lc .TypeRow { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.lc .TypeRow code { font: 400 11px var(--font-mono); color: var(--text-3); }
+.lc .Scale { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; padding: 16px 0 4px; }
+.lc .Scale-item { display: flex; flex-direction: column; gap: 6px; font: 400 11px var(--font-mono); color: var(--text-2); }
+.lc .Scale-item i { display: block; background: var(--text); height: 12px; }
+.lc .Scale-item u { display: block; width: 48px; height: 32px; border: 1px solid var(--border-strong); background: var(--surface-2); text-decoration: none; }
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 860px) {
+  .lc .SidebarNav { max-width: none; border-right: 0; border-bottom: 1px solid var(--border); }
+  .lc .AppShell-page { padding: 16px; }
+  .lc .PipelineStrip { overflow-x: auto; }
+  .lc .HopGroups { grid-template-columns: minmax(0, 1fr); }
+  .lc .HopGroup.is-effects { grid-column: 1; border-left: 0; }
+  .lc .PipelineHops, .lc .PipelineBranch, .lc .PipelineHops.is-six, .lc .PipelineBranch.is-six, .lc .PipelineHops.is-three { grid-template-columns: minmax(0, 1fr); }
+  .lc .PipelineHop { border-right: 0; border-bottom: 1px solid var(--border); }
+  .lc .PipelineBranch-recon, .lc .PipelineBranch .PipelineHop, .lc .PipelineBranch.is-six .PipelineBranch-recon, .lc .PipelineBranch.is-six .PipelineHop { grid-column: 1; border-right: 0; }
+  .lc .SloBudget { grid-template-columns: minmax(0, 1fr); }
+  .lc .SloBudget-status { justify-self: start; }
+  .lc .Spec { grid-template-columns: minmax(0, 1fr); }
+  .lc .Sheet { padding: 24px 16px; }
+}

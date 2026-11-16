@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foundations and Components</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="lc" style="width: 100%; min-height: 900px">
+<div class="Sheet">
+
+<header>
+<h1 class="Sheet-title">Foundations &amp; Components</h1>
+<p class="muted" style="margin-top: 4px; max-width: 56ch">Every screen on this canvas is composed only of the components below. Class names equal component names. Light theme ships first; dark tokens are defined and proven on PipelineStrip. On the screens, the developer layer (the showLabels tweak) names each component, tags the ones that still need an endpoint, and says which numbers are illustrative.</p>
+</header>
+
+<section class="Sheet-section">
+<h2 class="Sheet-h">Color · light</h2>
+<div class="Swatches">
+<div class="Swatch"><i style="background: #F7F7F5"></i><b>--bg</b><span>#F7F7F5 · sidebar, table head</span></div>
+<div class="Swatch"><i style="background: #FFFFFF"></i><b>--surface</b><span>#FFFFFF · page, panels</span></div>
+<div class="Swatch"><i style="background: #F0F0ED"></i><b>--surface-2</b><span>#F0F0ED · tracks, hover</span></div>
+<div class="Swatch"><i style="background: #E2E2DD"></i><b>--border</b><span>#E2E2DD</span></div>
+<div class="Swatch"><i style="background: #C6C6C0"></i><b>--border-strong</b><span>#C6C6C0 · rails, inputs</span></div>
+<div class="Swatch"><i style="background: #16181B"></i><b>--text</b><span>#16181B</span></div>
+<div class="Swatch"><i style="background: #4D5157"></i><b>--text-2</b><span>#4D5157</span></div>
+<div class="Swatch"><i style="background: #666A71"></i><b>--text-3</b><span>#666A71 · 5.2:1 on surface</span></div>
+<div class="Swatch"><i style="background: #BDBDB6"></i><b>--track</b><span>#BDBDB6 · 1.9:1 on white</span></div>
+</div>
+<div class="Swatches">
+<div class="Swatch"><i style="background: #2348C9"></i><b>--accent</b><span>#2348C9 · the one accent</span></div>
+<div class="Swatch"><i style="background: #EBEFFC"></i><b>--accent-bg</b><span>#EBEFFC · selection</span></div>
+<div class="Swatch"><i style="background: #FFFFFF; outline: 2px solid #2348C9; outline-offset: 2px"></i><b>--focus</b><span>#2348C9 · 2 px ring, 2 px offset</span></div>
+<div class="Swatch"><i style="background: #1F9D63"></i><b>--ok-solid</b><span>#1F9D63 · glyph, fill</span></div>
+<div class="Swatch"><i style="background: #E6F4EC"></i><b>--ok-bg / --ok</b><span>#E6F4EC / text #116A42</span></div>
+<div class="Swatch"><i style="background: #B07500"></i><b>--warn-solid</b><span>#B07500 · 3.9:1 on white</span></div>
+<div class="Swatch"><i style="background: #FBF1DA"></i><b>--warn-bg / --warn</b><span>#FBF1DA / text #855300</span></div>
+<div class="Swatch"><i style="background: #D5382D"></i><b>--fail-solid</b><span>#D5382D</span></div>
+<div class="Swatch"><i style="background: #FCEAE8"></i><b>--fail-bg / --fail</b><span>#FCEAE8 / text #B4261D</span></div>
+</div>
+</section>
+
+<section class="Sheet-section">
+<h2 class="Sheet-h">Color · dark (tokens only, class .lc-dark)</h2>
+<div class="Swatches">
+<div class="Swatch"><i style="background: #0F1113"></i><b>--bg</b><span>#0F1113</span></div>
+<div class="Swatch"><i style="background: #16191C"></i><b>--surface</b><span>#16191C</span></div>
+<div class="Swatch"><i style="background: #1E2226"></i><b>--surface-2</b><span>#1E2226</span></div>
+<div class="Swatch"><i style="background: #2A2F35"></i><b>--border</b><span>#2A2F35</span></div>
+<div class="Swatch"><i style="background: #454C55"></i><b>--border-strong</b><span>#454C55</span></div>
+<div class="Swatch"><i style="background: #ECEDEE"></i><b>--text</b><span>#ECEDEE</span></div>
+<div class="Swatch"><i style="background: #B6BBC2"></i><b>--text-2</b><span>#B6BBC2</span></div>
+<div class="Swatch"><i style="background: #979DA5"></i><b>--text-3</b><span>#979DA5</span></div>
+<div class="Swatch"><i style="background: #8FA6FF"></i><b>--accent</b><span>#8FA6FF</span></div>
+<div class="Swatch"><i style="background: #4A515A"></i><b>--track</b><span>#4A515A</span></div>
+<div class="Swatch"><i style="background: #16191C; outline: 2px solid #B4C3FF; outline-offset: 2px"></i><b>--focus</b><span>#B4C3FF</span></div>
+<div class="Swatch"><i style="background: #34B57A"></i><b>--ok-solid</b><span>#34B57A · text #6AD7A2</span></div>
+<div class="Swatch"><i style="background: #D99A1A"></i><b>--warn-solid</b><span>#D99A1A · text #F0BE55</span></div>
+<div class="Swatch"><i style="background: #E5534A"></i><b>--fail-solid</b><span>#E5534A · text #FF9A91</span></div>
+</div>
+</section>
+
+<section class="Sheet-section">
+<h2 class="Sheet-h">Type · Inter for UI, JetBrains Mono for every number, ID and resource name</h2>
+<div class="TypeRow"><code>page-title 20/28 · 600</code><span style="font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -.01em">season-12-global</span></div>
+<div class="TypeRow"><code>title 13/20 · 600</code><span style="font-weight: 600">Dead-letter records</span></div>
+<div class="TypeRow"><code>body 13/20 · 400</code><span>Ties share a rank; the next rank is skipped.</span></div>
+<div class="TypeRow"><code>small 12/18 · 400</code><span style="font-size: 12px; line-height: 18px; color: #4D5157">Length includes delivered entries; it is not backlog.</span></div>
+<div class="TypeRow"><code>label 11/16 · 500 · caps</code><span style="font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: #666A71">Failure reason</span></div>
+<div class="TypeRow"><code>mono 12 · tabular</code><span class="mono">300,001 · lb-audit-events · 7c9e6679-7425-40de-944b-e07fc1f90ae7</span></div>
+<div class="TypeRow"><code>mono-value 15/20 · 500</code><span class="mono" style="font-size: 15px; font-weight: 500">11.82 ms</span></div>
+</section>
+
+<section class="Sheet-section">
+<h2 class="Sheet-h">Spacing and radius</h2>
+<div class="Scale">
+<div class="Scale-item"><i style="width: 4px"></i>4</div>
+<div class="Scale-item"><i style="width: 8px"></i>8</div>
+<div class="Scale-item"><i style="width: 12px"></i>12</div>
+<div class="Scale-item"><i style="width: 16px"></i>16 · panel pad</div>
+<div class="Scale-item"><i style="width: 20px"></i>20 · section gap</div>
+<div class="Scale-item"><i style="width: 24px"></i>24</div>
+<div class="Scale-item"><i style="width: 32px"></i>32 · page pad</div>
+<div class="Scale-item"><u style="border-radius: 3px"></u>--r-1 3 · tags</div>
+<div class="Scale-item"><u style="border-radius: 4px"></u>--r-2 4 · controls</div>
+<div class="Scale-item"><u style="border-radius: 6px"></u>--r-3 6 · panels</div>
+<div class="Scale-item"><span style="display: flex; gap: 10px; align-items: center; height: 32px"><i class="glyph is-ok" style="height: 8px"></i><i class="glyph is-warn" style="height: 8px"></i><i class="glyph is-fail" style="height: 8px"></i><i class="glyph is-idle" style="height: 8px; background: transparent"></i></span>glyph ok · warn · fail · idle</div>
+</div>
+</section>
+
+<section class="Sheet-section">
+<h2 class="Sheet-h">Components</h2>
+
+<div class="Spec" style="grid-template-columns: minmax(0, 1fr)">
+<div><h3 class="Spec-name">PipelineStrip</h3><p class="Spec-purpose" style="max-width: 56ch">Signature element. One line, always visible in layout.tsx: the write path and the audit path as a single rail. Each node shows the same summary string as its hop's StatusBadge on /delivery and links to that hop's anchor.</p><p class="Spec-props">audience: 'operator' | 'tenant'
+breaker: BreakerStatus
+streams: StreamsStatus | Stale&lt;StreamsStatus&gt;
+topic: AuditTopicStatus
+stored: number  // audit-events/count
+relayLeader: string | null  // needs GET /internal/relay/status
+// node href: /[project]/delivery#write-path | #stream | #relay | #kafka | #consumer | #postgres | #dlt
+// node aria-label = name + full value; hover or focus expands a cut value in place
+// counts ≥ 100,000: compact under 1100 px</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">healthy</span>
+<nav class="PipelineStrip" aria-label="Pipeline status" style="border: 1px solid #E2E2DD">
+<span class="PS-origin">POST /events</span><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#write-path" aria-label="Breaker: CLOSED"><i class="glyph is-ok"></i><span class="PS-name">Breaker</span><span class="PS-val">CLOSED</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#stream" aria-label="Stream: 0 unread · 0 unacked"><i class="glyph is-ok"></i><span class="PS-name">Stream</span><span class="PS-val">0 unread · 0 unacked</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#relay" aria-label="Relay: leader app-1"><i class="glyph is-ok"></i><span class="PS-name">Relay</span><span class="PS-val">leader app-1</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#kafka" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#consumer" aria-label="Consumer: RUNNING"><i class="glyph is-ok"></i><span class="PS-name">Consumer</span><span class="PS-val">RUNNING</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#postgres" aria-label="PostgreSQL: 300,001 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">300,001 stored</span><span class="PS-compact">300.0k stored</span></span></a>
+<a class="PS-node is-warn is-aside" href="DeliveryHealthy.dc.html" data-anchor="#dlt" aria-label="DLT: 2 to review"><i class="glyph is-warn"></i><span class="PS-name">DLT</span><span class="PS-val">2 to review</span></a>
+</nav>
+</div>
+<div class="Spec-state is-full"><span class="Spec-cap">incident · the rail is dashed from the blocked hop to the next healthy one · Redis-derived count shown as StaleValue</span>
+<nav class="PipelineStrip" aria-label="Pipeline status" style="border: 1px solid #E2E2DD">
+<span class="PS-origin">POST /events</span><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="DeliveryHealthy.dc.html" data-anchor="#write-path" aria-label="Breaker: OPEN · 503"><i class="glyph is-fail"></i><span class="PS-name">Breaker</span><span class="PS-val">OPEN · 503</span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="DeliveryHealthy.dc.html" data-anchor="#stream" aria-label="Stream: unreachable. Last known at 14:41:16 UTC: 1,001 unacked"><i class="glyph is-fail"></i><span class="PS-name">Stream</span><span class="PS-val">unreachable<span class="StaleValue"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg>1,001</span></span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node is-warn" href="DeliveryHealthy.dc.html" data-anchor="#relay" aria-label="Relay: ack retry"><i class="glyph is-warn"></i><span class="PS-name">Relay</span><span class="PS-val">ack retry</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="Consumer: RUNNING"><i class="glyph is-ok"></i><span class="PS-name">Consumer</span><span class="PS-val">RUNNING</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="PostgreSQL: 301,002 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">301,002 stored</span><span class="PS-compact">301.0k stored</span></span></a>
+<a class="PS-node is-warn is-aside" href="DeliveryHealthy.dc.html" aria-label="DLT: 2 to review"><i class="glyph is-warn"></i><span class="PS-name">DLT</span><span class="PS-val">2 to review</span></a>
+</nav>
+</div>
+<div class="Spec-state is-full"><span class="Spec-cap">after DLT review · the DLT node turns neutral and reads "2 retained"</span>
+<nav class="PipelineStrip" aria-label="Pipeline status" style="border: 1px solid #E2E2DD">
+<span class="PS-origin">POST /events</span><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#write-path" aria-label="Breaker: CLOSED"><i class="glyph is-ok"></i><span class="PS-name">Breaker</span><span class="PS-val">CLOSED</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#stream" aria-label="Stream: 0 unread · 0 unacked"><i class="glyph is-ok"></i><span class="PS-name">Stream</span><span class="PS-val">0 unread · 0 unacked</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#relay" aria-label="Relay: leader app-1"><i class="glyph is-ok"></i><span class="PS-name">Relay</span><span class="PS-val">leader app-1</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#kafka" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#consumer" aria-label="Consumer: RUNNING"><i class="glyph is-ok"></i><span class="PS-name">Consumer</span><span class="PS-val">RUNNING</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#postgres" aria-label="PostgreSQL: 300,001 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">300,001 stored</span><span class="PS-compact">300.0k stored</span></span></a>
+<a class="PS-node is-aside" href="DeliveryHealthy.dc.html" data-anchor="#dlt" aria-label="DLT: 2 retained"><i class="glyph is-idle"></i><span class="PS-name">DLT</span><span class="PS-val">2 retained</span></a>
+</nav>
+</div>
+<div class="Spec-state is-full"><span class="Spec-cap">audience tenant · three nodes in the tenant's own terms, same incident as the operator strip above</span>
+<nav class="PipelineStrip" aria-label="Service status" style="border: 1px solid #E2E2DD">
+<span class="PS-origin">POST /events</span><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="#writes" aria-label="Writes: 503 · retry after 10 s"><i class="glyph is-fail"></i><span class="PS-name">Writes</span><span class="PS-val">503 · retry after 10 s</span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="#rankings" aria-label="Rankings: read errors"><i class="glyph is-fail"></i><span class="PS-name">Rankings</span><span class="PS-val">read errors</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#audit" aria-label="Audit log: storing"><i class="glyph is-ok"></i><span class="PS-name">Audit log</span><span class="PS-val">storing</span></a>
+</nav>
+</div>
+<div class="Spec-state is-full"><span class="Spec-cap">long values in a 1000 px strip · breaker HALF_OPEN on light · cut with an ellipsis, counts compact, origin hidden under 1180 px · Relay is shown expanded, as on hover or focus</span>
+<div style="width: 1000px; max-width: 100%">
+<nav class="PipelineStrip" aria-label="Pipeline status" style="border: 1px solid #E2E2DD">
+<span class="PS-origin">POST /events</span><i class="PS-link"></i>
+<a class="PS-node is-warn" href="DeliveryHealthy.dc.html" aria-label="Breaker: HALF_OPEN"><i class="glyph is-warn"></i><span class="PS-name">Breaker</span><span class="PS-val">HALF_OPEN</span></a><i class="PS-link"></i>
+<a class="PS-node is-warn" href="DeliveryHealthy.dc.html" aria-label="Stream: 12,480 unread · 1,001 unacked · oldest idle 9 min 40 s"><i class="glyph is-warn"></i><span class="PS-name">Stream</span><span class="PS-val">12,480 unread · 1,001 unacked · oldest idle 9 min 40 s</span></a><i class="PS-link"></i>
+<a class="PS-node is-warn is-expanded" href="DeliveryHealthy.dc.html" aria-label="Relay: leader app-2 · took over from app-1 · claiming in batches of 500"><i class="glyph is-warn"></i><span class="PS-name">Relay</span><span class="PS-val">leader app-2 · took over from app-1 · claiming in batches of 500</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node is-warn" href="DeliveryHealthy.dc.html" aria-label="Consumer: DB_RETRYING · attempt 6 · next backoff 150–300 s"><i class="glyph is-warn"></i><span class="PS-name">Consumer</span><span class="PS-val">DB_RETRYING · attempt 6 · next backoff 150–300 s</span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="PostgreSQL: 300,001 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">300,001 stored</span><span class="PS-compact">300.0k stored</span></span></a>
+<a class="PS-node is-aside" href="DeliveryHealthy.dc.html" aria-label="DLT: 0"><i class="glyph is-idle"></i><span class="PS-name">DLT</span><span class="PS-val">0</span></a>
+</nav>
+</div>
+</div>
+<div class="Spec-state is-full"><span class="Spec-cap">dark tokens · same markup inside .lc-dark · Relay shows the focus ring</span>
+<div class="lc lc-dark" style="border-radius: 4px">
+<nav class="PipelineStrip" aria-label="Pipeline status" style="border: 1px solid #2A2F35">
+<span class="PS-origin">POST /events</span><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="Breaker: HALF_OPEN"><i class="glyph is-ok"></i><span class="PS-name">Breaker</span><span class="PS-val">HALF_OPEN</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="Stream: 0 unread · 0 unacked"><i class="glyph is-ok"></i><span class="PS-name">Stream</span><span class="PS-val">0 unread · 0 unacked</span></a><i class="PS-link"></i>
+<a class="PS-node is-focus-visible" href="DeliveryHealthy.dc.html" aria-label="Relay: leader app-1"><i class="glyph is-ok"></i><span class="PS-name">Relay</span><span class="PS-val">leader app-1</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node is-warn" href="DeliveryHealthy.dc.html" aria-label="Consumer: DB_RETRYING"><i class="glyph is-warn"></i><span class="PS-name">Consumer</span><span class="PS-val">DB_RETRYING</span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="DeliveryHealthy.dc.html" aria-label="PostgreSQL: unavailable"><i class="glyph is-fail"></i><span class="PS-name">PostgreSQL</span><span class="PS-val">unavailable</span></a>
+<a class="PS-node is-aside" href="DeliveryHealthy.dc.html" aria-label="DLT: 0"><i class="glyph is-idle"></i><span class="PS-name">DLT</span><span class="PS-val">0</span></a>
+</nav>
+</div>
+</div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">PipelineHop</h3><p class="Spec-purpose">The expanded form of one strip node, used on /delivery, numbered 00 to 05 in strip order. Its StatusBadge repeats the strip value word for word. Rail on top, resource name, counts as a KeyValueList, one line of behavior.</p><p class="Spec-props">step: number; title: string
+status: 'ok' | 'warn' | 'fail' | 'idle'
+statusLabel: string
+resource: string
+rows: Array&lt;{ label: string; field?: string; value: ReactNode }&gt;
+note?: string
+variant?: 'main' | 'branch'
+link?: 'flowing' | 'blocked' | 'none'
+children?: ReactNode  // e.g. PartitionLagBar[]</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full">
+<span class="Spec-cap">ok with children · warn (DB_RETRYING) · fail · fail (STOPPED) · variant branch</span>
+<div class="Panel"><div class="PipelineHops">
+
+<section class="PipelineHop">
+<div class="PH-rail"><i class="PH-in is-none"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">03</span>Kafka</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>lag 0</span></div>
+<div class="PH-res">lb-audit-events · 3 partitions</div>
+<dl class="KeyValueList"><dt>Messages</dt><dd>300,003</dd><dt>Consumer lag</dt><dd>0</dd></dl>
+<div class="PH-block">
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p0</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-1</span></div>
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p1</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-1</span></div>
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p2</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-2</span></div>
+</div>
+</section>
+
+<section class="PipelineHop">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-warn"></i><i class="PH-out is-blocked"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">04</span>Consumer</h3><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>DB_RETRYING</span></div>
+<div class="PH-res">group audit-trend</div>
+<dl class="KeyValueList"><dt>Ready</dt><dd class="t-warn">false</dd><dt>Retry attempts</dt><dd>3</dd><dt>Retrying for</dt><dd>52 s</dd><dt>Next backoff</dt><dd>40–80 s</dd></dl>
+<p class="PH-note">Offsets are kept. The same batch is retried with equal jitter, up to 150–300 s between attempts.</p>
+</section>
+
+<section class="PipelineHop">
+<div class="PH-rail"><i class="PH-in is-blocked"></i><i class="glyph is-fail"></i><i class="PH-out is-blocked"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">01</span>Redis Stream</h3><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>unreachable</span></div>
+<div class="PH-res">audit outbox · XADD inside Lua</div>
+<dl class="KeyValueList"><dt>Unread</dt><dd><span class="StaleValue"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>0</span></dd><dt>Unacked</dt><dd class="is-strong"><span class="StaleValue is-warn"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>1,001</span><small>re-sent on recovery</small></dd></dl>
+<p class="PH-note">The clock marks the last value read before the source stopped answering.</p>
+</section>
+
+<section class="PipelineHop">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-fail"></i><i class="PH-out is-blocked"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">04</span>Consumer</h3><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>STOPPED</span></div>
+<div class="PH-res">group audit-trend</div>
+<dl class="KeyValueList"><dt>Ready</dt><dd class="t-fail">false</dd><dt>Offset</dt><dd>not committed</dd></dl>
+<p class="PH-note">Permanent database error. Fix the schema or code, then the same batch is processed again.</p>
+</section>
+
+<section class="PipelineHop">
+<div class="PH-rail"><i class="PH-in is-branch"></i><i class="glyph is-warn"></i><span class="PH-railnote">after 3 attempts</span></div>
+<div class="PH-head"><h3 class="PH-title">Dead-letter topic</h3><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>2 to review</span></div>
+<div class="PH-res">lb-audit-events.DLT</div>
+<dl class="KeyValueList"><dt>Quarantined</dt><dd class="is-strong">2</dd><dt>Retained</dt><dd>2</dd></dl>
+</section>
+
+</div></div>
+</div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">PartitionLagBar</h3><p class="Spec-purpose">One Kafka partition: lag against a fixed scale, the number, and the instance that owns it.</p><p class="Spec-props">partition: 0 | 1 | 2
+lag: number
+scaleMax: number
+owner: string | null
+// needs endpoint:
+// GET /internal/kafka/audit-topic/partitions</p></div>
+<div class="Spec-demos">
+<div class="Spec-state" style="width: 240px"><span class="Spec-cap">lag 0</span><div class="PartitionLagBar"><span class="PartitionLagBar-id">p0</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-1</span></div></div>
+<div class="Spec-state" style="width: 240px"><span class="Spec-cap">catching up</span><div class="PartitionLagBar is-warn"><span class="PartitionLagBar-id">p1</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 24%"></i></span><span class="PartitionLagBar-lag">120</span><span class="PartitionLagBar-owner">app-1</span></div></div>
+<div class="Spec-state" style="width: 240px"><span class="Spec-cap">stalled</span><div class="PartitionLagBar is-fail"><span class="PartitionLagBar-id">p2</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 100%"></i></span><span class="PartitionLagBar-lag">1,001</span><span class="PartitionLagBar-owner">app-2</span></div></div>
+<div class="Spec-state" style="width: 240px"><span class="Spec-cap">unassigned · rebalance in progress</span><div class="PartitionLagBar"><span class="PartitionLagBar-id">p2</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag muted">—</span><span class="PartitionLagBar-owner">none</span></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">StatusBadge</h3><p class="Spec-purpose">Health of a resource. Glyph shape carries the status so it survives without color. Quiet variant for table cells.</p><p class="Spec-props">status: 'ok' | 'warn' | 'fail' | 'idle'
+label: string
+quiet?: boolean</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">ok</span><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>RUNNING</span></div>
+<div class="Spec-state"><span class="Spec-cap">warn</span><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>DB_RETRYING</span></div>
+<div class="Spec-state"><span class="Spec-cap">fail</span><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>Circuit OPEN</span></div>
+<div class="Spec-state"><span class="Spec-cap">idle</span><span class="StatusBadge"><i class="glyph is-idle"></i>Standby</span></div>
+<div class="Spec-state"><span class="Spec-cap">incident severity vocabulary</span><span style="display: flex; gap: 16px"><span class="StatusBadge is-quiet is-fail"><i class="glyph is-fail"></i>Critical</span><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>Warning</span><span class="StatusBadge is-quiet"><i class="glyph is-idle"></i>Info</span></span></div>
+<div class="Spec-state"><span class="Spec-cap">quiet ok · warn · fail</span><span style="display: flex; gap: 16px"><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Active</span><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>Open</span><span class="StatusBadge is-quiet is-fail"><i class="glyph is-fail"></i>Degraded</span></span></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">OutcomeTag</h3><p class="Spec-purpose">Result of one POST /events. Filled means the service decided about the event (NEW, REPLAY, 409). Outlined means the request was turned away before that (429, 503); a dashed outline means it failed in transit.</p><p class="Spec-props">outcome: FireOutcome
+// 'NEW' | 'REPLAY' | 'CONFLICT_409'
+// | 'RATE_LIMITED_429' | 'BLOCKED_503' | 'ERROR'</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">NEW</span><span class="OutcomeTag is-new">NEW</span></div>
+<div class="Spec-state"><span class="Spec-cap">REPLAY</span><span class="OutcomeTag is-replay">REPLAY</span></div>
+<div class="Spec-state"><span class="Spec-cap">CONFLICT_409</span><span class="OutcomeTag is-conflict">409 CONFLICT</span></div>
+<div class="Spec-state"><span class="Spec-cap">RATE_LIMITED_429</span><span class="OutcomeTag is-limited">429 LIMITED</span></div>
+<div class="Spec-state"><span class="Spec-cap">BLOCKED_503</span><span class="OutcomeTag is-blocked">503 BLOCKED</span></div>
+<div class="Spec-state"><span class="Spec-cap">ERROR</span><span class="OutcomeTag is-error">ERROR</span></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">OutcomeBreakdown</h3><p class="Spec-purpose">Share of outcomes over a fixed sample of write requests. Shows the 503 fail-fast share during an incident.</p><p class="Spec-props">counts: Record&lt;FireOutcome, number&gt;
+sampleLabel: string
+// needs endpoint:
+// GET /internal/events/outcomes?last=50</p></div>
+<div class="Spec-demos">
+<div class="Spec-state" style="width: 300px"><span class="Spec-cap">k6 T4 · 50 concurrent requests, one key</span>
+<div class="OutcomeBreakdown"><div class="OutcomeBreakdown-bar"><i class="is-new" style="width: 2%"></i><i class="is-replay" style="width: 98%"></i></div>
+<div class="OutcomeBreakdown-rows"><span class="is-tag"><span class="OutcomeTag is-new">NEW</span></span><span>1</span><span class="muted">2%</span><span class="is-tag"><span class="OutcomeTag is-replay">REPLAY</span></span><span>49</span><span class="muted">98%</span><span class="is-tag"><span class="OutcomeTag is-error">ERROR</span></span><span>0</span><span class="muted">0%</span></div></div></div>
+<div class="Spec-state" style="width: 300px"><span class="Spec-cap">circuit open</span>
+<div class="OutcomeBreakdown"><div class="OutcomeBreakdown-bar"><i class="is-new" style="width: 38%"></i><i class="is-replay" style="width: 2%"></i><i class="is-error" style="width: 10%"></i><i class="is-blocked" style="width: 50%"></i></div>
+<div class="OutcomeBreakdown-rows"><span class="is-tag"><span class="OutcomeTag is-blocked">503 BLOCKED</span></span><span>25</span><span class="muted">50%</span><span class="is-tag"><span class="OutcomeTag is-error">ERROR</span></span><span>5</span><span class="muted">10%</span><span class="is-tag"><span class="OutcomeTag is-new">NEW</span></span><span>19</span><span class="muted">38%</span><span class="is-tag"><span class="OutcomeTag is-replay">REPLAY</span></span><span>1</span><span class="muted">2%</span></div></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">SloBudget</h3><p class="Spec-purpose">One objective as budget consumed against its limit. Two kinds that never share a panel: live (polled now, colored, with a StatusBadge) and evidence (a past load test, neutral fill, a plain Passed label and no status color).</p><p class="Spec-props">kind: 'live' | 'evidence'
+name: string; objective: string
+measured: number | null; limit: number
+unit: 'ms' | 's' | '%' | 'count'
+detail: string; source: string
+history?: number[]  // feeds Sparkline
+status: 'ok' | 'warn' | 'fail' | 'unmeasured'
+// live: ok &lt; 80% · warn 80–100% · fail &gt; 100%
+// live error rate needs endpoint:
+// GET /internal/events/error-rate?window=5m</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">live · ok · warn · not measured</span>
+<div class="Panel">
+<div class="SloBudget">
+<div><div class="SloBudget-name">Snapshot lag</div><div class="SloBudget-objective">snapshot_lag_seconds &lt; 45 s</div><div class="SloBudget-source">last success 14:31:40 UTC</div></div>
+<div><div class="SloBudget-value">27 s</div><div class="SloBudget-sub">interval 30 s</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 60%"></i></div><div class="SloBudget-scale"><span><b>60%</b> of budget used</span><span>limit 45 s</span></div></div>
+<div class="SloBudget-history"><span>live value</span></div>
+<div class="SloBudget-status"><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>Within SLO</span></div>
+</div>
+<div class="SloBudget is-warn">
+<div><div class="SloBudget-name">Snapshot lag</div><div class="SloBudget-objective">snapshot_lag_seconds &lt; 45 s</div><div class="SloBudget-source">last success 14:31:26 UTC</div></div>
+<div><div class="SloBudget-value">41 s</div><div class="SloBudget-sub">interval 30 s</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 91%"></i></div><div class="SloBudget-scale"><span><b>91%</b> of budget used</span><span>limit 45 s</span></div></div>
+<div class="SloBudget-history"><span>live value</span></div>
+<div class="SloBudget-status"><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>At risk</span></div>
+</div>
+<div class="SloBudget">
+<div><div class="SloBudget-name">Write error rate</div><div class="SloBudget-objective">POST /events errors &lt; 0.1%</div><div class="SloBudget-source">no live source yet</div></div>
+<div><div class="SloBudget-value muted">no data</div><div class="SloBudget-sub">last 5 min</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 0%"></i></div><div class="SloBudget-scale"><span>not measured</span><span>limit 0.1%</span></div></div>
+<div class="SloBudget-history"><span>no series</span></div>
+<div class="SloBudget-status"><span class="StatusBadge"><i class="glyph is-idle"></i>Not measured</span></div>
+</div>
+</div>
+</div>
+<div class="Spec-state is-full"><span class="Spec-cap">live during a Redis outage · this is what Overview shows while the circuit is open</span>
+<div class="Panel">
+<div class="SloBudget is-fail">
+<div><div class="SloBudget-name">Write path</div><div class="SloBudget-objective">breaker failure rate &lt; 50%</div><div class="SloBudget-source">last 10 calls to Redis</div></div>
+<div><div class="SloBudget-value t-fail">50%</div><div class="SloBudget-sub">breaker OPEN · 503</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 100%"></i></div><div class="SloBudget-scale"><span><b>5 of 10</b> calls failed</span><span>opens at 50%</span></div></div>
+<div class="SloBudget-history"><span>live value</span></div>
+<div class="SloBudget-status"><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>Breached</span></div>
+</div>
+<div class="SloBudget is-fail">
+<div><div class="SloBudget-name">Snapshot lag</div><div class="SloBudget-objective">snapshot_lag_seconds &lt; 45 s</div><div class="SloBudget-source">last success 14:40:40 UTC</div></div>
+<div><div class="SloBudget-value t-fail">1m 27s</div><div class="SloBudget-sub">interval 30 s</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 100%"></i></div><div class="SloBudget-scale"><span><b>193%</b> of budget used</span><span>limit 45 s</span></div></div>
+<div class="SloBudget-history"><span>live value</span></div>
+<div class="SloBudget-status"><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>Breached</span></div>
+</div>
+</div>
+</div>
+<div class="Spec-state is-full"><span class="Spec-cap">evidence · passed · rejected run</span>
+<div class="Panel">
+<div class="SloBudget is-evidence">
+<div><div class="SloBudget-name">Write latency</div><div class="SloBudget-objective">POST /events p99 &lt; 50 ms</div><div class="SloBudget-source">T1 Kafka E2E · 27b5b47 · 991.11 RPS · 5 min</div></div>
+<div><div class="SloBudget-value">11.82 ms</div><div class="SloBudget-sub">0 failed / 301,007</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 23.6%"></i></div><div class="SloBudget-scale"><span><b>23.6%</b> of budget used</span><span>limit 50 ms</span></div></div>
+<div class="SloBudget-history"><svg class="Sparkline" viewBox="0 0 96 24" role="img" aria-label="Write p99 by run, in ms: T1 300 users 4.15, T1 500 users 27.09, T1 1000 users 20.92, T1 Kafka E2E phase 2 3.99, T3 1.47, T8 30 s 1.36, T8 5 min 1.67, T1 Kafka E2E 27b5b47 11.82. Limit 50."><line x1="0" y1="2" x2="96" y2="2"></line><polyline points="2,20.3 15.1,11.2 28.3,13.6 41.4,20.4 54.6,21.4 67.7,21.5 80.9,21.3 94,17.3"></polyline><circle cx="94" cy="17.3" r="2"></circle></svg><span>8 runs to 27b5b47</span></div>
+<div class="SloBudget-status"><span class="StatusBadge">Passed</span></div>
+</div>
+<div class="SloBudget is-evidence">
+<div><div class="SloBudget-name">Write latency</div><div class="SloBudget-objective">POST /events p99 &lt; 50 ms</div><div class="SloBudget-source">k6 run 2026-09-07 · rejected, not reproduced</div></div>
+<div><div class="SloBudget-value">62.23 ms</div><div class="SloBudget-sub">over by 12.23 ms</div></div>
+<div class="SloBudget-bar"><div class="SloBudget-track"><i class="SloBudget-fill" style="width: 100%"></i></div><div class="SloBudget-scale"><span><b>124%</b> of budget used</span><span>limit 50 ms</span></div></div>
+<div class="SloBudget-history"><span>single run</span></div>
+<div class="SloBudget-status"><span class="StatusBadge">Rejected run</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">Sparkline</h3><p class="Spec-purpose">A small series beside a number that needs its direction. Optional dashed limit line. Never used without a real series behind it.</p><p class="Spec-props">points: number[]
+limit?: number
+tone?: 'neutral' | 'warn' | 'fail'
+label: string  // aria-label
+// from TrendBucket[].eventCount or polled status</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">with limit · write p99, 8 runs</span><svg class="Sparkline" viewBox="0 0 96 24" role="img" aria-label="Write p99 across 8 recorded runs"><line x1="0" y1="2" x2="96" y2="2"></line><polyline points="2,20.3 15.1,11.2 28.3,13.6 41.4,20.4 54.6,21.4 67.7,21.5 80.9,21.3 94,17.3"></polyline><circle cx="94" cy="17.3" r="2"></circle></svg></div>
+<div class="Spec-state"><span class="Spec-cap">short · read p99, 3 runs</span><svg class="Sparkline" viewBox="0 0 96 24" role="img" aria-label="Read p99 across 3 recorded runs"><line x1="0" y1="2" x2="96" y2="2"></line><polyline points="2,20.4 48,20.4 94,20"></polyline><circle cx="94" cy="20" r="2"></circle></svg></div>
+<div class="Spec-state"><span class="Spec-cap">tone fail · backlog rising</span><svg class="Sparkline is-fail" viewBox="0 0 96 24" role="img" aria-label="Unacked entries rising from 0 to 1,001"><polyline points="2,22 15.1,22 28.3,22 41.4,19.6 54.6,15.2 67.7,9.8 80.9,4.4 94,2"></polyline><circle cx="94" cy="2" r="2"></circle></svg></div>
+<div class="Spec-state"><span class="Spec-cap">empty</span><svg class="Sparkline is-empty" viewBox="0 0 96 24" role="img" aria-label="No data"><polyline points="2,12 94,12"></polyline></svg></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">FreshnessIndicator</h3><p class="Spec-purpose">Age of the latest PostgreSQL snapshot against the 45 s objective. The tick on the meter is the 30 s interval.</p><p class="Spec-props">lagSeconds: number | null
+// SnapshotStatus.snapshotLagSeconds, or
+// now − SnapshotEntries.snapshotAt
+sloSeconds?: number      // 45
+intervalSeconds?: number // 30</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">fresh · under 30 s</span><span class="FreshnessIndicator"><span class="FreshnessIndicator-meter"><i style="width: 60%"></i></span>snapshot <b>27s</b> ago</span></div>
+<div class="Spec-state"><span class="Spec-cap">late · 30–45 s</span><span class="FreshnessIndicator is-warn"><span class="FreshnessIndicator-meter"><i style="width: 91%"></i></span>snapshot <b>41s</b> ago</span></div>
+<div class="Spec-state"><span class="Spec-cap">stale · over 45 s</span><span class="FreshnessIndicator is-fail"><span class="FreshnessIndicator-meter"><i style="width: 100%"></i></span>snapshot <b>1m 27s</b> ago · stale</span></div>
+<div class="Spec-state"><span class="Spec-cap">none · empty guard skipped the write</span><span class="FreshnessIndicator is-idle"><span class="FreshnessIndicator-meter"><i style="width: 0%"></i></span><b>no snapshot yet</b></span></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">IncidentBanner</h3><p class="Spec-purpose">Top of the page content while an incident is open. Says what is failing, what callers receive, what is safe, whether someone has to act, and when the system tries again.</p><p class="Spec-props">severity: 'fail' | 'warn' | 'ok'
+title: string; body: string
+impact: { writes: string; reads: string;
+  audit: string }
+next: string  // action + countdown, with
+  // absolute UTC and local time second
+facts: string[]
+since: string  // ISO time
+runbookHref?: string  // operator only
+actions?: ReactNode
+// role="alert" only on the render where the
+// incident first opens; every later poll
+// updates inside aria-live="polite"</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">fail, first render · role="alert" so it is announced once; every later poll re-renders it with aria-live="polite" (as on the incident artboards)</span>
+<div class="IncidentBanner" role="alert">
+<div class="IncidentBanner-main"><i class="glyph is-fail"></i><div>
+<div class="IncidentBanner-title">Circuit open · Redis is not responding</div>
+<dl class="IncidentBanner-impact">
+<dt>Writes</dt><dd>POST /events returns 503 with Retry-After: 10. No score is partially applied.</dd>
+<dt>Reads</dt><dd>GET tops and user rank read Redis directly, outside the breaker. They return errors, not the fast 503.</dd>
+<dt>Audit</dt><dd>Events already in Kafka are still being stored.</dd>
+</dl>
+<p class="IncidentBanner-next"><b>Action needed:</b> restore Redis. The breaker closes by itself once 3 trial calls succeed. Next trial in <b>10 s</b> <span class="muted">(14:41:28 UTC · 23:41:28 local)</span></p>
+<div class="IncidentBanner-facts"><span>opened 14:41:18 UTC · 23:41:18 local</span><span>just now</span><span>failure rate 50% · 5 of last 10 calls</span></div>
+</div></div>
+<div class="IncidentBanner-actions"><a class="Button is-ghost" href="#">Runbook: Redis outage</a><a class="Button" href="#">View incident</a></div>
+</div></div>
+<div class="Spec-state is-full"><span class="Spec-cap">warn</span>
+<div class="IncidentBanner is-warn" role="status">
+<div class="IncidentBanner-main"><i class="glyph is-warn"></i><div><div class="IncidentBanner-title">Audit consumer is retrying · PostgreSQL unavailable</div><p class="IncidentBanner-body">Events are accepted and rankings are live. Audit rows are held in Kafka; offsets are not committed until the batch is stored.</p><p class="IncidentBanner-next"><b>No action needed</b> unless PostgreSQL stays down; the consumer retries by itself.</p><div class="IncidentBanner-facts"><span>state DB_RETRYING</span><span>attempt 3</span><span>next backoff 40–80 s</span></div></div></div>
+<div class="IncidentBanner-actions"><a class="Button" href="#">View incident</a></div>
+</div></div>
+<div class="Spec-state is-full"><span class="Spec-cap">ok · resolved</span>
+<div class="IncidentBanner is-ok" role="status">
+<div class="IncidentBanner-main"><i class="glyph is-ok"></i><div><div class="IncidentBanner-title">Circuit closed · writes restored</div><p class="IncidentBanner-body">The relay is re-publishing 1,001 unacknowledged entries. Duplicates are dropped by UNIQUE (leaderboard_id, event_id).</p></div></div>
+<div class="IncidentBanner-actions"><button class="Button is-ghost" type="button">Dismiss</button></div>
+</div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">DataTable</h3><p class="Spec-purpose">The default container for anything countable. 32 px head, 36 px rows, numbers right-aligned in mono.</p><p class="Spec-props">columns: Array&lt;{ key: string; header: string;
+  align?: 'left' | 'right'; mono?: boolean }&gt;
+rows: T[]
+renderRow?: (row: T) =&gt; ReactNode
+selectedKey?: string
+empty: string</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">default · hover · selected</span>
+<div class="Panel"><div class="Panel-scroll"><table class="DataTable">
+<thead><tr><th>Event time</th><th>Event ID</th><th>Type</th><th>User</th><th class="num">Delta</th><th>API key ID</th><th>Idempotency key</th></tr></thead>
+<tbody>
+<tr><td class="mono">14:32:05.412</td><td class="mono">1794839525412-0</td><td><span class="OutcomeTag is-new">NEW</span></td><td>aoki_ren</td><td class="num">+20</td><td class="mono">1</td><td class="mono">4f0c2a1e-9b77-4c0d-8a53-0e6d1b7c9f21</td></tr>
+<tr class="is-hover"><td class="mono">14:32:04.988</td><td class="mono">1794839524988-0</td><td><span class="OutcomeTag is-new">NEW</span></td><td>quill_r</td><td class="num">+40</td><td class="mono">1</td><td class="mono">b81d5e37-2c46-4f19-a0e8-73c9d2f45a60</td></tr>
+<tr class="is-selected"><td class="mono">14:32:04.117</td><td class="mono">1794839524117-0</td><td><span class="OutcomeTag is-conflict">409 CONFLICT</span></td><td>hana_seo</td><td class="num">+15</td><td class="mono">2</td><td class="mono">0a94c7d2-5e18-4b3f-9c61-d27f8e03b5a4</td></tr>
+</tbody></table></div></div></div>
+<div class="Spec-state is-full"><span class="Spec-cap">empty</span>
+<div class="Panel"><table class="DataTable">
+<thead><tr><th>Quarantined at</th><th>Partition</th><th>Failure reason</th><th class="num">Attempts</th></tr></thead>
+<tbody><tr><td class="DataTable-empty" colspan="4">No records in lb-audit-events.DLT.</td></tr></tbody></table></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">RankRow</h3><p class="Spec-purpose">A DataTable row for one ranked user. Competition ranking: equal scores share a rank and the next rank is skipped. Live score is Redis; snapshot is PostgreSQL.</p><p class="Spec-props">item: TopRankItem  // rank, userId, score
+snapshot?: TopRankItem | null
+tied: boolean
+highlighted?: boolean
+// unranked: rank null, score 0</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">default · tied (1, 2, 2, 4 from the ranking policy) · highlighted · unranked</span>
+<div class="Panel"><div class="Panel-scroll"><table class="DataTable is-fixed">
+<thead><tr><th>Rank</th><th>User</th><th class="num">Score · Redis</th><th class="num">Score · snapshot</th><th class="num">Since snapshot</th><th class="num">Snapshot rank</th></tr></thead>
+<tbody>
+<tr class="RankRow"><td class="RankRow-rank">1</td><td class="RankRow-user">userA</td><td class="num">1,000</td><td class="num">1,000</td><td class="num is-zero">0</td><td class="num">1</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">2<span class="RankRow-tie">TIE</span></td><td class="RankRow-user">userB</td><td class="num">800</td><td class="num">800</td><td class="num is-zero">0</td><td class="num">2</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">2<span class="RankRow-tie">TIE</span></td><td class="RankRow-user">userC</td><td class="num">800</td><td class="num">780</td><td class="num is-up">+20</td><td class="num">3</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">4</td><td class="RankRow-user">userD</td><td class="num">600</td><td class="num">600</td><td class="num is-zero">0</td><td class="num">4</td></tr>
+<tr class="RankRow is-selected"><td class="RankRow-rank">212</td><td class="RankRow-user">tavi_okoro</td><td class="num">18,430</td><td class="num">18,400</td><td class="num is-up">+30</td><td class="num">214</td></tr>
+<tr class="RankRow is-unranked"><td class="RankRow-rank">—</td><td class="RankRow-user">new_player</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+</tbody></table></div></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">KeyValueList</h3><p class="Spec-purpose">Label and value pairs, value in mono. The optional second line names the API field.</p><p class="Spec-props">rows: Array&lt;{ label: string;
+  field?: string; value: ReactNode;
+  tone?: 'ok' | 'warn' | 'fail' }&gt;</p></div>
+<div class="Spec-demos">
+<div class="Spec-state" style="width: 260px"><span class="Spec-cap">with "Show API fields" on (operator only)</span><div class="lc lc-fields"><dl class="KeyValueList"><dt>Unread<code>consumerGroupLag</code></dt><dd>0</dd><dt>Unacked<code>pendingEntries</code></dt><dd>0</dd><dt>Stream length<code>streamLength</code></dt><dd>300,003</dd></dl></div></div>
+<div class="Spec-state" style="width: 260px"><span class="Spec-cap">plain, with tone</span><dl class="KeyValueList"><dt>State</dt><dd class="t-fail">OPEN</dd><dt>Failure rate</dt><dd>50%</dd><dt>Retry-After</dt><dd>10 s</dd></dl></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">Panel</h3><p class="Spec-purpose">The only surface container. Head with title and meta, body or a flush DataTable, optional foot.</p><p class="Spec-props">title: string
+meta?: ReactNode
+foot?: ReactNode
+flush?: boolean  // table to the edges</p></div>
+<div class="Spec-demos">
+<div class="Spec-state" style="width: 420px"><span class="Spec-cap">head · body · foot</span>
+<div class="Panel"><div class="Panel-head"><h3 class="Panel-title">User lookup</h3><div class="Panel-meta"><span class="mono">GET /leaderboards/{id}/users/{userId}</span></div></div><div class="Panel-body">Body content.</div><div class="Panel-foot"><span>1–10 of 1,000</span><span>limit 10</span></div></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">PageHeader · Tabs</h3><p class="Spec-purpose">Title, one row of identifying meta, actions on the right. Tabs sit directly under it on leaderboard pages.</p><p class="Spec-props">PageHeader: title: string
+  meta?: ReactNode; actions?: ReactNode
+Tabs: items: Array&lt;{ label: string;
+  href: string }&gt;; active: string</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full">
+<div class="PageHeader"><div><div class="PageHeader-title">season-12-global</div><div class="PageHeader-meta"><span class="IdCell"><span class="mono">7c9e6679-7425-40de-944b-e07fc1f90ae7</span><button class="CopyButton" type="button" aria-label="Copy leaderboard ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span><span>1,000 participants</span><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Active</span></div></div><div class="PageHeader-actions"><a class="Button" href="#">Send test event</a></div></div>
+<nav class="Tabs" aria-label="Leaderboard sections"><a class="is-active" href="#" aria-current="page">Live</a><a class="is-focus-visible" href="#">Events</a><a href="#">Snapshot</a></nav>
+</div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">Button · TextField</h3><p class="Spec-purpose">32 px controls. One primary per page at most. TextField input is mono because it takes IDs.</p><p class="Spec-props">Button: variant?: 'default' | 'primary'
+  | 'ghost'; size?: 'md' | 'sm'
+TextField: label: string; hint?: string
+  error?: string</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">primary</span><button class="Button is-primary" type="button">New leaderboard</button></div>
+<div class="Spec-state"><span class="Spec-cap">default</span><button class="Button" type="button">Look up</button></div>
+<div class="Spec-state"><span class="Spec-cap">ghost</span><button class="Button is-ghost" type="button">Inspect payload</button></div>
+<div class="Spec-state"><span class="Spec-cap">small</span><button class="Button is-small" type="button">Next</button></div>
+<div class="Spec-state"><span class="Spec-cap">disabled</span><button class="Button" type="button" disabled>Previous</button></div>
+<div class="Spec-state"><span class="Spec-cap">danger</span><button class="Button is-danger" type="button">Discard…</button></div>
+<div class="Spec-state"><span class="Spec-cap">toggle, pressed</span><button class="Button" type="button" aria-pressed="true">Show API fields</button></div>
+<div class="Spec-state" style="width: 220px"><span class="Spec-cap">field</span><div class="TextField"><label for="f1">User ID</label><input id="f1" type="text" placeholder="userId"></div></div>
+<div class="Spec-state" style="width: 220px"><span class="Spec-cap">focus</span><div class="TextField is-focus"><label for="f2">User ID</label><input id="f2" type="text" value="tavi_okoro"></div></div>
+<div class="Spec-state" style="width: 220px"><span class="Spec-cap">error</span><div class="TextField is-error"><label for="f3">User ID</label><input id="f3" type="text" value=""><span class="TextField-hint">Enter a userId.</span></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">Focus · SkipLink</h3><p class="Spec-purpose">One ring for everything that takes keyboard focus: 2 px --focus, 2 px offset, :focus-visible only. SkipLink is the first tab stop on the page. It appears as an overlay at the top left, moves nothing, and jumps to #content.</p><p class="Spec-props">SkipLink: href: '#content'
+// ring applies to a, button, summary,
+// input, [tabindex]; shown here with
+// the .is-focus-visible demo class</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">SkipLink, focused</span><a class="SkipLink is-focus-visible is-demo" href="#">Skip to content</a></div>
+<div class="Spec-state"><span class="Spec-cap">Button</span><button class="Button is-focus-visible" type="button">Look up</button></div>
+<div class="Spec-state"><span class="Spec-cap">Button primary</span><button class="Button is-primary is-focus-visible" type="button">New leaderboard</button></div>
+<div class="Spec-state"><span class="Spec-cap">strip node</span><a class="PS-node is-focus-visible" href="#"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a></div>
+<div class="Spec-state"><span class="Spec-cap">table link</span><a class="is-focus-visible" href="#" style="font-weight: 500">season-12-global</a></div>
+<div class="Spec-state" style="width: 200px"><span class="Spec-cap">TextField</span><div class="TextField is-focus"><label for="f4">User ID</label><input id="f4" type="text" value="tavi_okoro"></div></div>
+<div class="Spec-state"><span class="Spec-cap">CopyButton</span><button class="CopyButton is-focus-visible" type="button" aria-label="Copy ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">CopyButton</h3><p class="Spec-purpose">Copies an ID that sits next to it. 24 by 24 px, icon only, named by aria-label; confirms in place for two seconds.</p><p class="Spec-props">value: string
+label: string  // "Copy leaderboard ID"
+disabled?: boolean</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">default, beside an ID</span><span class="IdCell"><span class="mono">7c9e6679-7425-40de-944b-e07fc1f90ae7</span><button class="CopyButton" type="button" aria-label="Copy leaderboard ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></div>
+<div class="Spec-state"><span class="Spec-cap">hover</span><button class="CopyButton is-hover" type="button" aria-label="Copy ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></div>
+<div class="Spec-state"><span class="Spec-cap">copied</span><button class="CopyButton is-copied" type="button">Copied</button></div>
+<div class="Spec-state"><span class="Spec-cap">nothing to copy · text, not a disabled button</span><span class="muted">no ID: payload unreadable</span></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">StaleValue</h3><p class="Spec-purpose">A number last read from a source that has stopped answering. Muted with a clock, never red: it is old, not wrong. Warn tone when the old value still needs follow-up. Used inside PipelineStrip values and KeyValueList.</p><p class="Spec-props">value: ReactNode
+asOf: string  // ISO time, read out as
+              // "last known at ..."
+tone?: 'neutral' | 'warn'
+note?: string  // "re-sent on recovery"</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">neutral</span><span class="mono"><span class="StaleValue"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>301,004</span></span></div>
+<div class="Spec-state" style="width: 220px"><span class="Spec-cap">warn, with note, in a KeyValueList</span><dl class="KeyValueList"><dt>Unacked<code>pendingEntries</code></dt><dd class="is-strong"><span class="StaleValue is-warn"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>1,001</span><small>re-sent on recovery</small></dd></dl></div>
+<div class="Spec-state"><span class="Spec-cap">in a strip node</span><a class="PS-node is-fail" href="#"><i class="glyph is-fail"></i><span class="PS-name">Stream</span><span class="PS-val">unreachable<span class="StaleValue"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg>1,001</span></span></a></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">CollapsedHops</h3><p class="Spec-purpose">During an incident the hops that are fine fold into one row under the failing ones, keeping their number, name and strip value. A native details element, so it opens with Enter or Space.</p><p class="Spec-props">hops: Array&lt;{ step: number; title: string;
+  summary: string }&gt;
+defaultOpen?: boolean
+children: ReactNode  // PipelineHop[]</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">collapsed</span>
+<div class="Panel"><details class="CollapsedHops" style="border-top: 0">
+<summary><span class="CollapsedHops-title">Healthy · 3 hops</span><span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>03 Kafka</b><span>lag 0</span></span><span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>04 Consumer</b><span>RUNNING</span></span><span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>05 PostgreSQL</b><span>301,002 stored</span></span><span class="CollapsedHops-toggle"><span class="when-closed">Show details</span><span class="when-open">Hide details</span></span></summary>
+</details></div></div>
+<div class="Spec-state is-full"><span class="Spec-cap">expanded</span>
+<div class="Panel"><details class="CollapsedHops" style="border-top: 0" open>
+<summary><span class="CollapsedHops-title">Healthy · 3 hops</span><span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>03 Kafka</b><span>lag 0</span></span><span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>04 Consumer</b><span>RUNNING</span></span><span class="CollapsedHops-item"><i class="glyph is-ok"></i><b>05 PostgreSQL</b><span>301,002 stored</span></span><span class="CollapsedHops-toggle"><span class="when-closed">Show details</span><span class="when-open">Hide details</span></span></summary>
+<div class="PipelineHops is-three">
+<section class="PipelineHop"><div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div><div class="PH-head"><h3 class="PH-title"><span class="PH-step">03</span>Kafka</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>lag 0</span></div><div class="PH-res">lb-audit-events</div><dl class="KeyValueList"><dt>Messages</dt><dd>301,004</dd><dt>Lag</dt><dd class="is-strong">0</dd></dl></section>
+<section class="PipelineHop"><div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div><div class="PH-head"><h3 class="PH-title"><span class="PH-step">04</span>Consumer</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>RUNNING</span></div><div class="PH-res">group audit-trend</div><dl class="KeyValueList"><dt>State</dt><dd class="is-strong">RUNNING</dd><dt>Ready</dt><dd>true</dd></dl></section>
+<section class="PipelineHop"><div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out is-none"></i></div><div class="PH-head"><h3 class="PH-title"><span class="PH-step">05</span>PostgreSQL</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>301,002 stored</span></div><div class="PH-res">audit_events</div><dl class="KeyValueList"><dt>Rows</dt><dd class="is-strong">301,002</dd><dt>Duplicates</dt><dd>ignored</dd></dl></section>
+</div>
+</details></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">RoleChip · EnvTag · OperatorOnly</h3><p class="Spec-purpose">One console, two roles. Operator means an admin JWT, the same one /internal/** requires. OperatorOnly is a rule, not a look: a region marked data-op is not rendered for a tenant. Operator-only today: relay leader and lock, unacked and ack internals, Reconcile, the dead-letter topic and its actions, the runbook and "Action needed", release evidence, API field names. EnvTag marks the project's environment on the switcher.</p><p class="Spec-props">RoleChip: role: 'operator' | 'tenant'
+EnvTag: env: 'prod' | 'sandbox'
+OperatorOnly: children: ReactNode
+// server-side: render null unless the
+// session carries the admin role</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">RoleChip operator · tenant</span><span style="display: flex; gap: 8px"><span class="RoleChip is-operator">Operator</span><span class="RoleChip">Tenant</span></span></div>
+<div class="Spec-state"><span class="Spec-cap">EnvTag prod · sandbox</span><span style="display: flex; gap: 8px"><span class="EnvTag is-prod">prod</span><span class="EnvTag">sandbox</span></span></div>
+<div class="Spec-state" style="width: 300px"><span class="Spec-cap">OperatorOnly as the developer layer shows it (dashed outline)</span><div data-op style="padding: 10px"><dl class="KeyValueList"><dt>Leader</dt><dd class="is-strong">app-1</dd><dt>Leader lock</dt><dd>held</dd></dl></div></div>
+<div class="Spec-state" style="width: 300px"><span class="Spec-cap">the same region for a tenant</span><span class="muted">not rendered</span></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">Reconcile</h3><p class="Spec-purpose">The single answer at the top of /delivery: everything published is either stored or quarantined. Green only when every term is live. During a Redis outage the result is neutral and the unacked count is shown as a StaleValue. Operator only.</p><p class="Spec-props">published: number  // totalMessages
+stored: number     // audit-events/count
+quarantined: number // dltTotalMessages
+unacked?: Stale&lt;number&gt;</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">balanced</span>
+<div class="Reconcile"><span>300,003<small>published</small></span><span class="Reconcile-op">=</span><span>300,001<small>stored</small></span><span class="Reconcile-op">+</span><span>2<small>in DLT</small></span><span class="Reconcile-result"><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>0 unaccounted</span></span></div></div>
+<div class="Spec-state is-full"><span class="Spec-cap">during a Redis outage · neutral result, stale unacked count</span>
+<div class="Reconcile"><span>301,004<small>published</small></span><span class="Reconcile-op">=</span><span>301,002<small>stored</small></span><span class="Reconcile-op">+</span><span>2<small>in DLT</small></span><span class="Reconcile-result"><span class="StatusBadge">0 unaccounted between Kafka and PostgreSQL</span></span><span class="Reconcile-extra"><span class="StaleValue is-warn"><svg class="StaleValue-glyph" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.4V6l1.9 1.2"></path></svg><span class="sr">last known: </span>1,001</span> unacked in Redis. They are already in Kafka and are re-sent on recovery; duplicates are ignored.</span></div></div>
+<div class="Spec-state is-full"><span class="Spec-cap">out of balance</span>
+<div class="Reconcile"><span>300,003<small>published</small></span><span class="Reconcile-op">=</span><span>299,998<small>stored</small></span><span class="Reconcile-op">+</span><span>2<small>in DLT</small></span><span class="Reconcile-result"><span class="StatusBadge is-fail"><i class="glyph is-fail"></i>3 unaccounted</span></span></div></div>
+</div>
+</div>
+
+<div class="Spec" style="grid-template-columns: minmax(0, 1fr)">
+<div><h3 class="Spec-name">DataTable · review actions</h3><p class="Spec-purpose" style="max-width: 56ch">Dead-letter review has an end. Replay publishes the record again; if it now parses it is stored and leaves the list. Discard deletes it and requires a reason. Mark reviewed keeps it and clears the warning. All three work on a selection. Operator only.</p><p class="Spec-props">selectable: boolean
+bulkActions: Array&lt;{ label: string;
+  danger?: boolean }&gt;
+// needs endpoints:
+// POST …/dlt/{partition}/{offset}/replay
+// POST …/dlt/{partition}/{offset}/discard
+// POST …/dlt/{partition}/{offset}/review
+// POST …/dlt/bulk</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><span class="Spec-cap">one selected · bulk bar enabled</span>
+<div class="Panel"><div class="Panel-head"><div class="Panel-title">Dead-letter topic</div><div class="Panel-meta"><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>2 to review</span><span class="BulkBar"><span>1 selected</span><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button><button class="Button is-small" type="button">Mark reviewed</button></span></div></div>
+<div class="Panel-scroll"><table class="DataTable"><thead><tr><th class="is-check"><input class="Check" type="checkbox" aria-label="Select all"></th><th>Quarantined</th><th>Source</th><th>Event ID</th><th>Failure reason</th><th>Review</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
+<tr><td class="is-check"><input class="Check" type="checkbox" aria-label="Select record"></td><td class="mono">14:07:52 UTC</td><td class="mono">p1 · 61,204</td><td><span class="muted">no ID: payload unreadable</span></td><td class="mono">malformed audit event json</td><td><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>To review</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button><button class="Button is-small" type="button">Mark reviewed</button></td></tr>
+<tr class="is-selected"><td class="is-check"><input class="Check" type="checkbox" checked aria-label="Select record"></td><td class="mono">14:19:26 UTC</td><td class="mono">p2 · 83,551</td><td><span class="IdCell"><span class="mono">1794838763118-0</span><button class="CopyButton" type="button" aria-label="Copy event ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="mono">unsupported audit event type: adjust</td><td><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>To review</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button><button class="Button is-small" type="button">Mark reviewed</button></td></tr>
+</tbody></table></div></div></div>
+<div class="Spec-state is-full"><span class="Spec-cap">after Mark reviewed on both · badge neutral, rows kept, strip reads "DLT 2 retained"</span>
+<div class="Panel"><div class="Panel-head"><div class="Panel-title">Dead-letter topic</div><div class="Panel-meta"><span class="StatusBadge"><i class="glyph is-idle"></i>2 retained</span><span class="BulkBar"><span>0 selected</span><button class="Button is-small" type="button" disabled>Replay</button><button class="Button is-small" type="button" disabled>Discard…</button></span></div></div>
+<div class="Panel-scroll"><table class="DataTable"><thead><tr><th class="is-check"><input class="Check" type="checkbox" aria-label="Select all"></th><th>Quarantined</th><th>Source</th><th>Event ID</th><th>Failure reason</th><th>Review</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
+<tr><td class="is-check"><input class="Check" type="checkbox" aria-label="Select record"></td><td class="mono">14:07:52 UTC</td><td class="mono">p1 · 61,204</td><td><span class="muted">no ID: payload unreadable</span></td><td class="mono">malformed audit event json</td><td><span class="StatusBadge is-quiet"><i class="glyph is-idle"></i>Reviewed 14:35 by admin</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button></td></tr>
+<tr><td class="is-check"><input class="Check" type="checkbox" aria-label="Select record"></td><td class="mono">14:19:26 UTC</td><td class="mono">p2 · 83,551</td><td><span class="IdCell"><span class="mono">1794838763118-0</span><button class="CopyButton" type="button" aria-label="Copy event ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="mono">unsupported audit event type: adjust</td><td><span class="StatusBadge is-quiet"><i class="glyph is-idle"></i>Reviewed 14:35 by admin</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button></td></tr>
+</tbody></table></div></div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">ConfirmDialog</h3><p class="Spec-purpose">Only for actions that change production data or delete something. It names exactly what will change and offers the safe path first. A modal with focus kept inside; Escape cancels.</p><p class="Spec-props">title: string
+children: ReactNode  // what changes
+confirmLabel: string; danger?: boolean
+safeAction?: { label: string }
+requireReason?: boolean</p></div>
+<div class="Spec-demos">
+<div class="Spec-state"><span class="Spec-cap">test event aimed at a live leaderboard</span>
+<div class="ConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="cd1">
+<div class="ConfirmDialog-head" id="cd1">Send a test event to a live leaderboard?</div>
+<div class="ConfirmDialog-body">
+<dl class="KeyValueList"><dt>Leaderboard</dt><dd>season-12-global <span class="EnvTag is-prod">prod</span></dd><dt>userId</dt><dd>tavi_okoro</dd><dt>deltaScore</dt><dd>+10</dd></dl>
+<p>This changes the live ranking that 1,000 participants see. Scores only go up, so it cannot be undone.</p>
+</div>
+<div class="ConfirmDialog-actions"><button class="Button is-ghost" type="button">Cancel</button><button class="Button is-danger" type="button">Send to live leaderboard</button><button class="Button is-primary" type="button">Send in Sandbox instead</button></div>
+</div></div>
+<div class="Spec-state"><span class="Spec-cap">discard a dead-letter record · reason required</span>
+<div class="ConfirmDialog" role="dialog" aria-modal="true" aria-labelledby="cd2">
+<div class="ConfirmDialog-head" id="cd2">Discard this record?</div>
+<div class="ConfirmDialog-body">
+<dl class="KeyValueList"><dt>Source</dt><dd>p1 · 61,204</dd><dt>Failure</dt><dd>malformed audit event json</dd></dl>
+<p>It is deleted from lb-audit-events.DLT and cannot be replayed afterwards. Retained goes from 2 to 1.</p>
+<div class="TextField is-error"><label for="cd2r">Reason</label><input id="cd2r" type="text" value=""><span class="TextField-hint">Enter a reason to discard.</span></div>
+</div>
+<div class="ConfirmDialog-actions"><button class="Button is-ghost" type="button">Cancel</button><button class="Button is-danger" type="button" disabled>Discard record</button></div>
+</div></div>
+</div>
+</div>
+
+<div class="Spec">
+<div><h3 class="Spec-name">HopGroups</h3><p class="Spec-purpose">During an incident, separates the cause from what it drags down, so three red hops do not read as three problems. Sits above the expanded hops; affected hops also say "caused by Redis" under their badge.</p><p class="Spec-props">cause: { label: string; span: number }
+effects: { label: string; span: number }</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full"><div class="Panel"><div class="HopGroups" style="border-bottom: 0"><div class="HopGroup">Cause<span>Redis is not responding</span></div><div class="HopGroup is-effects">Downstream effects<span>caused by Redis; they clear when it returns</span></div></div></div></div>
+</div>
+</div>
+
+<div class="Spec" style="border-bottom: 0">
+<div><h3 class="Spec-name">AppShell</h3><p class="Spec-purpose">app/(console)/layout.tsx. SidebarNav, TopBar, SkipLink, then PipelineStrip above every page. Text-only navigation; the active item is a fill and carries aria-current. Documentation lives only in the sidebar foot. Delivery is shown with the focus ring.</p><p class="Spec-props">project: { id: string; name: string }
+nav: Array&lt;{ label: string; href: string;
+  count?: number }&gt;
+crumbs: string[]
+children: ReactNode</p></div>
+<div class="Spec-demos">
+<div class="Spec-state is-full">
+<div class="AppShell" style="border: 1px solid #E2E2DD; border-radius: 6px; overflow: hidden">
+<aside class="SidebarNav">
+<div class="SidebarNav-brand"><span class="SidebarNav-mark" aria-hidden="true"><i></i><i></i><i></i></span>RealtimeAPI</div>
+<button class="SidebarNav-project" type="button">arena-prod<span class="EnvTag is-prod">prod</span></button>
+<nav class="SidebarNav-group" aria-label="Project"><a class="SidebarNav-item" href="#">Overview</a><a class="SidebarNav-item is-active" href="#" aria-current="page">Leaderboards</a><a class="SidebarNav-item is-focus-visible" href="#">Delivery</a><a class="SidebarNav-item" href="#">Incidents<span class="SidebarNav-count">1</span></a></nav>
+<nav class="SidebarNav-group" aria-label="Build"><div class="SidebarNav-label">Build</div><a class="SidebarNav-item" href="#">API keys</a><a class="SidebarNav-item" href="#">Sandbox</a></nav>
+<div class="SidebarNav-foot"><a href="#">Documentation</a><span>Signed in as admin</span></div>
+</aside>
+<div class="AppShell-main">
+<div class="TopBar"><div class="TopBar-crumbs"><span>arena-prod</span><span>/</span><span>Leaderboards</span><span>/</span><b>season-12-global</b></div><div class="TopBar-meta"><span class="RoleChip is-operator">Operator</span><span class="mono">polled 2s ago</span><span class="mono">2026-11-16 14:32:07 UTC · 23:32:07 local</span></div></div>
+<div class="PipelineStrip" style="justify-content: center"><span class="PS-origin">PipelineStrip</span></div>
+<div class="AppShell-page"><span class="muted">Page content</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":9800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

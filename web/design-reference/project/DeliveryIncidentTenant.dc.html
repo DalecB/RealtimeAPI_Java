@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Delivery, circuit open, tenant view</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="lc {{labelsClass}}">
+<a class="SkipLink" href="#content">Skip to content</a>
+<div class="AppShell" style="min-height: 845px">
+
+<aside class="SidebarNav c-in" data-c="SidebarNav">
+<div class="SidebarNav-brand"><span class="SidebarNav-mark" aria-hidden="true"><i></i><i></i><i></i></span>RealtimeAPI</div>
+<button class="SidebarNav-project" type="button" aria-label="Project arena-prod, production. Switch project">arena-prod<span class="EnvTag is-prod">prod</span></button>
+<nav class="SidebarNav-group" aria-label="Project">
+<a class="SidebarNav-item" href="Overview.dc.html">Overview</a>
+<a class="SidebarNav-item" href="LeaderboardLive.dc.html">Leaderboards</a>
+<a class="SidebarNav-item is-active" href="#content" aria-current="page">Delivery</a>
+<a class="SidebarNav-item" href="#">Incidents<span class="SidebarNav-count is-fail">1</span></a>
+</nav>
+<nav class="SidebarNav-group" aria-label="Build">
+<div class="SidebarNav-label">Build</div>
+<a class="SidebarNav-item" href="#">API keys</a>
+<a class="SidebarNav-item" href="#">Sandbox</a>
+</nav>
+<div class="SidebarNav-foot"><a href="#">Documentation</a><span>Signed in as dev@arena.example</span></div>
+</aside>
+
+<div class="AppShell-main">
+<div class="TopBar c-in" data-c="TopBar">
+<div class="TopBar-crumbs"><span>arena-prod</span><span>/</span><b>Delivery</b></div>
+<div class="TopBar-meta"><span class="RoleChip">Tenant</span><span class="mono">polled 2s ago</span><span class="mono">2026-11-16 14:42:07 UTC · 23:42:07 local</span></div>
+</div>
+
+<nav class="PipelineStrip" data-c="PipelineStrip" aria-label="Pipeline status">
+<span class="PS-origin">POST /events</span><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="#writes" aria-label="Writes: 503 · retry after 10 s"><i class="glyph is-fail"></i><span class="PS-name">Writes</span><span class="PS-val">503 · retry after 10 s</span></a><i class="PS-link is-blocked"></i>
+<a class="PS-node is-fail" href="#rankings" aria-label="Rankings: read errors"><i class="glyph is-fail"></i><span class="PS-name">Rankings</span><span class="PS-val">read errors</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#audit" aria-label="Audit log: storing"><i class="glyph is-ok"></i><span class="PS-name">Audit log</span><span class="PS-val">storing</span></a>
+</nav>
+
+<main class="AppShell-page" id="content">
+<div class="DevNote"><b>illustrative state data</b>clock times and outcome counts. Real: 503, Retry-After: 10, 24 h idempotency keys, retry guidance from the PRD. Read behavior is read from code, not from a test.</div>
+
+<div class="PageHeader" data-c="PageHeader">
+<div>
+<h1 class="PageHeader-title">Delivery</h1>
+<div class="PageHeader-meta"><span>Writes, rankings and the audit log for arena-prod</span><span class="StatusBadge is-quiet is-fail"><i class="glyph is-fail"></i>Writes blocked</span></div>
+</div>
+</div>
+
+<div class="IncidentBanner" data-c="IncidentBanner" aria-live="polite">
+<div class="IncidentBanner-main"><i class="glyph is-fail"></i><div>
+<div class="IncidentBanner-title">Writes are paused · our ranking store is not responding</div>
+<dl class="IncidentBanner-impact">
+<dt>Writes</dt><dd>POST /events returns 503 with Retry-After: 10. No score is partially applied.</dd>
+<dt>Reads</dt><dd>GET tops and user rank are returning errors.</dd>
+<dt>Audit</dt><dd>Every event we accepted is stored.</dd>
+</dl>
+<p class="IncidentBanner-next"><b>Nothing to change on your side.</b> Keep retrying with the same Idempotency-Key. We test the store again every 10 s; next test in <b>1 s</b> <span class="muted">(14:42:08 UTC · 23:42:08 local)</span></p>
+<div class="IncidentBanner-facts"><span>started 14:41:18 UTC · 23:41:18 local</span><span>49 s ago</span></div>
+</div></div>
+<div class="IncidentBanner-actions"><a class="Button" href="#">View incident</a></div>
+</div>
+
+<div class="Split">
+
+<section class="Panel is-wide" aria-labelledby="p-sees" data-c="Panel · DataTable">
+<div class="Panel-head"><h2 class="Panel-title" id="p-sees">What your integration sees</h2></div>
+<div class="Panel-scroll"><table class="DataTable">
+<thead><tr><th>Surface</th><th>Status</th><th>You receive</th><th>What to do</th></tr></thead>
+<tbody>
+<tr id="writes"><td class="mono">POST /events</td><td><span class="StatusBadge is-quiet is-fail"><i class="glyph is-fail"></i>Blocked</span></td><td><span class="OutcomeTag is-blocked">503 BLOCKED</span> <span class="mono">Retry-After: 10</span></td><td class="wrap">Retry with the same Idempotency-Key.</td></tr>
+<tr id="rankings"><td class="mono">GET tops · user rank</td><td><span class="StatusBadge is-quiet is-fail"><i class="glyph is-fail"></i>Failing</span></td><td>An error response</td><td class="wrap">Show the last ranking you fetched.</td></tr>
+<tr><td>Scores</td><td><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Safe</span></td><td>Unchanged since 14:41:18 UTC</td><td class="wrap">Nothing. A request either applied fully or not at all.</td></tr>
+<tr id="audit"><td>Audit log</td><td><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Storing</span></td><td>Accepted events are stored</td><td class="wrap">Nothing.</td></tr>
+</tbody></table></div>
+<div class="Panel-foot"><span>If the ranking store loses its data, rankings are rebuilt from a snapshot taken at most about 30 s earlier; score gained after that snapshot is not recovered.</span></div>
+</section>
+
+<div class="Stack is-narrow">
+<section class="Panel" aria-labelledby="p-retry" data-c="Panel · KeyValueList">
+<div class="Panel-head"><h2 class="Panel-title" id="p-retry">Retry guidance</h2></div>
+<div class="Panel-body">
+<dl class="KeyValueList">
+<dt>Wait before retrying</dt><dd>10 s</dd>
+<dt>Then back off</dt><dd>1 s, doubling</dd>
+<dt>Jitter</dt><dd>±20%</dd>
+<dt>Give up after</dt><dd>3 retries</dd>
+<dt>Same key is safe for</dt><dd>24 h</dd>
+</dl>
+</div>
+</section>
+<section class="Panel" aria-labelledby="p-yours" data-c="Panel" data-need="GET /events/outcomes?last=50  (API key scope)">
+<div class="Panel-head"><h2 class="Panel-title" id="p-yours">Your last 50 requests</h2></div>
+<div class="Panel-body" data-c="OutcomeBreakdown">
+<div class="OutcomeBreakdown"><div class="OutcomeBreakdown-bar"><i class="is-new" style="width: 38%"></i><i class="is-replay" style="width: 2%"></i><i class="is-error" style="width: 10%"></i><i class="is-blocked" style="width: 50%"></i></div>
+<div class="OutcomeBreakdown-rows"><span class="is-tag"><span class="OutcomeTag is-blocked">503 BLOCKED</span></span><span>25</span><span class="muted">50%</span><span class="is-tag"><span class="OutcomeTag is-error">ERROR</span></span><span>5</span><span class="muted">10%</span><span class="is-tag"><span class="OutcomeTag is-new">NEW</span></span><span>19</span><span class="muted">38%</span><span class="is-tag"><span class="OutcomeTag is-replay">REPLAY</span></span><span>1</span><span class="muted">2%</span></div></div>
+</div>
+</section>
+</div>
+
+</div>
+
+</main>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showLabels":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":845}}'>
+class Component extends DCLogic {
+renderVals() {
+return { labelsClass: (this.props.showLabels ?? true) ? '' : 'lc-nolabels' };
+}
+}
+</script>
+</body>
+</html>

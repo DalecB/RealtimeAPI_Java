@@ -1,0 +1,113 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-16T09:00:00Z"
+  },
+  "title": "Leaderboard Console",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 9800,
+      "title": "0 · Foundations & Components",
+      "expand": "fill"
+    },
+    "Overview.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1280,
+      "title": "1 · Overview (operator view) — /[project]/overview",
+      "expand": "fill"
+    },
+    "LeaderboardLive.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1010,
+      "title": "2 · Leaderboard › Live (operator view) — /[project]/leaderboards/[id]",
+      "expand": "fill"
+    },
+    "DeliveryHealthy.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 995,
+      "title": "3 · Delivery — healthy (operator view) — /[project]/delivery",
+      "expand": "fill"
+    },
+    "DeliveryIncident.dc.html": {
+      "x": 6080,
+      "y": 0,
+      "w": 1440,
+      "h": 1350,
+      "title": "4 · Delivery — incident (operator view)",
+      "expand": "fill"
+    },
+    "DeliveryIncidentTenant.dc.html": {
+      "x": 7600,
+      "y": 0,
+      "w": 1440,
+      "h": 845,
+      "title": "5 · Delivery — incident (tenant view)",
+      "expand": "fill"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Overview.dc.html",
+    "LeaderboardLive.dc.html",
+    "DeliveryHealthy.dc.html",
+    "DeliveryIncident.dc.html",
+    "DeliveryIncidentTenant.dc.html"
+  ],
+  "notes": {
+    "illus1": {
+      "x": 1520,
+      "y": 1340,
+      "w": 560,
+      "text": "Illustrative state data on this artboard: DLT 2 and the open-incident row, leaderboard names, participants, top scores, per-row snapshot age, live breaker 0%.\n\nMeasured: the release evidence rows (write p99 11.82 ms at 991.11 RPS, commit 27b5b47), 300,001 stored, lag 0.",
+      "fill": "pink",
+      "size": "m"
+    },
+    "illus2": {
+      "x": 3040,
+      "y": 1070,
+      "w": 560,
+      "text": "Illustrative state data on this artboard: user IDs, scores, ranks, snapshot 1,284, DLT 2.\n\nReal behavior: competition ranking 1, 2, 2, 4, ties by user ID, 30 s snapshot interval, top-1,000 snapshot.",
+      "fill": "pink",
+      "size": "m"
+    },
+    "illus3": {
+      "x": 4560,
+      "y": 1055,
+      "w": 560,
+      "text": "Illustrative state data on this artboard: DLT 2 records (the measured run had DLT 0), Kafka 300,003, partition offsets, last-50 outcome counts.\n\nMeasured: 300,001 stored, unread 0, unacked 0, lag 0.",
+      "fill": "pink",
+      "size": "m"
+    },
+    "illus4": {
+      "x": 6080,
+      "y": 1410,
+      "w": 560,
+      "text": "Illustrative state data on this artboard: unacked 1,001, Kafka 301,004, PostgreSQL 301,002, the unacked series, outcome counts, clock times, DLT 2.\n\nReal behavior: opens at 50% of the last 10 calls, 503 with Retry-After: 10, 3 trial calls. That reads return errors is read from the code, not from a test.",
+      "fill": "pink",
+      "size": "m"
+    },
+    "illus5": {
+      "x": 7600,
+      "y": 905,
+      "w": 560,
+      "fill": "pink",
+      "size": "m",
+      "text": "Illustrative state data on this artboard: clock times and outcome counts.\n\nReal behavior: 503 with Retry-After: 10, 24 h idempotency keys, retry guidance from the PRD. That reads return errors during a Redis outage is read from the code (the breaker wraps only the write path), not from a test."
+    }
+  },
+  "designSystems": []
+}

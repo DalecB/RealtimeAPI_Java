@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Delivery, healthy, operator view</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="lc {{labelsClass}} {{fieldsClass}}">
+<a class="SkipLink" href="#content">Skip to content</a>
+<div class="AppShell" style="min-height: 995px">
+
+<aside class="SidebarNav c-in" data-c="SidebarNav">
+<div class="SidebarNav-brand"><span class="SidebarNav-mark" aria-hidden="true"><i></i><i></i><i></i></span>RealtimeAPI</div>
+<button class="SidebarNav-project" type="button" aria-label="Project arena-prod, production. Switch project">arena-prod<span class="EnvTag is-prod">prod</span></button>
+<nav class="SidebarNav-group" aria-label="Project">
+<a class="SidebarNav-item" href="Overview.dc.html">Overview</a>
+<a class="SidebarNav-item" href="LeaderboardLive.dc.html">Leaderboards</a>
+<a class="SidebarNav-item is-active" href="#content" aria-current="page">Delivery</a>
+<a class="SidebarNav-item" href="#">Incidents<span class="SidebarNav-count">1</span></a>
+</nav>
+<nav class="SidebarNav-group" aria-label="Build">
+<div class="SidebarNav-label">Build</div>
+<a class="SidebarNav-item" href="#">API keys</a>
+<a class="SidebarNav-item" href="#">Sandbox</a>
+</nav>
+<div class="SidebarNav-foot"><a href="#">Documentation</a><span>Signed in as admin</span></div>
+</aside>
+
+<div class="AppShell-main">
+<div class="TopBar c-in" data-c="TopBar">
+<div class="TopBar-crumbs"><span>arena-prod</span><span>/</span><b>Delivery</b></div>
+<div class="TopBar-meta"><span class="RoleChip is-operator">Operator</span><span class="mono">polled 2s ago</span><span class="mono">2026-11-16 14:32:07 UTC · 23:32:07 local</span></div>
+</div>
+
+<nav class="PipelineStrip" data-c="PipelineStrip" aria-label="Pipeline status">
+<span class="PS-origin">POST /events</span><i class="PS-link"></i>
+<a class="PS-node" href="#write-path" aria-label="Breaker: CLOSED"><i class="glyph is-ok"></i><span class="PS-name">Breaker</span><span class="PS-val">CLOSED</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#stream" aria-label="Stream: 0 unread · 0 unacked"><i class="glyph is-ok"></i><span class="PS-name">Stream</span><span class="PS-val">0 unread · 0 unacked</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#relay" aria-label="Relay: leader app-1"><i class="glyph is-ok"></i><span class="PS-name">Relay</span><span class="PS-val">leader app-1</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#kafka" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#consumer" aria-label="Consumer: RUNNING"><i class="glyph is-ok"></i><span class="PS-name">Consumer</span><span class="PS-val">RUNNING</span></a><i class="PS-link"></i>
+<a class="PS-node" href="#postgres" aria-label="PostgreSQL: 300,001 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">300,001 stored</span><span class="PS-compact">300.0k stored</span></span></a>
+<a class="PS-node is-warn is-aside" href="#dlt" aria-label="DLT: 2 to review"><i class="glyph is-warn"></i><span class="PS-name">DLT</span><span class="PS-val">2 to review</span></a>
+</nav>
+
+<main class="AppShell-page" id="content">
+<div class="DevNote"><b>illustrative state data</b>DLT 2 records (the measured run had 0), Kafka 300,003, partition offsets, last-50 outcome counts. Measured: 300,001 stored, unread 0, unacked 0, lag 0.</div>
+
+<div class="PageHeader" data-c="PageHeader">
+<div>
+<h1 class="PageHeader-title">Delivery</h1>
+<div class="PageHeader-meta"><span>Write path and audit pipeline for every leaderboard in arena-prod</span><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Delivering</span></div>
+</div>
+<div class="PageHeader-actions"><button class="Button" type="button" aria-pressed="{{fieldsPressed}}" data-op>Show API fields</button></div>
+</div>
+
+<div class="Reconcile" data-op data-c="Reconcile · operator only" aria-label="Reconciliation: 300,003 published equals 300,001 stored plus 2 in the dead-letter topic. 0 unaccounted.">
+<span>300,003<small>published</small></span><span class="Reconcile-op">=</span><span>300,001<small>stored</small></span><span class="Reconcile-op">+</span><span>2<small>in DLT</small></span>
+<span class="Reconcile-result"><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>0 unaccounted</span></span>
+</div>
+
+<section class="Panel" aria-labelledby="p-pipeline" data-c="Panel">
+<div class="Panel-head"><h2 class="Panel-title" id="p-pipeline">Pipeline</h2><div class="Panel-meta"><span>Each accepted event is published at least once and stored exactly once</span></div></div>
+<div class="PipelineHops is-six">
+<section class="PipelineHop n-left" id="write-path" data-c="PipelineHop" data-need="GET /internal/events/outcomes?last=50">
+<div class="PH-rail"><i class="PH-in is-none"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">00</span>Write path</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>CLOSED</span></div>
+<div class="PH-res">circuit breaker</div>
+<dl class="KeyValueList">
+<dt>State<code>state</code></dt><dd class="is-strong">CLOSED</dd>
+<dt>Failure rate<code>failureRate</code></dt><dd>0%</dd>
+<dt>Opens at</dt><dd>50%</dd>
+<dt>Window</dt><dd>10 calls</dd>
+<dt>While open</dt><dd>503</dd>
+<dt>Retry-After</dt><dd>10 s</dd>
+</dl>
+<div class="PH-block" data-c="OutcomeBreakdown">
+<div class="Sparkline-caption">Last 50 POST /events</div>
+<div class="OutcomeBreakdown"><div class="OutcomeBreakdown-bar"><i class="is-new" style="width: 96%"></i><i class="is-replay" style="width: 4%"></i></div>
+<div class="OutcomeBreakdown-rows"><span class="is-tag"><span class="OutcomeTag is-new">NEW</span></span><span>48</span><span class="muted">96%</span><span class="is-tag"><span class="OutcomeTag is-replay">REPLAY</span></span><span>2</span><span class="muted">4%</span><span class="is-tag"><span class="OutcomeTag is-blocked">503 BLOCKED</span></span><span>0</span><span class="muted">0%</span></div></div>
+</div>
+</section>
+<section class="PipelineHop" id="stream">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">01</span>Redis Stream</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>0 unread · 0 unacked</span></div>
+<div class="PH-res">audit outbox</div>
+<dl class="KeyValueList">
+<dt>Unread<code>consumerGroupLag</code></dt><dd class="is-strong">0</dd>
+<dt>Unacked<code>pendingEntries</code></dt><dd class="is-strong">0</dd>
+<dt>Length<code>streamLength</code></dt><dd>300,003</dd>
+</dl>
+<p class="PH-note">Unacked entries were read by the relay but not yet confirmed. Length includes delivered entries; it is not backlog.</p>
+</section>
+<section class="PipelineHop c-in" id="relay" data-op data-c="operator only" data-need="GET /internal/relay/status">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">02</span>Relay</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>leader app-1</span></div>
+<div class="PH-res">one active instance</div>
+<dl class="KeyValueList">
+<dt>Leader</dt><dd class="is-strong">app-1</dd>
+<dt>Leader lock</dt><dd>held</dd>
+<dt>Standby</dt><dd>app-2</dd>
+<dt>Handoff</dt><dd>10 min idle</dd>
+</dl>
+<p class="PH-note">A standby takes the PostgreSQL lock on its next tick if the leader's session drops.</p>
+</section>
+<section class="PipelineHop n-left" id="kafka" data-need="GET /internal/kafka/audit-topic/partitions">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">03</span>Kafka</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>lag 0</span></div>
+<div class="PH-res">lb-audit-events</div>
+<dl class="KeyValueList">
+<dt>Messages<code>totalMessages</code></dt><dd>300,003</dd>
+<dt>Lag<code>consumerLag</code></dt><dd class="is-strong">0</dd>
+</dl>
+<div class="PH-block" data-c="PartitionLagBar">
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p0</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-1</span></div>
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p1</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-1</span></div>
+<div class="PartitionLagBar"><span class="PartitionLagBar-id">p2</span><span class="PartitionLagBar-track"><i class="PartitionLagBar-fill" style="width: 0%"></i></span><span class="PartitionLagBar-lag">0</span><span class="PartitionLagBar-owner">app-2</span></div>
+</div>
+</section>
+<section class="PipelineHop" id="consumer">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">04</span>Consumer</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>RUNNING</span></div>
+<div class="PH-res">group audit-trend</div>
+<dl class="KeyValueList">
+<dt>State<code>consumerState</code></dt><dd class="is-strong">RUNNING</dd>
+<dt>Ready<code>consumerReady</code></dt><dd>true</dd>
+<dt>Retries<code>retryAttempts</code></dt><dd>0</dd>
+<dt>Members</dt><dd>app-1 · app-2</dd>
+</dl>
+<p class="PH-note">Offsets are committed only after the batch is stored.</p>
+</section>
+<section class="PipelineHop" id="postgres">
+<div class="PH-rail"><i class="PH-in"></i><i class="glyph is-ok"></i><i class="PH-out is-none"></i></div>
+<div class="PH-head"><h3 class="PH-title"><span class="PH-step">05</span>PostgreSQL</h3><span class="StatusBadge is-ok"><i class="glyph is-ok"></i>300,001 stored</span></div>
+<div class="PH-res">audit_events</div>
+<dl class="KeyValueList">
+<dt>Rows<code>count</code></dt><dd class="is-strong">300,001</dd>
+<dt>Duplicates</dt><dd>ignored</dd>
+</dl>
+<p class="PH-note">One row per event, even when it is delivered twice.</p>
+</section>
+</div>
+</section>
+
+<section class="Panel" id="dlt" aria-labelledby="p-dlt" data-op data-c="Panel · DataTable · operator only" data-need="GET …/audit-topic/dlt?limit=20 · POST …/dlt/{partition}/{offset}/replay | discard | review · POST …/dlt/bulk">
+<div class="Panel-head"><h2 class="Panel-title" id="p-dlt">Dead-letter topic</h2><div class="Panel-meta"><span class="StatusBadge is-warn"><i class="glyph is-warn"></i>2 to review</span><span class="BulkBar"><span>0 selected</span><button class="Button is-small" type="button" disabled>Replay</button><button class="Button is-small" type="button" disabled>Discard…</button><button class="Button is-small" type="button" disabled>Mark reviewed</button></span></div></div>
+<div class="Panel-scroll"><table class="DataTable">
+<thead><tr><th class="is-check"><input class="Check" type="checkbox" aria-label="Select all records"></th><th>Quarantined</th><th>Source</th><th>Event ID</th><th>Failure reason</th><th>Review</th><th><span class="sr">Actions</span></th></tr></thead>
+<tbody>
+<tr><td class="is-check"><input class="Check" type="checkbox" aria-label="Select record at p1 · 61,204"></td><td class="mono">14:07:52 UTC</td><td class="mono">p1 · 61,204</td><td><span class="muted">no ID: payload unreadable</span></td><td class="mono">malformed audit event json</td><td><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>To review</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button><button class="Button is-small" type="button">Mark reviewed</button></td></tr>
+<tr><td class="is-check"><input class="Check" type="checkbox" aria-label="Select record at p2 · 83,551"></td><td class="mono">14:19:26 UTC</td><td class="mono">p2 · 83,551</td><td><span class="IdCell"><span class="mono">1794838763118-0</span><button class="CopyButton" type="button" aria-label="Copy event ID 1794838763118-0"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span></td><td class="mono">unsupported audit event type: adjust</td><td><span class="StatusBadge is-quiet is-warn"><i class="glyph is-warn"></i>To review</span></td><td class="is-actions"><button class="Button is-small" type="button">Inspect</button><button class="Button is-small" type="button">Replay</button><button class="Button is-small is-danger" type="button">Discard…</button><button class="Button is-small" type="button">Mark reviewed</button></td></tr>
+</tbody></table></div>
+<div class="Panel-foot"><span>A record lands here after 3 failed processing attempts. Replay publishes the record to lb-audit-events again; if it now parses it is stored and leaves this list. Discard deletes it and asks for a reason; retained goes down by one. Mark reviewed keeps the record and clears the warning: the strip then reads DLT 2 retained.</span></div>
+</section>
+</main>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showLabels":{"editor":"boolean","default":true},"showApiFields":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":995}}'>
+class Component extends DCLogic {
+renderVals() {
+return { fieldsPressed: (this.props.showApiFields ?? false) ? 'true' : 'false', labelsClass: (this.props.showLabels ?? true) ? '' : 'lc-nolabels', fieldsClass: (this.props.showApiFields ?? false) ? 'lc-fields' : '' };
+}
+}
+</script>
+</body>
+</html>

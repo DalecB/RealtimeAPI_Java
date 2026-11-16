@@ -1,0 +1,88 @@
+/* ---------- Tokens ---------- */
+.lc {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-2: #F0F0ED;
+  --border: #E2E2DD;
+  --border-strong: #C6C6C0;
+  --text: #16181B;
+  --text-2: #4D5157;
+  --text-3: #666A71;
+  --accent: #2348C9;
+  --accent-bg: #EBEFFC;
+  --accent-text: #1D3CA8;
+  --ok: #116A42;
+  --ok-solid: #1F9D63;
+  --ok-bg: #E6F4EC;
+  --warn: #855300;
+  --warn-solid: #B07500;
+  --warn-bg: #FBF1DA;
+  --fail: #B4261D;
+  --fail-solid: #D5382D;
+  --fail-bg: #FCEAE8;
+  --on-solid: #FFFFFF;
+  --track: #BDBDB6;
+  --focus: #2348C9;
+
+  --font-ui: var(--font-inter), Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r-1: 3px;
+  --r-2: 4px;
+  --r-3: 6px;
+
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text);
+  background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  position: relative;
+}
+.lc-dark {
+  --bg: #0F1113;
+  --surface: #16191C;
+  --surface-2: #1E2226;
+  --border: #2A2F35;
+  --border-strong: #454C55;
+  --text: #ECEDEE;
+  --text-2: #B6BBC2;
+  --text-3: #979DA5;
+  --accent: #8FA6FF;
+  --accent-bg: #1B2550;
+  --accent-text: #B4C3FF;
+  --ok: #6AD7A2;
+  --ok-solid: #34B57A;
+  --ok-bg: #12301F;
+  --warn: #F0BE55;
+  --warn-solid: #D99A1A;
+  --warn-bg: #3A2A08;
+  --fail: #FF9A91;
+  --fail-solid: #E5534A;
+  --fail-bg: #3D1512;
+  --on-solid: #0F1113;
+  --track: #4A515A;
+  --focus: #B4C3FF;
+  color: var(--text);
+  background: var(--surface);
+}
+.lc *, .lc *::before, .lc *::after { box-sizing: border-box; }
+.lc h1, .lc h2, .lc h3, .lc p, .lc dl, .lc dd, .lc dt, .lc ul, .lc ol { margin: 0; padding: 0; }
+.lc ul, .lc ol { list-style: none; }
+.lc a { color: var(--accent-text); text-decoration: none; }
+.lc a:hover { text-decoration: underline; }
+.lc .mono, .lc .num { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.lc .num { text-align: right; }
+.lc .muted { color: var(--text-3); }
+.lc .t-ok { color: var(--ok); }
+.lc .t-warn { color: var(--warn); }
+.lc .t-fail { color: var(--fail); }
+.lc .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.lc ::selection { background: var(--accent-bg); color: var(--text); }
+
+/* ---------- Focus: one ring for every interactive element ---------- */
+.lc :is(a, button, summary, [tabindex]):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-2); }
+.lc .TextField input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+

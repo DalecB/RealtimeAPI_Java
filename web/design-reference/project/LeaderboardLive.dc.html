@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Leaderboard, Live tab</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./console.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="lc {{labelsClass}}">
+<a class="SkipLink" href="#content">Skip to content</a>
+<div class="AppShell" style="min-height: 1010px">
+
+<aside class="SidebarNav c-in" data-c="SidebarNav">
+<div class="SidebarNav-brand"><span class="SidebarNav-mark" aria-hidden="true"><i></i><i></i><i></i></span>RealtimeAPI</div>
+<button class="SidebarNav-project" type="button" aria-label="Project arena-prod, production. Switch project">arena-prod<span class="EnvTag is-prod">prod</span></button>
+<nav class="SidebarNav-group" aria-label="Project">
+<a class="SidebarNav-item" href="Overview.dc.html">Overview</a>
+<a class="SidebarNav-item is-active" href="LeaderboardLive.dc.html" aria-current="page">Leaderboards</a>
+<a class="SidebarNav-item" href="DeliveryHealthy.dc.html">Delivery</a>
+<a class="SidebarNav-item" href="#">Incidents<span class="SidebarNav-count">1</span></a>
+</nav>
+<nav class="SidebarNav-group" aria-label="Build">
+<div class="SidebarNav-label">Build</div>
+<a class="SidebarNav-item" href="#">API keys</a>
+<a class="SidebarNav-item" href="#">Sandbox</a>
+</nav>
+<div class="SidebarNav-foot"><a href="#">Documentation</a><span>Signed in as admin</span></div>
+</aside>
+
+<div class="AppShell-main">
+<div class="TopBar c-in" data-c="TopBar">
+<div class="TopBar-crumbs"><span>arena-prod</span><span>/</span><a href="Overview.dc.html">Leaderboards</a><span>/</span><b>season-12-global</b></div>
+<div class="TopBar-meta"><span class="RoleChip is-operator">Operator</span><span class="mono">polled 2s ago</span><span class="mono">2026-11-16 14:32:07 UTC · 23:32:07 local</span></div>
+</div>
+
+<nav class="PipelineStrip" data-c="PipelineStrip" aria-label="Pipeline status">
+<span class="PS-origin">POST /events</span><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#write-path" aria-label="Breaker: CLOSED"><i class="glyph is-ok"></i><span class="PS-name">Breaker</span><span class="PS-val">CLOSED</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#stream" aria-label="Stream: 0 unread · 0 unacked"><i class="glyph is-ok"></i><span class="PS-name">Stream</span><span class="PS-val">0 unread · 0 unacked</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#relay" aria-label="Relay: leader app-1"><i class="glyph is-ok"></i><span class="PS-name">Relay</span><span class="PS-val">leader app-1</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#kafka" aria-label="Kafka: lag 0"><i class="glyph is-ok"></i><span class="PS-name">Kafka</span><span class="PS-val">lag 0</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#consumer" aria-label="Consumer: RUNNING"><i class="glyph is-ok"></i><span class="PS-name">Consumer</span><span class="PS-val">RUNNING</span></a><i class="PS-link"></i>
+<a class="PS-node" href="DeliveryHealthy.dc.html" data-anchor="#postgres" aria-label="PostgreSQL: 300,001 stored"><i class="glyph is-ok"></i><span class="PS-name">PostgreSQL</span><span class="PS-val"><span class="PS-full">300,001 stored</span><span class="PS-compact">300.0k stored</span></span></a>
+<a class="PS-node is-warn is-aside" href="DeliveryHealthy.dc.html" data-anchor="#dlt" aria-label="DLT: 2 to review"><i class="glyph is-warn"></i><span class="PS-name">DLT</span><span class="PS-val">2 to review</span></a>
+</nav>
+
+<main class="AppShell-page" id="content">
+<div class="DevNote"><b>illustrative state data</b>user IDs, scores, ranks, snapshot 1,284, DLT 2. Real: competition ranking and tie order, 30 s interval, top-1,000 snapshot.</div>
+
+<div class="PageHeader" data-c="PageHeader">
+<div>
+<h1 class="PageHeader-title">season-12-global</h1>
+<div class="PageHeader-meta"><span class="IdCell"><span class="mono">7c9e6679-7425-40de-944b-e07fc1f90ae7</span><button class="CopyButton" type="button" aria-label="Copy leaderboard ID"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><path d="M8 4V2.5a1 1 0 0 0-1-1H2.5a1 1 0 0 0-1 1V7a1 1 0 0 0 1 1H4"></path></svg></button></span><span>1,000 participants</span><span class="StatusBadge is-quiet is-ok"><i class="glyph is-ok"></i>Active</span><span class="FreshnessIndicator c-up" data-c="FreshnessIndicator"><span class="FreshnessIndicator-meter"><i style="width: 60%"></i></span>snapshot <b>27s</b> ago</span></div>
+</div>
+<div class="PageHeader-actions"><a class="Button c-up" href="#" data-c="opens ConfirmDialog">Send test event…</a></div>
+</div>
+
+<nav class="Tabs" data-c="Tabs" aria-label="Leaderboard sections"><a class="is-active" href="LeaderboardLive.dc.html" aria-current="page">Live</a><a href="#">Events</a><a href="#">Snapshot</a></nav>
+
+<div class="Split">
+
+<div class="Stack is-wide">
+
+<section class="Panel" aria-labelledby="pn1" data-c="Panel">
+<div class="Panel-head"><h2 class="Panel-title" id="pn1">User lookup</h2><div class="Panel-meta"><span class="mono">GET /leaderboards/{id}/users/{userId}</span></div></div>
+<div class="Panel-body">
+<div class="Inline">
+<div class="TextField is-field c-up" data-c="TextField"><label for="lookup-user">User ID</label><input id="lookup-user" type="text" value="tavi_okoro"></div>
+<button class="Button" type="button">Look up</button>
+</div>
+</div>
+<div class="Panel-scroll is-divided"><table class="DataTable is-fixed">
+<thead><tr><th>Rank</th><th>User</th><th class="num">Score · Redis</th><th class="num">Score · snapshot</th><th class="num">Since snapshot</th><th class="num">Snapshot rank</th></tr></thead>
+<tbody>
+<tr class="RankRow is-selected"><td class="RankRow-rank">212</td><td class="RankRow-user">tavi_okoro</td><td class="num">18,430</td><td class="num">18,400</td><td class="num is-up">+30</td><td class="num">214</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="Panel" aria-labelledby="pn2" data-c="Panel · DataTable · RankRow">
+<div class="Panel-head"><h2 class="Panel-title" id="pn2">Top 10</h2><div class="Panel-meta"><span>Competition ranking · live from Redis</span><span class="mono">GET /leaderboards/{id}/tops?limit=10</span></div></div>
+<div class="Panel-scroll"><table class="DataTable is-fixed">
+<thead><tr><th>Rank</th><th>User</th><th class="num">Score · Redis</th><th class="num">Score · snapshot</th><th class="num">Since snapshot</th><th class="num">Snapshot rank</th></tr></thead>
+<tbody>
+<tr class="RankRow"><td class="RankRow-rank">1</td><td class="RankRow-user">aoki_ren</td><td class="num">48,210</td><td class="num">48,190</td><td class="num is-up">+20</td><td class="num">1</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">2<span class="RankRow-tie">TIE</span></td><td class="RankRow-user">dmitri.v</td><td class="num">47,655</td><td class="num">47,655</td><td class="num is-zero">0</td><td class="num">2</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">2<span class="RankRow-tie">TIE</span></td><td class="RankRow-user">hana_seo</td><td class="num">47,655</td><td class="num">47,640</td><td class="num is-up">+15</td><td class="num">3</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">4</td><td class="RankRow-user">kestrel07</td><td class="num">46,980</td><td class="num">46,980</td><td class="num is-zero">0</td><td class="num">4</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">5</td><td class="RankRow-user">lumen_ix</td><td class="num">45,300</td><td class="num">45,270</td><td class="num is-up">+30</td><td class="num">5</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">6<span class="RankRow-tie">TIE</span></td><td class="RankRow-user">marlowe</td><td class="num">44,875</td><td class="num">44,875</td><td class="num is-zero">0</td><td class="num">6</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">6<span class="RankRow-tie">TIE</span></td><td class="RankRow-user">nyx_arc</td><td class="num">44,875</td><td class="num">44,875</td><td class="num is-zero">0</td><td class="num">6</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">6<span class="RankRow-tie">TIE</span></td><td class="RankRow-user">orrin.b</td><td class="num">44,875</td><td class="num">44,860</td><td class="num is-up">+15</td><td class="num">8</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">9</td><td class="RankRow-user">pax_delta</td><td class="num">43,120</td><td class="num">43,120</td><td class="num is-zero">0</td><td class="num">9</td></tr>
+<tr class="RankRow"><td class="RankRow-rank">10</td><td class="RankRow-user">quill_r</td><td class="num">42,940</td><td class="num">42,900</td><td class="num is-up">+40</td><td class="num">10</td></tr>
+</tbody></table></div>
+<div class="Panel-foot"><span>Equal scores share a rank and the next is skipped. Ties sort by user ID.</span><span class="Inline is-center"><span class="mono">1–10 of 1,000</span><button class="Button is-small" type="button" disabled>Previous</button><button class="Button is-small" type="button">Next</button></span></div>
+</section>
+
+</div>
+
+<section class="Panel is-narrow" aria-labelledby="pn3" data-c="Panel · KeyValueList">
+<div class="Panel-head"><h2 class="Panel-title" id="pn3">Redis and the latest snapshot</h2></div>
+<div class="Panel-body is-stack">
+<dl class="KeyValueList">
+<dt>Live source</dt><dd>Redis sorted set</dd>
+<dt>Participants<code>total</code></dt><dd>1,000</dd>
+<dt>Latest snapshot<code>snapshotId</code></dt><dd>1,284</dd>
+<dt>Taken at<code>snapshotAt</code></dt><dd>14:31:40 UTC</dd>
+<dt>Entries in snapshot</dt><dd>1,000</dd>
+<dt>Snapshot interval</dt><dd>30 s</dd>
+<dt>Top 10 changed since</dt><dd>5 of 10</dd>
+<dt>Largest gain since</dt><dd>+40</dd>
+</dl>
+<p class="Panel-caption">Scores only increase, so a live score is never below its snapshot. If Redis loses its data, the ranking is rebuilt from the latest snapshot; score gained after it was taken is not recovered.</p>
+</div>
+</section>
+
+</div>
+
+</main>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showLabels":{"editor":"boolean","default":true},"$preview":{"width":1440,"height":1010}}'>
+class Component extends DCLogic {
+renderVals() {
+return { labelsClass: (this.props.showLabels ?? true) ? '' : 'lc-nolabels' };
+}
+}
+</script>
+</body>
+</html>
