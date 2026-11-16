@@ -893,7 +893,11 @@ class KafkaAuditRoundTripTest {
             int count,
             String consumerName
     ) {
-        redisTemplate.opsForStream().createGroup(streamKey, ReadOffset.from("0"), AuditRelayWorker.GROUP);
+        try {
+            redisTemplate.opsForStream().createGroup(streamKey, ReadOffset.from("0"), AuditRelayWorker.GROUP);
+        } catch (org.springframework.dao.DataAccessException ex) {
+            // 컨텍스트 릴레이의 기동 틱이 먼저 그룹을 만들었을 수 있다(BUSYGROUP). 운영 ensureGroup과 같은 처리.
+        }
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
                 Consumer.from(AuditRelayWorker.GROUP, consumerName),
                 StreamReadOptions.empty().count(count),
