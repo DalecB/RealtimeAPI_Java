@@ -52,17 +52,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-print_section "1. create user"
-USER_RESPONSE="$(json_request POST /users "$(cat <<JSON
-{
-  "externalId":"$USER_EXTERNAL_ID"
-}
-JSON
-)")"
-echo "$USER_RESPONSE" | jq
-USER_ID="$(echo "$USER_RESPONSE" | jq -r '.id')"
-
-print_section "2. admin login"
+print_section "1. admin login"
 LOGIN_RESPONSE="$(json_request POST /auth/login "$(jq -n --arg u "$ADMIN_USERNAME" --arg p "$ADMIN_PASSWORD" '{externalId: $u, password: $p}')")"
 echo "$LOGIN_RESPONSE" | jq
 ADMIN_JWT="$(echo "$LOGIN_RESPONSE" | jq -r '.accessToken')"
@@ -70,6 +60,16 @@ if [[ -z "$ADMIN_JWT" || "$ADMIN_JWT" == "null" ]]; then
   echo "[breaker] admin login failed: ADMIN_USERNAME/ADMIN_PASSWORD가 서버 시드 관리자와 같은지 확인하세요" >&2
   exit 1
 fi
+
+print_section "2. create user"
+USER_RESPONSE="$(json_request POST /users "$(cat <<JSON
+{
+  "externalId":"$USER_EXTERNAL_ID"
+}
+JSON
+)" -H "Authorization: Bearer $ADMIN_JWT")"
+echo "$USER_RESPONSE" | jq
+USER_ID="$(echo "$USER_RESPONSE" | jq -r '.id')"
 
 print_section "3. create project and leaderboard"
 PROJECT_RESPONSE="$(json_request POST /projects "$(cat <<JSON
