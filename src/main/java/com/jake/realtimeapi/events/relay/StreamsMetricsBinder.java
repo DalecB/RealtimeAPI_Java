@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.infra.metrics;
+package com.jake.realtimeapi.events.relay;
 
 import com.jake.realtimeapi.events.application.usecase.GetStreamsStatusUseCase;
 import io.micrometer.core.instrument.Gauge;

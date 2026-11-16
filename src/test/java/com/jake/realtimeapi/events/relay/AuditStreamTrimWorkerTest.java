@@ -1,7 +1,7 @@
 package com.jake.realtimeapi.events.relay;
 
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;

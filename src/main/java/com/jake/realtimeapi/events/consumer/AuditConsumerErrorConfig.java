@@ -1,6 +1,5 @@
-package com.jake.realtimeapi.infra.config;
+package com.jake.realtimeapi.events.consumer;
 
-import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.springframework.beans.factory.annotation.Value;

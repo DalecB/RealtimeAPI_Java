@@ -2,7 +2,8 @@ package com.jake.realtimeapi.events.consumer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jake.realtimeapi.infra.config.AuditTopicConfig;
+import com.jake.realtimeapi.events.kafka.AuditTopicConfig;
+import com.jake.realtimeapi.events.persistence.AuditEventRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

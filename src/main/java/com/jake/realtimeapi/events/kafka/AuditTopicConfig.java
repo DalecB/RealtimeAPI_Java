@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.infra.config;
+package com.jake.realtimeapi.events.kafka;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.common.config.TopicConfig;

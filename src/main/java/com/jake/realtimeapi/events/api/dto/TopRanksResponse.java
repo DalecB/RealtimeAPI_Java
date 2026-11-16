@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.leaderboards.api.dto;
+package com.jake.realtimeapi.events.api.dto;
 
 import java.util.List;
 import java.util.UUID;

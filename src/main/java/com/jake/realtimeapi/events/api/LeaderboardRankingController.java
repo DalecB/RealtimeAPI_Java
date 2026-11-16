@@ -1,12 +1,12 @@
-package com.jake.realtimeapi.leaderboards.api;
+package com.jake.realtimeapi.events.api;
 
+import com.jake.realtimeapi.events.api.dto.TopRanksResponse.TopRankItemResponse;
+import com.jake.realtimeapi.events.api.dto.TopRanksResponse;
+import com.jake.realtimeapi.events.api.dto.UserRankResponse;
 import com.jake.realtimeapi.events.application.query.GetTopRanksQuery;
 import com.jake.realtimeapi.events.application.query.GetUserRankQuery;
 import com.jake.realtimeapi.events.application.usecase.GetTopRanksUseCase;
 import com.jake.realtimeapi.events.application.usecase.GetUserRankUseCase;
-import com.jake.realtimeapi.leaderboards.api.dto.TopRanksResponse;
-import com.jake.realtimeapi.leaderboards.api.dto.TopRanksResponse.TopRankItemResponse;
-import com.jake.realtimeapi.leaderboards.api.dto.UserRankResponse;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.springframework.web.bind.annotation.*;
 

@@ -3,7 +3,7 @@ package com.jake.realtimeapi.events.persistence;
 import com.jake.realtimeapi.events.domain.model.TopRankItem;
 import com.jake.realtimeapi.events.domain.model.UserRankResult;
 import com.jake.realtimeapi.events.domain.repository.RankingQueryRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;

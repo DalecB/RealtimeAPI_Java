@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.leaderboards.api;
+package com.jake.realtimeapi.events.api;
 
 import com.jake.realtimeapi.auth.application.usecase.AuthenticateAdminJwtUseCase;
 import com.jake.realtimeapi.events.application.usecase.GetTopRanksUseCase;

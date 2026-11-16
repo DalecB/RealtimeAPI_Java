@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.support.redis;
+package com.jake.realtimeapi.events.persistence.redis;
 
 import java.util.UUID;
 

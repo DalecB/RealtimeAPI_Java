@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.events.consumer;
+package com.jake.realtimeapi.events.persistence;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

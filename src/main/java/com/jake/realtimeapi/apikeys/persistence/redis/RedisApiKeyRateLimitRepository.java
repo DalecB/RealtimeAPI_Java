@@ -3,7 +3,6 @@ package com.jake.realtimeapi.apikeys.persistence.redis;
 import com.jake.realtimeapi.apikeys.domain.model.RateLimitCheckResult;
 import com.jake.realtimeapi.apikeys.domain.repository.ApiKeyRateLimitRepository;
 import com.jake.realtimeapi.infra.metrics.HotPathMetrics;
-import com.jake.realtimeapi.support.redis.ApiKeyRedisKeyFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;

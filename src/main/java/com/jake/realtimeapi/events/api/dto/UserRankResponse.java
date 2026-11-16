@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.leaderboards.api.dto;
+package com.jake.realtimeapi.events.api.dto;
 
 public record UserRankResponse(
         String userId,

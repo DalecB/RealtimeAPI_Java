@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.events.consumer;
+package com.jake.realtimeapi.events.persistence;
 
 import com.jake.realtimeapi.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;

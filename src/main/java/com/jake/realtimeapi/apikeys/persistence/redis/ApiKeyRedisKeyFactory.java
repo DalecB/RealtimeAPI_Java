@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.support.redis;
+package com.jake.realtimeapi.apikeys.persistence.redis;
 
 public final class ApiKeyRedisKeyFactory {
 

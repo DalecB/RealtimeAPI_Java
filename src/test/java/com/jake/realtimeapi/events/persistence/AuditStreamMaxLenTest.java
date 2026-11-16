@@ -3,7 +3,7 @@ package com.jake.realtimeapi.events.persistence;
 import com.jake.realtimeapi.TestcontainersConfiguration;
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

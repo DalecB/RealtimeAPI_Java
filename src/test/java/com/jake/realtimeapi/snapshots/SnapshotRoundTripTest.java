@@ -1,6 +1,7 @@
 package com.jake.realtimeapi.snapshots;
 
 import com.jake.realtimeapi.TestcontainersConfiguration;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.leaderboards.domain.model.Leaderboard;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import com.jake.realtimeapi.projects.domain.model.Project;
@@ -10,7 +11,6 @@ import com.jake.realtimeapi.snapshots.application.command.RecoverLeaderboardSnap
 import com.jake.realtimeapi.snapshots.application.model.RecoverLeaderboardSnapshotResult;
 import com.jake.realtimeapi.snapshots.application.usecase.CaptureSnapshotUseCase;
 import com.jake.realtimeapi.snapshots.application.usecase.RecoverLeaderboardSnapshotUseCase;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import com.jake.realtimeapi.users.domain.model.User;
 import com.jake.realtimeapi.users.domain.repository.UserRepository;

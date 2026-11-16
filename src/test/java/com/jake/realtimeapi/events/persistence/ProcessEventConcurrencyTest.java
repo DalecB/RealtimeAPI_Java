@@ -5,7 +5,7 @@ import com.jake.realtimeapi.events.domain.exception.IdempotencyKeyReuseMismatchE
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.model.ProcessEventResult;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

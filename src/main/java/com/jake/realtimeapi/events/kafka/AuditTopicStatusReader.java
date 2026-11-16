@@ -1,7 +1,6 @@
-package com.jake.realtimeapi.events.relay;
+package com.jake.realtimeapi.events.kafka;
 
 import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
-import com.jake.realtimeapi.infra.config.AuditTopicConfig;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
 import org.apache.kafka.clients.admin.OffsetSpec;

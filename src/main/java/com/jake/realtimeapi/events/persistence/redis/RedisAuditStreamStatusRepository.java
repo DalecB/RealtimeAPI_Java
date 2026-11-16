@@ -1,6 +1,5 @@
 package com.jake.realtimeapi.events.persistence.redis;
 
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.events.domain.model.StreamsStatus;
 import com.jake.realtimeapi.events.domain.repository.AuditStreamStatusRepository;
 import org.springframework.dao.DataAccessException;

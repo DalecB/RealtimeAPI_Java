@@ -1,6 +1,6 @@
-package com.jake.realtimeapi.infra.config;
+package com.jake.realtimeapi.events.consumer;
 
-import com.jake.realtimeapi.events.consumer.AuditConsumerStatus;
+import com.jake.realtimeapi.events.kafka.AuditTopicConfig;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

@@ -1,4 +1,4 @@
-package com.jake.realtimeapi.events.consumer;
+package com.jake.realtimeapi.events.persistence;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;

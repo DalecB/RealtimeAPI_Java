@@ -1,6 +1,6 @@
 package com.jake.realtimeapi.events.api;
 
-import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
+import com.jake.realtimeapi.events.persistence.AuditEventQueryRepository;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;

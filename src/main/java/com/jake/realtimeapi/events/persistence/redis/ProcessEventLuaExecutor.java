@@ -1,6 +1,5 @@
 package com.jake.realtimeapi.events.persistence.redis;
 
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.infra.metrics.HotPathMetrics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;

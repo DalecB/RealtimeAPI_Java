@@ -1,14 +1,14 @@
 package com.jake.realtimeapi.events.relay;
 
 import com.jake.realtimeapi.TestcontainersConfiguration;
-import com.jake.realtimeapi.events.consumer.AuditEventQueryRepository;
 import com.jake.realtimeapi.events.domain.model.EventPayload;
 import com.jake.realtimeapi.events.domain.repository.EventCommandRepository;
+import com.jake.realtimeapi.events.persistence.AuditEventQueryRepository;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.leaderboards.domain.model.Leaderboard;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
 import com.jake.realtimeapi.projects.domain.model.Project;
 import com.jake.realtimeapi.projects.domain.repository.ProjectRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.users.domain.model.User;
 import com.jake.realtimeapi.users.domain.repository.UserRepository;
 import io.micrometer.observation.Observation;

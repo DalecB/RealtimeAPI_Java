@@ -2,7 +2,7 @@ package com.jake.realtimeapi.events.persistence;
 
 import com.jake.realtimeapi.events.domain.model.TopRankItem;
 import com.jake.realtimeapi.events.domain.model.UserRankResult;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.support.userid.UserIdCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

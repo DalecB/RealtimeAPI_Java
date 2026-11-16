@@ -1,9 +1,9 @@
 package com.jake.realtimeapi.events.relay;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jake.realtimeapi.infra.config.AuditTopicConfig;
+import com.jake.realtimeapi.events.kafka.AuditTopicConfig;
+import com.jake.realtimeapi.events.persistence.redis.LeaderboardRedisKeyFactory;
 import com.jake.realtimeapi.leaderboards.domain.repository.LeaderboardRepository;
-import com.jake.realtimeapi.support.redis.LeaderboardRedisKeyFactory;
 import io.lettuce.core.StreamMessage;
 import io.lettuce.core.XAutoClaimArgs;
 import io.lettuce.core.cluster.api.async.RedisClusterAsyncCommands;
