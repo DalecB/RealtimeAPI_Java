@@ -36,14 +36,15 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-// 측정용이다. 기본값(request 30s, delivery 120s, max.block 60s, relay batch 500)으로 돌리면 수십 분이 걸려 타임아웃을 줄였고, 줄인 비율은 출력에 같이 찍는다.
+// 기본값(request 30s, delivery 120s, max.block 60s, relay batch 500)으로 돌리면 수십 분이 걸려 타임아웃을 줄였고, 줄인 비율은 출력에 같이 찍는다.
 @SpringBootTest(properties = {
         "events.relay.enabled=true",
         "events.relay.delay-ms=500",
         "events.relay.batch-size=5",
         "events.relay.trim-delay-ms=3600000",
         "snapshots.worker.enabled=true",
-        "snapshots.worker.delay-ms=500",
+        "snapshots.worker.delay-ms=" + KafkaOutageSchedulerImpactTest.SNAPSHOT_PERIOD_MS,
+        "app.usage-stats.flush-delay-ms=" + KafkaOutageSchedulerImpactTest.USAGE_FLUSH_PERIOD_MS,
         "spring.kafka.producer.properties.request.timeout.ms=1000",
         "spring.kafka.producer.properties.delivery.timeout.ms=" + KafkaOutageSchedulerImpactTest.DELIVERY_TIMEOUT_MS,
         "spring.kafka.producer.properties.max.block.ms=" + KafkaOutageSchedulerImpactTest.MAX_BLOCK_MS
@@ -53,6 +54,10 @@ class KafkaOutageSchedulerImpactTest {
 
     static final long DELIVERY_TIMEOUT_MS = 2000;
     static final long MAX_BLOCK_MS = 1000;
+    static final long SNAPSHOT_PERIOD_MS = 500;
+    static final long USAGE_FLUSH_PERIOD_MS = 1000;
+    // 공유 기본 스레드에서 다른 작업 한 번과 자기 실행 시간이 끼는 여유다. 분리 전에는 간격이 8.5s였다.
+    private static final long CADENCE_TOLERANCE_MS = 1000;
     private static final int BATCH_SIZE = 5;
     private static final long API_KEY_ID = 7L;
     private static final String RELAY = "relayAll";
@@ -90,7 +95,7 @@ class KafkaOutageSchedulerImpactTest {
     private LeaderboardRepository leaderboardRepository;
 
     @Test
-    void kafkaOutage_holdsTheSingleSchedulerThread_withoutLosingEvents() throws Exception {
+    void kafkaOutage_holdsOnlyTheRelayThread_withoutLosingEvents() throws Exception {
         assertEquals(1, taskScheduler.getScheduledThreadPoolExecutor().getCorePoolSize());
 
         Fixture fixture = createFixture();
@@ -105,8 +110,9 @@ class KafkaOutageSchedulerImpactTest {
         try {
             pauseKafka();
             paused = true;
+            long outageStart = System.nanoTime();
 
-            awaitRelayTickEndedAfter(System.nanoTime());
+            awaitRelayTickEndedAfter(outageStart);
             int backlog = 12;
             for (int i = 0; i < backlog; i++) {
                 writeEvent(fixture);
@@ -114,12 +120,12 @@ class KafkaOutageSchedulerImpactTest {
             written += backlog;
             long backlogWrittenAt = System.nanoTime();
             Run backlogTick = awaitRelayTickStartedAfter(backlogWrittenAt);
-            long backlogBatches = (backlog + BATCH_SIZE - 1) / BATCH_SIZE;
-            assertTrue(backlogTick.durationMs() >= (backlogBatches - 1) * DELIVERY_TIMEOUT_MS);
-            assertEquals(backlog, pendingCount(streamKey));
+            assertTrue(backlogTick.durationMs() >= DELIVERY_TIMEOUT_MS * 9 / 10);
+            assertTrue(backlogTick.durationMs() < 2 * DELIVERY_TIMEOUT_MS);
+            assertEquals(BATCH_SIZE, pendingCount(streamKey));
             assertEquals(1, auditRowCount(fixture));
             report("A warm producer, fixed backlog", backlogTick,
-                    backlogBatches + " batches x delivery.timeout " + DELIVERY_TIMEOUT_MS + "ms",
+                    "one batch x delivery.timeout " + DELIVERY_TIMEOUT_MS + "ms, then the drain stops",
                     DELIVERY_TIMEOUT_MS, 120_000);
 
             long inflowStart = System.nanoTime();
@@ -131,26 +137,30 @@ class KafkaOutageSchedulerImpactTest {
             }
             written += inflow;
             long inflowEnd = System.nanoTime();
-            Run inflowTick = awaitRelayTickEndedAfter(inflowEnd);
-            assertTrue(inflowTick.startNanos() < inflowEnd - Duration.ofSeconds(4).toNanos());
-            assertEquals(written - 1, pendingCount(streamKey));
+            awaitRelayTickEndedAfter(inflowEnd);
+            List<Run> inflowTicks = relayRunsBetween(inflowStart, inflowEnd);
+            long longestInflowTickMs = inflowTicks.stream().mapToLong(Run::durationMs).max().orElseThrow();
+            assertTrue(inflowTicks.size() >= 2);
+            assertTrue(longestInflowTickMs < 2 * DELIVERY_TIMEOUT_MS);
+            assertEquals(BATCH_SIZE, pendingCount(streamKey));
             assertEquals(1, auditRowCount(fixture));
-            System.out.printf("[C-15] B warm producer, 2 events/s inflow for 6s: relay tick %dms, started %dms after"
-                            + " inflow start, ended %dms after inflow end; length follows the inflow, not the timeout%n",
-                    inflowTick.durationMs(), ms(inflowTick.startNanos() - inflowStart),
-                    ms(inflowTick.endNanos() - inflowEnd));
+            System.out.printf("[C-15] B warm producer, 2 events/s inflow for 6s: %d relay ticks, longest %dms;"
+                            + " each tick retries the PEL batch only, so length no longer follows the inflow%n",
+                    inflowTicks.size(), longestInflowTickMs);
 
             producerFactory.reset();
             long resetAt = System.nanoTime();
             Run coldTick = awaitRelayTickStartedAfter(resetAt);
             assertTrue(coldTick.durationMs() >= MAX_BLOCK_MS * 9 / 10);
-            assertTrue(coldTick.failed());
-            assertEquals(written - 1, pendingCount(streamKey));
+            assertTrue(coldTick.durationMs() < 2 * MAX_BLOCK_MS);
+            assertEquals(BATCH_SIZE, pendingCount(streamKey));
             report("C cold producer (no metadata)", coldTick,
-                    "first send waits max.block " + MAX_BLOCK_MS + "ms, then KafkaException aborts the tick",
+                    "first send waits max.block " + MAX_BLOCK_MS + "ms, then the leaderboard is skipped",
                     MAX_BLOCK_MS, 60_000);
 
-            printOtherJobGaps(backlogWrittenAt, coldTick.endNanos());
+            long outageEnd = coldTick.endNanos();
+            assertCadence(USAGE_FLUSH, USAGE_FLUSH_PERIOD_MS, outageStart, outageEnd);
+            assertCadence(SNAPSHOT, SNAPSHOT_PERIOD_MS, outageStart, outageEnd);
 
             unpauseKafka();
             paused = false;
@@ -164,9 +174,11 @@ class KafkaOutageSchedulerImpactTest {
             System.out.printf("[C-15] recovery: events=%d PEL 0 after %dms, all %d rows (distinct %d) after %dms%n",
                     expected, pelDrainedMs, auditRowCount(fixture), distinctAuditEventIds(fixture), rowsStoredMs);
 
-            Set<String> threads = recorder.runs.stream().map(Run::thread).collect(Collectors.toSet());
-            assertEquals(1, threads.size());
-            System.out.println("[C-15] scheduled job threads=" + threads);
+            Set<String> relayThreads = threadsOf(RELAY);
+            Set<String> otherThreads = threadsOf(USAGE_FLUSH, SNAPSHOT);
+            assertEquals(Set.of("audit-relay-1"), relayThreads);
+            assertTrue(otherThreads.stream().allMatch(thread -> thread.startsWith("scheduling-")), otherThreads.toString());
+            System.out.println("[C-15] relay threads=" + relayThreads + ", other job threads=" + otherThreads);
         } finally {
             if (paused) {
                 unpauseKafka();
@@ -180,19 +192,38 @@ class KafkaOutageSchedulerImpactTest {
                 scenario, tick.durationMs(), expectation, scale, tick.durationMs() * scale / 1000);
     }
 
-    private void printOtherJobGaps(long fromNanos, long toNanos) {
-        for (String job : List.of(USAGE_FLUSH, SNAPSHOT)) {
-            List<Run> runs = recorder.runs.stream()
-                    .filter(run -> run.method().equals(job))
-                    .filter(run -> run.endNanos() >= fromNanos && run.startNanos() <= toNanos)
-                    .toList();
-            long maxGapMs = 0;
-            for (int i = 1; i < runs.size(); i++) {
-                maxGapMs = Math.max(maxGapMs, ms(runs.get(i).startNanos() - runs.get(i - 1).startNanos()));
-            }
-            System.out.printf("[C-15] %s during outage window %dms: runs=%d, max start-to-start gap %dms%n",
-                    job, ms(toNanos - fromNanos), runs.size(), maxGapMs);
+    private void assertCadence(String job, long periodMs, long fromNanos, long toNanos) {
+        List<Long> starts = recorder.runs.stream()
+                .filter(run -> run.method().equals(job))
+                .map(Run::startNanos)
+                .filter(start -> start >= fromNanos && start <= toNanos)
+                .sorted()
+                .toList();
+        long maxGapMs = 0;
+        long previous = fromNanos;
+        for (long start : starts) {
+            maxGapMs = Math.max(maxGapMs, ms(start - previous));
+            previous = start;
         }
+        maxGapMs = Math.max(maxGapMs, ms(toNanos - previous));
+        System.out.printf("[C-15] %s during outage window %dms: runs=%d, max gap %dms (period %dms)%n",
+                job, ms(toNanos - fromNanos), starts.size(), maxGapMs, periodMs);
+        assertTrue(maxGapMs <= periodMs + CADENCE_TOLERANCE_MS, job + " max gap " + maxGapMs + "ms");
+    }
+
+    private List<Run> relayRunsBetween(long fromNanos, long toNanos) {
+        return recorder.runs.stream()
+                .filter(run -> run.method().equals(RELAY))
+                .filter(run -> run.endNanos() >= fromNanos && run.startNanos() <= toNanos)
+                .toList();
+    }
+
+    private Set<String> threadsOf(String... methods) {
+        Set<String> names = Set.of(methods);
+        return recorder.runs.stream()
+                .filter(run -> names.contains(run.method()))
+                .map(Run::thread)
+                .collect(Collectors.toSet());
     }
 
     private Run awaitRelayTickStartedAfter(long nanos) {
@@ -255,7 +286,7 @@ class KafkaOutageSchedulerImpactTest {
     private record Fixture(long userId, UUID leaderboardId) {
     }
 
-    record Run(String method, String thread, long startNanos, long endNanos, boolean failed) {
+    record Run(String method, String thread, long startNanos, long endNanos) {
         long durationMs() {
             return ms(endNanos - startNanos);
         }
@@ -274,7 +305,7 @@ class KafkaOutageSchedulerImpactTest {
         @Override
         public void onStop(ScheduledTaskObservationContext context) {
             runs.add(new Run(context.getMethod().getName(), Thread.currentThread().getName(),
-                    context.getRequired(Long.class), System.nanoTime(), context.getError() != null));
+                    context.getRequired(Long.class), System.nanoTime()));
         }
 
         @Override
