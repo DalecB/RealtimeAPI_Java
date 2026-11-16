@@ -16,12 +16,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * audit 토픽을 소비해 원본 이벤트를 PostgreSQL에 적재한다(추이 집계·이상 탐지·아카이브의 소스).
- *
- * <p>배치 리스너: 컨테이너가 한 poll 분량을 넘겨주고, 이 메서드가 정상 반환하면 오프셋을 커밋한다(처리 후 커밋).
- * 처리 중 죽으면 커밋 안 된 지점부터 다시 읽어(중복) 유실을 막고, 중복은 DB UNIQUE로 흡수한다.
- */
 @Component
 public class AuditEventConsumer {
 

@@ -72,7 +72,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
 
-/** 실제 Redis·Kafka·PostgreSQL을 사용하는 audit event 왕복 통합 테스트. */
 @SpringBootTest(properties = {
         "events.relay.enabled=true",
         "events.relay.delay-ms=3600000",
@@ -722,7 +721,7 @@ class KafkaAuditRoundTripTest {
             await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
                     assertEquals(1, findAuditRows(fixture.leaderboardId()).size()));
 
-            // 프로세스 크래시처럼 A의 세션을 서버에서 끊는다. 두 int 키라 objsubid=2로 잡힌다.
+            // 두 int 키 advisory lock은 pg_locks에서 objsubid=2로 잡힌다.
             Integer terminated = jdbcTemplate.queryForObject("""
                     SELECT count(pg_terminate_backend(pid))::int FROM pg_locks
                     WHERE locktype = 'advisory' AND classid = 1 AND objid = 1 AND objsubid = 2 AND granted
@@ -736,7 +735,6 @@ class KafkaAuditRoundTripTest {
             });
             assertTrue(lockB.isLeader());
 
-            // 다시 연결한 A는 B가 쥔 락을 얻지 못해 옮기지 않는다.
             processEvents(fixture, 1);
             relayA.relayAll();
             assertTrue(!lockA.isLeader());
@@ -896,7 +894,7 @@ class KafkaAuditRoundTripTest {
         try {
             redisTemplate.opsForStream().createGroup(streamKey, ReadOffset.from("0"), AuditRelayWorker.GROUP);
         } catch (org.springframework.dao.DataAccessException ex) {
-            // 컨텍스트 릴레이의 기동 틱이 먼저 그룹을 만들었을 수 있다(BUSYGROUP). 운영 ensureGroup과 같은 처리.
+            // 컨텍스트 릴레이의 기동 틱이 먼저 그룹을 만들었을 수 있다(BUSYGROUP).
         }
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
                 Consumer.from(AuditRelayWorker.GROUP, consumerName),

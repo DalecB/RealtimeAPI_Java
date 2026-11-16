@@ -1,18 +1,8 @@
--- KEYS[1] = "lb:{leaderboardId}:idem:{eventUuid}"
--- KEYS[2] = "lb:{leaderboardId}:z"
--- KEYS[3] = "lb:{leaderboardId}:events"
--- ARGV[1] = userId
--- ARGV[2] = deltaScore
--- ARGV[3] = ttlSeconds
--- ARGV[4] = idempotency record (e.g. "v2:<payloadHash>:<processedAtEpochMillis>")
--- ARGV[5] = apiKeyId
--- ARGV[6] = idempotency key
+-- KEYS = idempotency, ranking(z), audit stream / ARGV = userId, deltaScore, ttlSeconds, idempotencyRecord, apiKeyId, idempotencyKey
 
--- 1) Idempotency check
 local existing = redis.call('GET', KEYS[1])
 if existing then
-    -- Replayed request.
-    -- Java layer parses the stored idempotency record and compares its hash with the incoming hash:
+    -- v2:<hash>:<ms> 형식은 EventCommandRepositoryAdapter도 파싱한다. 바꾸면 양쪽을 같이 고친다.
     local existingHash = string.match(existing, "^v2:([^:]+):")
     local incomingHash = string.match(ARGV[4], "^v2:([^:]+):")
 
@@ -30,14 +20,10 @@ if existing then
     return {0, existing}
 end
 
--- 2) Increase user score in leaderboard ZSET
 local newScore = redis.call('ZINCRBY', KEYS[2], tonumber(ARGV[2]), ARGV[1])
 
--- 3) Persist idempotency key with TTL
 redis.call('SET', KEYS[1], ARGV[4], 'EX', tonumber(ARGV[3]))
 
--- 4) Append audit stream entry
--- Use bounded stream to avoid unbounded memory growth.
 redis.call(
     'XADD', KEYS[3], 
     'MAXLEN', '~', 100000, '*', 
@@ -48,5 +34,4 @@ redis.call(
     'idempotencyKey', ARGV[6]
 )
 
--- isNew=1, newScore returned as string from Redis
 return {1, newScore}

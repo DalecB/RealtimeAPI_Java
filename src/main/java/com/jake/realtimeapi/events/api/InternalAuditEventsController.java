@@ -22,19 +22,16 @@ public class InternalAuditEventsController {
         this.auditEventQueryRepository = auditEventQueryRepository;
     }
 
-    /** 루프 확인: Kafka produced 대비 PG로 실제 적재된 총 건수. */
     @GetMapping("/count")
     public AuditEventCount count() {
         return new AuditEventCount(auditEventQueryRepository.count());
     }
 
-    /** 추이 페이지 드롭다운: 적재된 이벤트가 있는 리더보드만. */
     @GetMapping("/leaderboards")
     public List<UUID> leaderboards() {
         return auditEventQueryRepository.leaderboardsWithEvents();
     }
 
-    /** Ops Console Data Inspector: 한 리더보드의 최근 적재 이벤트. */
     @GetMapping("/recent")
     public List<RecentAuditEventResponse> recent(
             @RequestParam UUID leaderboardId,
@@ -56,7 +53,6 @@ public class InternalAuditEventsController {
                 .toList();
     }
 
-    /** 리더보드 점수 추이: 구간을 버킷으로 묶은 delta 합·건수. 누적은 클라이언트가 러닝 합으로 그린다. */
     @GetMapping("/trend")
     public List<AuditEventQueryRepository.TrendBucket> trend(
             @RequestParam UUID leaderboardId,

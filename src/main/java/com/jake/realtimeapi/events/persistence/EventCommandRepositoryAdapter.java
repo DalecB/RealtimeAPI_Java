@@ -44,8 +44,7 @@ public class EventCommandRepositoryAdapter implements EventCommandRepository {
         Instant processedAt = Instant.now();
         String idempotencyValue = idempotencyValue(incomingPayloadHash, processedAt);
 
-        // Only the Redis hot write path is protected by the breaker.
-        // Business conflicts after a successful Redis round trip should not count as breaker failures.
+        // 멱등 충돌은 Redis 장애가 아니므로 브레이커 실패로 세지 않게 Lua 호출만 감싼다.
         ProcessEventLuaExecutor.LuaExecutionResult luaResult = redisHotPathCircuitBreaker.execute(() ->
                 processEventLuaExecutor.execute(
                         payload.leaderboardId(),
@@ -95,7 +94,6 @@ public class EventCommandRepositoryAdapter implements EventCommandRepository {
         String safeStoredValue = Objects.requireNonNull(storedValue, "storedValue is required");
         String prefix = IDEMPOTENCY_RECORD_PREFIX + IDEMPOTENCY_RECORD_SEPARATOR;
         if (!safeStoredValue.startsWith(prefix)) {
-            // Legacy format stored only payload hash. Keep it readable during the TTL migration window.
             return new StoredIdempotencyRecord(safeStoredValue, legacyProcessedAtFallback);
         }
 

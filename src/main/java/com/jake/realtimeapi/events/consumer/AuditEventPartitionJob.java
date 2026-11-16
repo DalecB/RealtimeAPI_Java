@@ -12,18 +12,13 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * audit_events의 일 단위(UTC) 파티션을 미리 만들고, 보관 기간이 지난 파티션을 DROP한다.
- *
- * <p>DEFAULT 파티션이 없으므로 그날 파티션이 없으면 INSERT가 실패한다. 그래서 컨슈머가 켜져 있는 한
- * 이 잡도 항상 돈다(릴레이·스냅샷 워커처럼 opt-in이 아니다).
- */
+// DEFAULT 파티션이 없어 그날 파티션이 없으면 INSERT가 실패하므로, 릴레이·스냅샷 워커와 달리 opt-in이 아니다.
 @Component
 public class AuditEventPartitionJob {
 
-    // 여러 인스턴스가 동시에 돌면 CREATE TABLE IF NOT EXISTS끼리 카탈로그 경합으로 실패할 수 있어 직렬화한다.
+    // 여러 인스턴스의 CREATE TABLE IF NOT EXISTS끼리 카탈로그 경합으로 실패할 수 있어 xact 락으로 직렬화한다(뒤 인스턴스는 대기 후 no-op).
     private static final long LOCK_KEY = 7_000_000_001L;
-    private static final DateTimeFormatter SUFFIX = DateTimeFormatter.BASIC_ISO_DATE; // 20261116
+    private static final DateTimeFormatter SUFFIX = DateTimeFormatter.BASIC_ISO_DATE;
 
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
@@ -42,7 +37,7 @@ public class AuditEventPartitionJob {
         this.aheadDays = aheadDays;
     }
 
-    // @PostConstruct: Kafka 리스너 컨테이너는 모든 빈 생성 뒤(lifecycle 시작)에 뜨므로, 첫 INSERT 전에 오늘 파티션이 있다.
+    // Kafka 리스너 컨테이너는 모든 빈 생성 뒤 lifecycle 시작에 뜨므로 @PostConstruct면 첫 INSERT 전에 오늘 파티션이 있다.
     @PostConstruct
     @Scheduled(cron = "0 0 * * * *", zone = "UTC")
     public void maintainToday() {
@@ -51,7 +46,6 @@ public class AuditEventPartitionJob {
 
     void maintain(LocalDate today) {
         transactionTemplate.executeWithoutResult(status -> {
-            // 트랜잭션 락이라 커밋·롤백 시 자동으로 풀린다. 두 번째 인스턴스는 기다렸다가 no-op으로 끝난다.
             jdbcTemplate.execute("SELECT pg_advisory_xact_lock(" + LOCK_KEY + ")");
 
             for (int i = 0; i <= aheadDays; i++) {
@@ -61,7 +55,6 @@ public class AuditEventPartitionJob {
                         + " TO ('" + day.plusDays(1) + " 00:00:00+00')");
             }
 
-            // 그날 전체가 보관 기간 밖인 파티션만 지운다. today - 30일 파티션은 남는다.
             LocalDate oldestKept = today.minusDays(retentionDays);
             for (String partition : partitions()) {
                 LocalDate day = LocalDate.parse(partition.substring("audit_events_".length()), SUFFIX);

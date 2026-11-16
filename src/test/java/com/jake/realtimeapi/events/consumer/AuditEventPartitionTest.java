@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** audit_events 일 단위 파티션: 멱등 INSERT, 파티션 생성·DROP, 파티션 없는 날짜의 INSERT 실패. */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 class AuditEventPartitionTest {
@@ -70,7 +69,6 @@ class AuditEventPartitionTest {
             assertTrue(partitions.contains(name(today.plusDays(i))));
         }
 
-        // 다시 돌려도 같은 결과(IF NOT EXISTS / 지울 것 없음).
         auditEventPartitionJob.maintain(today);
         assertEquals(partitions.size(), partitions().size());
     }

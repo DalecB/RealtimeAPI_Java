@@ -16,12 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * audit 토픽에 실제로 도착한 메시지 수를 Kafka에서 직접 읽는다.
- *
- * <p>앱이 센 카운터가 아니라 토픽의 offset을 읽으므로, relay에 버그가 있어 실제로 produce가 안 됐다면
- * 이 값도 안 움직인다 — "Kafka에 들어갔다"를 앱과 독립적으로 확인한다.
- */
+// 앱 카운터가 아니라 토픽 offset을 읽어야 relay 버그로 produce가 안 된 경우도 드러난다.
 @Component
 public class AuditTopicStatusReader {
 
@@ -37,7 +32,6 @@ public class AuditTopicStatusReader {
         this.consumerStatus = consumerStatus;
     }
 
-    /** 원본 토픽의 발행량·보관량·consumer lag과 DLT의 발행량·보관량을 읽는다. */
     public AuditTopicStatus read() {
         AuditConsumerStatus.Snapshot consumer = consumerStatus.snapshot();
         try {

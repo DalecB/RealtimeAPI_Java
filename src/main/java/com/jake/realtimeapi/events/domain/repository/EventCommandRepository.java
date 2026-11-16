@@ -5,7 +5,6 @@ import com.jake.realtimeapi.events.domain.model.ProcessEventResult;
 
 public interface EventCommandRepository {
 
-    // apiKeyId는 점수 계산에 쓰이지 않고 감사 기록에만 남으므로 EventPayload가 아니라 별도 인자로 받는다.
-    // payload에 넣으면 멱등 해시(userId:deltaScore) 대상인지 아닌지가 한 record 안에서 섞인다.
+    // apiKeyId는 멱등 해시(userId:deltaScore) 대상이 아니라서 EventPayload에 넣지 않고 따로 받는다.
     ProcessEventResult process(EventPayload payload, long apiKeyId);
 }

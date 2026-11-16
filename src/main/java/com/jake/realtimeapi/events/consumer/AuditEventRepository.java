@@ -8,16 +8,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Kafka에서 읽은 원본 audit 이벤트를 PostgreSQL에 적재한다.
- *
- * <p>at-least-once라 같은 이벤트가 두 번 올 수 있으므로 (leaderboard_id, event_id, event_time) UNIQUE에 대해
- * ON CONFLICT DO NOTHING으로 중복을 DB가 무시하게 한다 — 집계가 두 번 반영되어 유저가 불이익을 받는 것을 막는다.
- * event_time은 파티션 키라 UNIQUE에 들어가야 하고, event_id에서만 계산되므로 같은 이벤트면 항상 같은 값이다.
- */
 @Repository
 public class AuditEventRepository {
 
+    // 파티션 테이블 UNIQUE에는 파티션 키가 들어가야 해서 event_time을 넣는다. event_id에서만 계산되므로 중복 판정은 그대로다.
     private static final String INSERT = """
             INSERT INTO audit_events
                 (leaderboard_id, event_id, event_time, event_type, user_id, delta, api_key_id, idempotency_key)

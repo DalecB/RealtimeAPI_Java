@@ -19,22 +19,15 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * verify-circuit-breaker-open.sh의 JUnit 자동화판.
- * Redis가 죽으면 실패가 누적돼 브레이커가 열리고(OPEN),
- * 열린 뒤의 요청은 Redis를 기다리지 않고 즉시 실패(fail-fast)해야 한다.
- * 어댑터 레벨 검증 — 브레이커는 JVM 안(어댑터의 Lua 호출을 감싸는 지점)에 산다.
- */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 // 이 테스트는 Redis 컨테이너를 죽인 채 끝나므로, 캐시된 컨텍스트를 다음 테스트 클래스에 물려주면 안 된다
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class RedisOutageCircuitBreakerTest {
 
-    // 웜 윈도우 시나리오(ⓐ′): 성공 10건으로 창을 채운 뒤 Redis 사망 →
-    // 실패 k건이면 실패율 k/10, threshold 50% → 정확히 5번째 실패에서 OPEN
-    private static final int WARMUP_CALLS = 10;      // sliding-window-size와 동일
-    private static final int FAILURES_TO_TRIP = 5;   // window(10) × threshold(50%)
+    // 성공 10건(sliding-window-size)으로 창을 채우면 실패율 50%를 정확히 5번째 실패에서 넘는다.
+    private static final int WARMUP_CALLS = 10;
+    private static final int FAILURES_TO_TRIP = 5;
     private static final long API_KEY_ID = 1L;
 
     @Autowired
@@ -61,7 +54,6 @@ class RedisOutageCircuitBreakerTest {
     void process_failsFastWithBreakerOpenWhenRedisIsDown() {
         UUID leaderboardId = UUID.randomUUID();
 
-        // 웜업: 성공 호출로 sliding window를 채운다 (실패하면 테스트가 죽는 게 맞으므로 try/catch 없음)
         for (int i = 0; i < WARMUP_CALLS; i++) {
             EventPayload payload = newPayload(leaderboardId);
             eventCommandRepository.process(payload, API_KEY_ID);
@@ -69,7 +61,6 @@ class RedisOutageCircuitBreakerTest {
 
         redisContainer.stop();
 
-        // 실패 축적: 이 단계의 예외는 커넥션 계열이어야 한다 — 브레이커가 조기 개입하면 여기서 잡힌다
         for (int i = 0; i < FAILURES_TO_TRIP; i++) {
             EventPayload payload = newPayload(leaderboardId);
             try {

@@ -9,13 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * 적재된 원본 이벤트 조회 — 루프 확인용 총 건수와 리더보드별 점수 추이.
- */
 @Repository
 public class AuditEventQueryRepository {
 
-    // 기간별 적응형 버킷. 클라이언트는 코드만 보내고, interval 문자열은 여기서만 만든다(임의 주입 차단).
+    // 클라이언트는 버킷 코드만 보내고 interval 문자열은 여기서만 만든다(임의 주입 차단).
     private static final Map<String, String> BUCKET_INTERVALS = Map.of(
             "1m", "1 minute",
             "5m", "5 minutes",
@@ -34,13 +31,11 @@ public class AuditEventQueryRepository {
         return count == null ? 0L : count;
     }
 
-    /** 추이 조회 대상 목록: 실제로 적재된 이벤트가 있는 리더보드만. */
     public List<UUID> leaderboardsWithEvents() {
         return jdbcTemplate.queryForList(
                 "SELECT DISTINCT leaderboard_id FROM audit_events ORDER BY leaderboard_id", UUID.class);
     }
 
-    /** Ops Console용 최근 원본 이벤트. DB 적재 순서의 최신 항목부터 반환한다. */
     public List<RecentAuditEvent> recent(UUID leaderboardId, int limit) {
         String sql = """
                 SELECT leaderboard_id, event_time, event_id, event_type, user_id, delta, api_key_id, idempotency_key
@@ -70,7 +65,7 @@ public class AuditEventQueryRepository {
         if (interval == null) {
             throw new IllegalArgumentException("unsupported bucket: " + bucketCode);
         }
-        // date_bin으로 event_time을 버킷에 정렬해 delta 합·건수를 낸다. 누적은 프론트가 러닝 합으로 그린다.
+        // 누적 점수는 프론트가 러닝 합으로 그리므로 버킷별 delta 합·건수만 낸다.
         String sql = """
                 SELECT date_bin(CAST(? AS interval), event_time, TIMESTAMPTZ '2000-01-01') AS bucket_start,
                        count(*)   AS event_count,
